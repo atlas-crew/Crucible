@@ -1,0 +1,33 @@
+{
+  "id": "compliance-hipaa-patient-export",
+  "name": "HIPAA Patient Right to Access Disclosure Check",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Checks if internal medical notes or psychotherapy notes are leaked during a standard patient data export.",
+  "steps": [
+    {
+      "id": "patient-export-request",
+      "name": "Request Patient Data Export",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/export",
+        "headers": {
+          "Authorization": "Bearer {{patient_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient_ids": ["{{patient_id}}"],
+          "include_notes": "all"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "bodyNotContains": "psychotherapy_notes",
+        "bodyNotContains": "internal_administrative_notes"
+      }
+    }
+  ]
+}

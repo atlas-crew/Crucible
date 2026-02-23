@@ -1,0 +1,299 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-recursive);
+  --font-mono: var(--font-recursive);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+/* ── Security Ops Dark Palette ───────────────────────────────────── */
+
+:root {
+  --radius: 0.5rem;
+
+  /* Deep slate base with cool blue undertone */
+  --background: oklch(0.13 0.015 265);
+  --foreground: oklch(0.93 0.008 260);
+  --card: oklch(0.17 0.012 265);
+  --card-foreground: oklch(0.93 0.008 260);
+  --popover: oklch(0.19 0.012 265);
+  --popover-foreground: oklch(0.93 0.008 260);
+
+  /* Primary: electric blue */
+  --primary: oklch(0.62 0.24 265);
+  --primary-foreground: oklch(0.98 0 0);
+
+  /* Secondary: raised slate */
+  --secondary: oklch(0.22 0.012 265);
+  --secondary-foreground: oklch(0.88 0.008 260);
+
+  /* Muted: subdued */
+  --muted: oklch(0.20 0.010 265);
+  --muted-foreground: oklch(0.56 0.015 260);
+
+  /* Accent: tinted surface */
+  --accent: oklch(0.22 0.015 265);
+  --accent-foreground: oklch(0.93 0.008 260);
+
+  /* Destructive: signal red */
+  --destructive: oklch(0.63 0.215 25);
+
+  /* Borders and inputs */
+  --border: oklch(0.26 0.012 265);
+  --input: oklch(0.22 0.012 265);
+  --ring: oklch(0.62 0.24 265);
+
+  /* Chart palette — blue, green, amber, magenta, violet */
+  --chart-1: oklch(0.62 0.24 265);
+  --chart-2: oklch(0.72 0.185 148);
+  --chart-3: oklch(0.80 0.155 80);
+  --chart-4: oklch(0.68 0.19 330);
+  --chart-5: oklch(0.65 0.20 290);
+
+  /* Sidebar */
+  --sidebar: oklch(0.11 0.015 265);
+  --sidebar-foreground: oklch(0.88 0.008 260);
+  --sidebar-primary: oklch(0.62 0.24 265);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.18 0.012 265);
+  --sidebar-accent-foreground: oklch(0.88 0.008 260);
+  --sidebar-border: oklch(0.22 0.012 265);
+  --sidebar-ring: oklch(0.62 0.24 265);
+
+  /* Semantic status colors */
+  --success: oklch(0.72 0.185 148);
+  --warning: oklch(0.80 0.155 80);
+  --info: oklch(0.62 0.24 265);
+}
+
+/* .dark mirrors root — this app is always dark */
+.dark {
+  --background: oklch(0.13 0.015 265);
+  --foreground: oklch(0.93 0.008 260);
+  --card: oklch(0.17 0.012 265);
+  --card-foreground: oklch(0.93 0.008 260);
+  --popover: oklch(0.19 0.012 265);
+  --popover-foreground: oklch(0.93 0.008 260);
+  --primary: oklch(0.62 0.24 265);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.22 0.012 265);
+  --secondary-foreground: oklch(0.88 0.008 260);
+  --muted: oklch(0.20 0.010 265);
+  --muted-foreground: oklch(0.56 0.015 260);
+  --accent: oklch(0.22 0.015 265);
+  --accent-foreground: oklch(0.93 0.008 260);
+  --destructive: oklch(0.63 0.215 25);
+  --border: oklch(0.26 0.012 265);
+  --input: oklch(0.22 0.012 265);
+  --ring: oklch(0.62 0.24 265);
+  --chart-1: oklch(0.62 0.24 265);
+  --chart-2: oklch(0.72 0.185 148);
+  --chart-3: oklch(0.80 0.155 80);
+  --chart-4: oklch(0.68 0.19 330);
+  --chart-5: oklch(0.65 0.20 290);
+  --sidebar: oklch(0.11 0.015 265);
+  --sidebar-foreground: oklch(0.88 0.008 260);
+  --sidebar-primary: oklch(0.62 0.24 265);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.18 0.012 265);
+  --sidebar-accent-foreground: oklch(0.88 0.008 260);
+  --sidebar-border: oklch(0.22 0.012 265);
+  --sidebar-ring: oklch(0.62 0.24 265);
+}
+
+/* ── Base layer ──────────────────────────────────────────────────── */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-variation-settings: "MONO" 0, "CASL" 0;
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      oklch(1 0 0 / 2.5%) 1px,
+      transparent 0
+    );
+    background-size: 24px 24px;
+  }
+  /* Flip Recursive to monospace for code elements */
+  code, kbd, pre, samp, .font-mono {
+    font-variation-settings: "MONO" 1, "CASL" 0;
+  }
+}
+
+/* ── Typography roles ───────────────────────────────────────────── */
+/* From the Apparatus Design System type-system.js                  */
+/* CASL = brand warmth · MONO = prose vs data · slnt = energy       */
+
+@layer utilities {
+  /* Page titles, hero text — light weight, calm authority */
+  .type-display {
+    font-variation-settings: "wght" 300, "MONO" 0, "CASL" 0, "CRSV" 0.5, "slnt" 0;
+    font-size: 36px;
+  }
+
+  /* Section headers, card titles — slight casual warmth */
+  .type-heading {
+    font-variation-settings: "wght" 500, "MONO" 0, "CASL" 0.2, "CRSV" 0.5, "slnt" 0;
+    font-size: 24px;
+  }
+
+  /* Card subtitles, secondary headers — subtle lean */
+  .type-subhead {
+    font-variation-settings: "wght" 600, "MONO" 0, "CASL" 0.3, "CRSV" 0.5, "slnt" -3;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+  }
+
+  /* Descriptions, tooltips, longer text — warmest casual */
+  .type-body {
+    font-variation-settings: "wght" 400, "MONO" 0, "CASL" 0.6, "CRSV" 0.5, "slnt" 0;
+    font-size: 13px;
+  }
+
+  /* Sidebar group headers, section tags — mono with lean */
+  .type-label {
+    font-variation-settings: "wght" 600, "MONO" 1, "CASL" 0.3, "CRSV" 0.5, "slnt" -4;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* Status badges, severity chips — heaviest, no personality */
+  .type-tag {
+    font-variation-settings: "wght" 800, "MONO" 0, "CASL" 0, "CRSV" 0.5, "slnt" -3;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+  }
+
+  /* Big numbers, KPI values — mono for alignment, casual for character */
+  .type-metric {
+    font-variation-settings: "wght" 400, "MONO" 1, "CASL" 0.6, "CRSV" 0.5, "slnt" 0;
+    font-size: 32px;
+    letter-spacing: -0.5px;
+  }
+
+  /* Units after numbers — clinical mono */
+  .type-metric-unit {
+    font-variation-settings: "wght" 500, "MONO" 1, "CASL" 0, "CRSV" 0.5, "slnt" 0;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Table cells, IP addresses, paths — full mono, no warmth */
+  .type-data {
+    font-variation-settings: "wght" 500, "MONO" 1, "CASL" 0, "CRSV" 0.5, "slnt" 0;
+    font-size: 13px;
+  }
+
+  /* Inline code, commands, config — pure monospace */
+  .type-code {
+    font-variation-settings: "wght" 400, "MONO" 1, "CASL" 0, "CRSV" 0.5, "slnt" 0;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Log times, durations — small, anchors rows */
+  .type-timestamp {
+    font-variation-settings: "wght" 500, "MONO" 1, "CASL" 0, "CRSV" 0.5, "slnt" 0;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Sidebar navigation links — half-mono hybrid */
+  .type-nav {
+    font-variation-settings: "wght" 500, "MONO" 0.5, "CASL" 0.2, "CRSV" 0.5, "slnt" -2;
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  /* Active sidebar link — bolder, less casual */
+  .type-nav-active {
+    font-variation-settings: "wght" 700, "MONO" 0.5, "CASL" 0.1, "CRSV" 0.5, "slnt" -2;
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  /* Clickable links, actions — full italic, aggressive */
+  .type-link {
+    font-variation-settings: "wght" 700, "MONO" 0, "CASL" 0, "CRSV" 0.5, "slnt" -15;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  /* Path navigation — heavy mono italic, wide tracking */
+  .type-breadcrumb {
+    font-variation-settings: "wght" 700, "MONO" 1, "CASL" 0.2, "CRSV" 0.5, "slnt" -7;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+  }
+}
+
+/* ── Glow utilities ──────────────────────────────────────────────── */
+
+@layer utilities {
+  .glow-blue {
+    box-shadow: 0 0 12px oklch(0.62 0.24 265 / 15%),
+                0 0 4px oklch(0.62 0.24 265 / 8%);
+  }
+  .glow-green {
+    box-shadow: 0 0 12px oklch(0.72 0.185 148 / 15%),
+                0 0 4px oklch(0.72 0.185 148 / 8%);
+  }
+  .glow-red {
+    box-shadow: 0 0 12px oklch(0.63 0.215 25 / 15%),
+                0 0 4px oklch(0.63 0.215 25 / 8%);
+  }
+  .glow-amber {
+    box-shadow: 0 0 12px oklch(0.80 0.155 80 / 15%),
+                0 0 4px oklch(0.80 0.155 80 / 8%);
+  }
+  .border-glow {
+    border-color: oklch(0.62 0.24 265 / 25%);
+  }
+}

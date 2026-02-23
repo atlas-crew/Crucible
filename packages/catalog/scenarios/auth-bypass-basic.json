@@ -1,0 +1,49 @@
+{
+  "id": "auth-bypass-basic",
+  "name": "Basic Authentication Bypass Probes",
+  "category": "Authentication",
+  "difficulty": "Beginner",
+  "description": "Simple probes for common authentication bypass vulnerabilities.",
+  "steps": [
+    {
+      "id": "sqli-login-probe",
+      "name": "SQL Injection Login Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin' OR '1'='1",
+          "password": "password"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "weak-token-status-check",
+      "name": "Weak Token Status Check",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Authorization": "Bearer weak-token-123"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "status": 401
+      }
+    }
+  ]
+}

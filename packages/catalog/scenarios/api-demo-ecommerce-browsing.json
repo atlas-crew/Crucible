@@ -1,0 +1,185 @@
+{
+  "id": "api-demo-ecommerce-browsing",
+  "name": "Chimera E-commerce Browsing Session",
+  "category": "Benign Traffic",
+  "difficulty": "Beginner",
+  "description": "Simulates a typical e-commerce browsing session with product searches, reviews, and cart management",
+  "steps": [
+    {
+      "id": "browse-vendors",
+      "name": "Browse Marketplace Vendors",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/marketplace"
+      },
+      "execution": {
+        "delayMs": 600
+      }
+    },
+    {
+      "id": "search-electronics",
+      "name": "Search for Electronics",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=smartphone&category=electronics"
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "dependsOn": [
+        "browse-vendors"
+      ]
+    },
+    {
+      "id": "search-accessories",
+      "name": "Search for Accessories",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=headphones&category=accessories"
+      },
+      "execution": {
+        "delayMs": 800
+      }
+    },
+    {
+      "id": "add-item-1",
+      "name": "Add First Item to Cart",
+      "stage": "shopping",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PHONE-001",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "dependsOn": [
+        "search-electronics"
+      ]
+    },
+    {
+      "id": "add-item-2",
+      "name": "Add Second Item to Cart",
+      "stage": "shopping",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "HDPH-002",
+          "quantity": 2
+        }
+      },
+      "execution": {
+        "delayMs": 550
+      },
+      "dependsOn": [
+        "search-accessories"
+      ]
+    },
+    {
+      "id": "update-cart-quantity",
+      "name": "Update Cart Quantity",
+      "stage": "shopping",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "HDPH-002",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "add-item-2"
+      ]
+    },
+    {
+      "id": "submit-review",
+      "name": "Submit Product Review",
+      "stage": "interaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/reviews/submit",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PHONE-001",
+          "rating": 5,
+          "review": "Great product, fast delivery, highly recommend!"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "add-item-1"
+      ]
+    },
+    {
+      "id": "check-inventory-multi",
+      "name": "Check Multiple Product Inventory",
+      "stage": "validation",
+      "request": {
+        "method": "POST",
+        "url": "/api/inventory/check",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_ids": [
+            "PHONE-001",
+            "HDPH-002",
+            "TAB-003"
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "dependsOn": [
+        "update-cart-quantity"
+      ]
+    },
+    {
+      "id": "reserve-inventory",
+      "name": "Reserve Inventory for Checkout",
+      "stage": "transaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/inventory/reserve",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PHONE-001",
+          "quantity": 1,
+          "duration_minutes": 15
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "check-inventory-multi"
+      ]
+    }
+  ]
+}

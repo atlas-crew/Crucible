@@ -1,0 +1,62 @@
+{
+  "id": "identity-oauth2-pkce-bypass",
+  "name": "OAuth2 PKCE Enforcement Bypass Probe",
+  "category": "Identity",
+  "difficulty": "Advanced",
+  "description": "Probes for OAuth2 implementations that fail to enforce Proof Key for Code Exchange (PKCE) for public clients.",
+  "steps": [
+    {
+      "id": "auth-request-no-pkce",
+      "name": "Authorize Request without PKCE",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/oauth/authorize?client_id=public-spa&response_type=code&redirect_uri=https://app.example.com/callback&scope=openid profile"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "token-exchange-no-pkce",
+      "name": "Attempt Token Exchange without Code Verifier",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/oauth/token",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "grant_type=authorization_code&code=fake-code-123&client_id=public-spa&redirect_uri=https://app.example.com/callback"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "auth-request-no-pkce"
+      ]
+    },
+    {
+      "id": "token-exchange-wrong-verifier",
+      "name": "Attempt Token Exchange with Incorrect Verifier",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/oauth/token",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "grant_type=authorization_code&code=fake-code-123&client_id=public-spa&code_verifier=invalid-verifier-value"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

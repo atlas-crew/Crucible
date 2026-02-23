@@ -1,0 +1,56 @@
+{
+  "id": "business-logic-race-condition",
+  "name": "Business Logic Race Condition",
+  "category": "Business Logic",
+  "difficulty": "Advanced",
+  "description": "Attempts to exploit concurrency issues to bypass usage limits or duplicate benefits.",
+  "steps": [
+    {
+      "id": "parallel-coupon-application",
+      "name": "Parallel Single-Use Coupon Application",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/ecommerce/cart/apply-discount",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "codes": ["WELCOME2024"],
+          "cart_id": "cart_{{timestamp}}"
+        }
+      },
+      "execution": {
+        "delayMs": 0,
+        "iterations": 10
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "parallel-withdrawal",
+      "name": "Parallel Account Balance Withdrawal",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/banking/transfer",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 1000,
+          "from_account": "ACC-999",
+          "to_account": "ACC-attacker"
+        }
+      },
+      "execution": {
+        "delayMs": 0,
+        "iterations": 5
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

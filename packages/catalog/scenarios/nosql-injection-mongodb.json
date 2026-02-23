@@ -1,0 +1,213 @@
+{
+  "id": "nosql-injection-mongodb",
+  "name": "NoSQL Injection - MongoDB",
+  "category": "Database Attacks",
+  "difficulty": "Intermediate",
+  "description": "NoSQL injection techniques targeting MongoDB databases through JSON parameters and operator injection",
+  "steps": [
+    {
+      "id": "nosql-recon-1",
+      "name": "API Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/users",
+        "params": {
+          "limit": "10"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "nosql-recon-2",
+      "name": "Parameter Structure Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/search",
+        "params": {
+          "name": "admin",
+          "status": "active"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "nosql-recon-1"
+      ]
+    },
+    {
+      "id": "nosql-exploit-1",
+      "name": "Boolean Operator Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": {
+            "$ne": null
+          },
+          "password": {
+            "$ne": null
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-recon-2"
+      ]
+    },
+    {
+      "id": "nosql-exploit-2",
+      "name": "Regex Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "params": {
+          "username": "admin.*"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-exploit-1"
+      ]
+    },
+    {
+      "id": "nosql-exploit-3",
+      "name": "Where Operator Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/products/search",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "category": "electronics",
+          "$where": "this.price < 100 || function(){return true}()"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-exploit-2"
+      ]
+    },
+    {
+      "id": "nosql-exploit-4",
+      "name": "JavaScript Function Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/orders/filter",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "user_id": "123",
+          "$where": "function(){var date=new Date(); do{curDate = new Date();}while(curDate-date<10000); return true;}"
+        }
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-exploit-3"
+      ]
+    },
+    {
+      "id": "nosql-exploit-5",
+      "name": "Aggregation Pipeline Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/analytics/aggregate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "pipeline": [
+            {
+              "$match": {
+                "$where": "sleep(5000) || true"
+              }
+            },
+            {
+              "$group": {
+                "_id": "$category",
+                "total": {
+                  "$sum": 1
+                }
+              }
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-exploit-4"
+      ]
+    },
+    {
+      "id": "nosql-exfil-1",
+      "name": "Data Extraction via Operators",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/find",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "password": {
+            "$regex": ".*"
+          }
+        },
+        "params": {
+          "role": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-exploit-5"
+      ]
+    }
+  ]
+}

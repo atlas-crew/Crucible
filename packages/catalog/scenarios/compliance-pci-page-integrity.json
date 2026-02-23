@@ -1,0 +1,43 @@
+{
+  "id": "compliance-pci-page-integrity",
+  "name": "PCI DSS Payment Page Integrity Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Probes for DOM injection vulnerabilities on the checkout page that could lead to form overlay attacks.",
+  "steps": [
+    {
+      "id": "checkout-page-recon",
+      "name": "Checkout Page Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/checkout/session"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "dom-injection-probe",
+      "name": "Checkout DOM Injection Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/checkout/ui-state",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "theme": "dark",
+          "custom_footer": "<script>alert('overlay')</script>"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

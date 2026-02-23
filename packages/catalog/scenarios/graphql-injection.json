@@ -1,0 +1,239 @@
+{
+  "id": "graphql-injection",
+  "name": "GraphQL Injection and DoS",
+  "category": "API Attacks",
+  "difficulty": "Expert",
+  "description": "GraphQL injection attacks including query depth attacks, field suggestions, introspection abuse, and resolver DoS",
+  "steps": [
+    {
+      "id": "gql-recon-1",
+      "name": "GraphQL Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/graphql"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "gql-recon-2",
+      "name": "Schema Introspection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query IntrospectionQuery { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "gql-recon-1"
+      ]
+    },
+    {
+      "id": "gql-exploit-1",
+      "name": "Query Depth Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { user { posts { comments { author { posts { comments { author { posts { comments { author { posts { comments { author { posts { comments { author { posts { comments { author { posts { comments { author { posts { comments { author { id } } } } } } } } } } } } } } } } } } } } } } } } } }"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-recon-2"
+      ]
+    },
+    {
+      "id": "gql-exploit-2",
+      "name": "Field Suggestion Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { user { id name email password adminFlag secretKey } }"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-exploit-1"
+      ]
+    },
+    {
+      "id": "gql-exploit-3",
+      "name": "Circular Query DoS",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { users { posts { author { posts { author { posts { author { posts { author { posts { author { posts { author { posts { author { posts { author { posts { author { posts { author { id } } } } } } } } } } } } } } } } } } } } }"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-exploit-2"
+      ]
+    },
+    {
+      "id": "gql-exploit-4",
+      "name": "Resource Exhaustion via Aliases",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { alias1: users { id } alias2: users { id } alias3: users { id } alias4: users { id } alias5: users { id } alias6: users { id } alias7: users { id } alias8: users { id } alias9: users { id } alias10: users { id } alias11: users { id } alias12: users { id } alias13: users { id } alias14: users { id } alias15: users { id } alias16: users { id } alias17: users { id } alias18: users { id } alias19: users { id } alias20: users { id } }"
+        }
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-exploit-3"
+      ]
+    },
+    {
+      "id": "gql-exploit-5",
+      "name": "Mutation Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "mutation { createUser(input: {username: \"'; DROP TABLE users; --\", email: \"attacker@evil.com\", role: \"admin\"}) { id username role } }"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-exploit-4"
+      ]
+    },
+    {
+      "id": "gql-exploit-6",
+      "name": "Batch Query Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": [
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          },
+          {
+            "query": "query { users { id name email } }"
+          }
+        ]
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-exploit-5"
+      ]
+    },
+    {
+      "id": "gql-exfil-1",
+      "name": "Data Exfiltration via GraphQL",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { users { id username email passwordHash role permissions { name } personalInfo { ssn creditCard phoneNumber address } adminNotes internalId } posts { content privateNotes drafts { content scheduledDate } } comments(includeDeleted: true) { content authorIP userAgent deleted } }"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "gql-exploit-6"
+      ]
+    }
+  ]
+}

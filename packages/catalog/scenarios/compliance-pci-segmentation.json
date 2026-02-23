@@ -1,0 +1,42 @@
+{
+  "id": "compliance-pci-segmentation",
+  "name": "PCI DSS CDE Segmentation Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Attempts to pivot from a public API to the internal Cardholder Data Environment (CDE) subnet.",
+  "steps": [
+    {
+      "id": "public-api-recon",
+      "name": "Public API Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/ecommerce/products"
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "internal-subnet-pivot",
+      "name": "Pivot to Internal Payment Subnet (SSRF)",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/diagnostics/webhook?url=http://10.0.50.10/admin/health",
+        "headers": {
+          "X-Internal-Secret": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "public-api-recon"
+      ]
+    }
+  ]
+}

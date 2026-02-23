@@ -1,0 +1,33 @@
+{
+  "id": "vp-demo-02-xss-attempt",
+  "name": "02 - XSS Attempt",
+  "category": "VP Demo",
+  "difficulty": "Beginner",
+  "description": "Cross-site scripting probe to highlight multi-vector detection.",
+  "kind": "campaign",
+  "tags": [
+    "campaign",
+    "vp-demo",
+    "xss",
+    "synapse",
+    "sequence-02"
+  ],
+  "sourceIp": "203.0.113.45",
+  "steps": [
+    {
+      "id": "xss-probe-1",
+      "name": "Reflected XSS Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/search",
+        "params": {
+          "q": "<script>alert(1)</script>"
+        }
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

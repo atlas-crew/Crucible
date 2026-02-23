@@ -1,0 +1,39 @@
+{
+  "id": "vp-demo-05-schema-violation",
+  "name": "05 - Schema Violation",
+  "category": "VP Demo",
+  "difficulty": "Intermediate",
+  "description": "Malformed API payload to demonstrate schema profiling and enforcement.",
+  "kind": "campaign",
+  "tags": [
+    "campaign",
+    "vp-demo",
+    "api-security",
+    "schema",
+    "sequence-05"
+  ],
+  "sourceIp": "198.51.100.77",
+  "steps": [
+    {
+      "id": "schema-violation-1",
+      "name": "Wrong Types Payload",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "https://localhost:6190/api/users",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "user_id": "not-a-number",
+          "age": "unknown",
+          "active": "yes",
+          "roles": "admin"
+        }
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

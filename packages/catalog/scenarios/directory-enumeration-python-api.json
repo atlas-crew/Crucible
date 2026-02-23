@@ -1,0 +1,379 @@
+{
+  "name": "Directory Enumeration (Python/Flask API)",
+  "description": "Slow directory and file discovery targeting Python/Flask API paths over 10-15 minutes",
+  "category": "Reconnaissance",
+  "difficulty": "Beginner",
+  "tags": [
+    "directory-enum",
+    "recon",
+    "low-risk",
+    "discovery",
+    "python",
+    "flask",
+    "api"
+  ],
+  "estimatedDuration": "10-15 minutes",
+  "id": "directory-enumeration-python-api",
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Check robots.txt for crawl restrictions",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/robots.txt"
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Enumerate sitemap for site structure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/sitemap.xml"
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Check for security policy disclosure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/security.txt"
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Probe for admin interface",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/admin"
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Check alternative admin path",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/admin/dashboard"
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Search for backup directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/backup"
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Check plural backup directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/backups"
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Probe for exposed git repository",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.git/config"
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Check for SVN repository exposure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.svn/entries"
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Look for old/deprecated files",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/old"
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Enumerate config directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/config"
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Search for environment configuration file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.env"
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Probe settings directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/settings"
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Look for debug interface",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/debug"
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Check for test directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/test"
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Enumerate development directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/dev"
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Search for staging environment",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/staging"
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Look for documentation directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/docs"
+      }
+    },
+    {
+      "id": "step-19",
+      "name": "Check for API documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/docs"
+      }
+    },
+    {
+      "id": "step-20",
+      "name": "Enumerate Swagger API docs",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger"
+      }
+    },
+    {
+      "id": "step-21",
+      "name": "Search for Swagger spec file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger.json"
+      }
+    },
+    {
+      "id": "step-22",
+      "name": "Check for OpenAPI spec",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/openapi.json"
+      }
+    },
+    {
+      "id": "step-23",
+      "name": "Look for ReDoc documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/redoc"
+      }
+    },
+    {
+      "id": "step-24",
+      "name": "Check for API v1 documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/docs"
+      }
+    },
+    {
+      "id": "step-25",
+      "name": "Check for API v2 documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v2/docs"
+      }
+    },
+    {
+      "id": "step-26",
+      "name": "Probe API v1 endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1"
+      }
+    },
+    {
+      "id": "step-27",
+      "name": "Probe API v2 endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v2"
+      }
+    },
+    {
+      "id": "step-28",
+      "name": "Check generic API endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api"
+      }
+    },
+    {
+      "id": "step-29",
+      "name": "Look for health check endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/health"
+      }
+    },
+    {
+      "id": "step-30",
+      "name": "Check for metrics endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/metrics"
+      }
+    },
+    {
+      "id": "step-31",
+      "name": "Probe status endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/status"
+      }
+    },
+    {
+      "id": "step-32",
+      "name": "Check for GraphQL endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/graphql"
+      }
+    },
+    {
+      "id": "step-33",
+      "name": "Look for static files directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/static"
+      }
+    },
+    {
+      "id": "step-34",
+      "name": "Check for assets directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/assets"
+      }
+    },
+    {
+      "id": "step-35",
+      "name": "Check for exposed requirements.txt",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/requirements.txt"
+      }
+    },
+    {
+      "id": "step-36",
+      "name": "Search for readme documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/readme.md"
+      }
+    },
+    {
+      "id": "step-37",
+      "name": "Look for Flask debug console",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/console"
+      }
+    },
+    {
+      "id": "step-38",
+      "name": "Check for Werkzeug debugger",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/__debug__"
+      }
+    },
+    {
+      "id": "step-39",
+      "name": "Probe for Prometheus metrics",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/prometheus"
+      }
+    },
+    {
+      "id": "step-40",
+      "name": "Check Flask profiler endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/_profiler"
+      }
+    }
+  ]
+}

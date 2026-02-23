@@ -1,0 +1,268 @@
+{
+  "id": "api-rate-limit-bypass",
+  "name": "API Rate Limiting Bypass",
+  "category": "Rate Limiting Attacks",
+  "difficulty": "Intermediate",
+  "description": "API rate limiting bypass techniques using header manipulation, IP rotation, and distributed attack patterns",
+  "steps": [
+    {
+      "id": "rate-recon-1",
+      "name": "Rate Limit Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/users"
+      },
+      "execution": {
+        "delayMs": 100
+      }
+    },
+    {
+      "id": "rate-recon-2",
+      "name": "Rate Limit Threshold Testing",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/login"
+      },
+      "execution": {
+        "delayMs": 50
+      }
+    },
+    {
+      "id": "rate-recon-3",
+      "name": "Rate Limit Response Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "test",
+          "password": "test"
+        }
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "dependsOn": [
+        "rate-recon-1",
+        "rate-recon-2"
+      ]
+    },
+    {
+      "id": "rate-exploit-1",
+      "name": "X-Forwarded-For Header Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "192.168.1.100"
+        },
+        "body": {
+          "username": "admin",
+          "password": "password123"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-recon-3"
+      ]
+    },
+    {
+      "id": "rate-exploit-2",
+      "name": "X-Real-IP Header Spoofing",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Real-IP": "10.0.0.50",
+          "X-Originating-IP": "172.16.0.25"
+        },
+        "body": {
+          "username": "admin",
+          "password": "admin123"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-1"
+      ]
+    },
+    {
+      "id": "rate-exploit-3",
+      "name": "Multiple IP Headers Rotation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "203.0.113.45",
+          "X-Real-IP": "198.51.100.78",
+          "X-Client-IP": "203.0.113.99",
+          "X-Cluster-Client-IP": "198.51.100.123"
+        },
+        "body": {
+          "username": "admin",
+          "password": "password"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-2"
+      ]
+    },
+    {
+      "id": "rate-exploit-4",
+      "name": "User-Agent Rotation Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          "X-Forwarded-For": "185.199.108.154"
+        },
+        "body": {
+          "username": "administrator",
+          "password": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-3"
+      ]
+    },
+    {
+      "id": "rate-exploit-5",
+      "name": "Session Token Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer fake.token.here",
+          "X-Session-ID": "new-session-123",
+          "X-Request-ID": "bypass-attempt-456"
+        },
+        "body": {
+          "username": "root",
+          "password": "toor"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-4"
+      ]
+    },
+    {
+      "id": "rate-exploit-6",
+      "name": "HTTP Method Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-HTTP-Method-Override": "POST"
+        },
+        "body": {
+          "username": "admin",
+          "password": "letmein"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-5"
+      ]
+    },
+    {
+      "id": "rate-exploit-7",
+      "name": "Parameter Pollution Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "username=admin&password=password&username=guest&password=guest123"
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-6"
+      ]
+    },
+    {
+      "id": "rate-exfil-1",
+      "name": "Distributed Brute Force",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "1.2.3.4, 5.6.7.8, 9.10.11.12",
+          "Via": "1.1 proxy1.example.com, 1.1 proxy2.example.com"
+        },
+        "body": {
+          "username": "admin",
+          "password": "qwerty123"
+        }
+      },
+      "execution": {
+        "delayMs": 25
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-exploit-7"
+      ]
+    }
+  ]
+}

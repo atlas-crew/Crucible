@@ -1,0 +1,27 @@
+{
+  "id": "compliance-soc2-access-review",
+  "name": "SOC 2 Access Review & Credential Lifecycle Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Tests enforcement of credential rotation policies by attempting to use an expired service account key.",
+  "steps": [
+    {
+      "id": "expired-key-attempt",
+      "name": "Use Expired Service Account Key",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/system/status",
+        "headers": {
+          "X-Service-Key": "key_expired_90_days_ago"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "status": 401
+      }
+    }
+  ]
+}

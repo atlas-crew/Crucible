@@ -1,0 +1,22 @@
+{
+  "id": "compliance-soc2-dos-resilience",
+  "name": "SOC 2 Availability & DoS Resilience Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Launches application-layer DoS against the status endpoint to test availability controls.",
+  "steps": [
+    {
+      "id": "status-dos-flood",
+      "name": "Status Endpoint Flood",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/status"
+      },
+      "execution": {
+        "delayMs": 10,
+        "iterations": 100
+      }
+    }
+  ]
+}

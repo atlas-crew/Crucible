@@ -1,0 +1,369 @@
+{
+  "name": "Technology Fingerprinting (Python/Flask API)",
+  "description": "Passive technology and version identification for Python/Flask APIs through common files and headers over 10-15 minutes",
+  "category": "Reconnaissance",
+  "difficulty": "Beginner",
+  "tags": [
+    "fingerprinting",
+    "recon",
+    "low-risk",
+    "passive",
+    "osint",
+    "python",
+    "flask",
+    "api"
+  ],
+  "metadata": {
+    "expectedBlocked": false,
+    "stage": "reconnaissance",
+    "estimatedDuration": "15 minutes",
+    "riskLevel": "minimal",
+    "detectionLikelihood": "low",
+    "targetTypes": [
+      "web-api",
+      "rest-api",
+      "python",
+      "flask",
+      "fastapi"
+    ],
+    "techniques": [
+      "passive-reconnaissance",
+      "version-enumeration",
+      "technology-identification",
+      "metadata-gathering"
+    ],
+    "indicators": {
+      "requestRate": "0.03 req/sec",
+      "averageDelay": "54 seconds",
+      "totalRequests": 27,
+      "cumulativeWeight": 2.59
+    }
+  },
+  "id": "tech-fingerprinting-python-api",
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Check robots.txt for technology hints and directory structure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/robots.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Probe for version information file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/version.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Check standard security contact information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/security.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Look for human-readable site information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/humans.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Check for Python requirements file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/requirements.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Look for Pipfile for dependency information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/Pipfile",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Check for Poetry dependency file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/pyproject.toml",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Check for web app manifest file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/manifest.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Check for changelog with version history",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/CHANGELOG.md",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Query API version endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/version",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Probe API information endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/info",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Check health monitoring endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/health",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Check status monitoring endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/status",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Look for build information metadata",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/build-info.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Check for Swagger/OpenAPI specification",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Check for OpenAPI spec file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/openapi.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Probe for Swagger UI documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Check for ReDoc API documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/redoc",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-19",
+      "name": "Look for Prometheus metrics endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/metrics",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-20",
+      "name": "Check for Flask debug console",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/console",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-21",
+      "name": "Probe for Werkzeug debugger",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/__debug__",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-22",
+      "name": "Look for uppercase VERSION file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/VERSION",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-23",
+      "name": "Analyze sitemap for site structure insights",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/sitemap.xml",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-24",
+      "name": "Check for GraphQL schema introspection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/graphql",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-25",
+      "name": "Look for API documentation at /docs",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/docs",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-26",
+      "name": "Check for API v1 documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/docs",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-27",
+      "name": "Check for API v2 documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v2/docs",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    }
+  ]
+}

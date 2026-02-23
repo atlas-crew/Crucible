@@ -1,0 +1,226 @@
+{
+  "id": "owasp-api-top10-comprehensive-campaign",
+  "name": "OWASP API Security Top 10 (2023) - Complete Test Campaign",
+  "category": "Comprehensive Campaign",
+  "difficulty": "Advanced",
+  "description": "Comprehensive attack campaign covering all OWASP API Security Top 10 (2023) vulnerabilities in a systematic, sequential manner for complete WAF validation",
+  "kind": "campaign",
+  "tags": [
+    "owasp-api-top10",
+    "comprehensive",
+    "campaign",
+    "api-security",
+    "waf-validation"
+  ],
+  "target": "http://localhost:8888",
+  "estimatedDuration": "45-60 minutes",
+  "documentation": "https://owasp.org/API-Security/editions/2023/en/0x00-header/",
+  "prerequisites": [
+    "crAPI running on localhost:8888 (OWASP vulnerable API)",
+    "VAmPI running on localhost:5000 (optional for additional coverage)",
+    "WAF or API gateway configured for testing",
+    "Sufficient system resources for extended campaign"
+  ],
+  "campaign": {
+    "phases": [
+      {
+        "name": "reconnaissance",
+        "duration": 600,
+        "description": "Initial reconnaissance across all API security domains",
+        "scenarios": [
+          {
+            "id": "api9-improper-inventory-management",
+            "weight": 1,
+            "concurrent": false
+          }
+        ]
+      },
+      {
+        "name": "authentication-attacks",
+        "duration": 900,
+        "description": "Authentication and authorization exploitation",
+        "scenarios": [
+          {
+            "id": "crapi-jwt-secret-leak",
+            "weight": 1,
+            "concurrent": false
+          },
+          {
+            "id": "api3-broken-object-property-level-authz",
+            "weight": 1,
+            "concurrent": false
+          },
+          {
+            "id": "api5-function-level-authz-bypass",
+            "weight": 1,
+            "concurrent": false
+          }
+        ]
+      },
+      {
+        "name": "data-exposure",
+        "duration": 1200,
+        "description": "Data exposure and unauthorized access",
+        "scenarios": [
+          {
+            "id": "crapi-bola-vehicle-enumeration",
+            "weight": 1,
+            "concurrent": false
+          },
+          {
+            "id": "vampi-bola-books-enumeration",
+            "weight": 1,
+            "concurrent": false
+          },
+          {
+            "id": "vampi-mass-assignment-privilege-escalation",
+            "weight": 1,
+            "concurrent": false
+          }
+        ]
+      },
+      {
+        "name": "resource-manipulation",
+        "duration": 900,
+        "description": "Resource consumption and rate limiting bypass",
+        "scenarios": [
+          {
+            "id": "api4-rate-limit-bypass",
+            "weight": 1,
+            "concurrent": false
+          }
+        ]
+      },
+      {
+        "name": "server-side-attacks",
+        "duration": 1200,
+        "description": "Server-side attacks and infrastructure exploitation",
+        "scenarios": [
+          {
+            "id": "api7-ssrf-cloud-metadata",
+            "weight": 1,
+            "concurrent": false
+          }
+        ]
+      },
+      {
+        "name": "integration-attacks",
+        "duration": 900,
+        "description": "Third-party integration and API consumption attacks",
+        "scenarios": [
+          {
+            "id": "api10-unsafe-api-consumption",
+            "weight": 1,
+            "concurrent": false
+          }
+        ]
+      }
+    ],
+    "execution": {
+      "mode": "sequential",
+      "pauseBetweenPhases": 30,
+      "continueOnFailure": true,
+      "captureMetrics": true
+    }
+  },
+  "attackVectors": [
+    {
+      "classification": "ComprehensiveAPISecurityAssessment",
+      "severity": "Critical",
+      "owasp": "API Security Top 10 (2023) - Complete Coverage"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "All 10 OWASP API Top 10 categories tested",
+      "Comprehensive WAF rule coverage validated",
+      "Metrics collected for each vulnerability class",
+      "Block rates measured per OWASP category",
+      "Performance impact assessed under sustained attack"
+    ],
+    "indicators": [
+      "Campaign completes all phases successfully",
+      "WAF blocks malicious requests across all categories",
+      "Legitimate traffic remains unaffected",
+      "Detailed metrics available for analysis",
+      "No false positives on benign requests"
+    ],
+    "coverage": {
+      "API1:2023": "Broken Object Level Authorization - BOLA/IDOR attacks",
+      "API2:2023": "Broken Authentication - JWT exploitation",
+      "API3:2023": "Broken Object Property Level Authorization - Mass assignment",
+      "API4:2023": "Unrestricted Resource Consumption - Rate limiting bypass",
+      "API5:2023": "Broken Function Level Authorization - Privilege escalation",
+      "API6:2023": "Unrestricted Access to Sensitive Business Flows - (Covered in scenarios)",
+      "API7:2023": "Server Side Request Forgery - Cloud metadata access",
+      "API8:2023": "Security Misconfiguration - (Covered in multiple scenarios)",
+      "API9:2023": "Improper Inventory Management - API discovery",
+      "API10:2023": "Unsafe Consumption of APIs - Third-party integration attacks"
+    }
+  },
+  "reporting": {
+    "metrics": [
+      "Total requests per OWASP category",
+      "Block rate per vulnerability type",
+      "False positive rate (benign traffic)",
+      "Response time impact under attack",
+      "WAF rule effectiveness by category",
+      "Coverage gaps identified"
+    ],
+    "recommendations": [
+      "Review WAF rules for categories with low block rates",
+      "Tune rules to reduce false positives",
+      "Implement missing controls for uncovered scenarios",
+      "Monitor performance degradation patterns",
+      "Update API inventory and documentation"
+    ]
+  },
+  "mitigations": {
+    "summary": "Comprehensive API security controls required",
+    "categories": {
+      "authentication": [
+        "Strong JWT validation and secret management",
+        "Multi-factor authentication",
+        "Rate limiting on authentication endpoints",
+        "Secure session management"
+      ],
+      "authorization": [
+        "Implement RBAC and ABAC models",
+        "Validate object ownership on every request",
+        "Function-level access control",
+        "Least privilege principle"
+      ],
+      "input_validation": [
+        "Strict input validation and sanitization",
+        "Schema validation for all API requests",
+        "Content-type verification",
+        "Parameter whitelisting"
+      ],
+      "rate_limiting": [
+        "Distributed rate limiting (Redis)",
+        "Per-user and per-IP limits",
+        "Adaptive rate limiting based on behavior",
+        "CAPTCHA for suspicious patterns"
+      ],
+      "api_security": [
+        "API gateway with WAF integration",
+        "Regular security audits",
+        "Automated API discovery",
+        "Third-party API validation",
+        "Comprehensive API documentation"
+      ]
+    }
+  },
+  "usage": {
+    "cli": "npm run dev -- --url http://localhost:8888 --catalog-scenarios owasp-api-top10-comprehensive-campaign --terminal-ui",
+    "dashboard": "Select 'OWASP API Top 10 Campaign' from catalog in web dashboard",
+    "notes": [
+      "Campaign runs sequentially through all OWASP categories",
+      "Total execution time: 45-60 minutes depending on target responsiveness",
+      "Pause between phases allows for metric collection and analysis",
+      "Can be interrupted and resumed via session management",
+      "Results should be exported for compliance reporting"
+    ]
+  },
+  "steps": []
+}

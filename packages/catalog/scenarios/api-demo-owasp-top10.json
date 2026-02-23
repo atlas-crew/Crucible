@@ -1,0 +1,290 @@
+{
+  "id": "api-demo-owasp-top10",
+  "name": "Chimera OWASP Top 10 Comprehensive Chain",
+  "category": "OWASP Top 10",
+  "difficulty": "Expert",
+  "description": "Comprehensive attack chain covering all OWASP API Security Top 10 categories",
+  "steps": [
+    {
+      "id": "api1-broken-object-level",
+      "name": "API1: Broken Object Level Authorization",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/orders/ORD-2024-9999",
+        "headers": {
+          "Authorization": "Bearer {{low_privilege_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "api2-broken-authentication",
+      "name": "API2: Broken Authentication",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/reset",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "token": "000000",
+          "new_password": "hacked123"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api1-broken-object-level"
+      ]
+    },
+    {
+      "id": "api3-excessive-data-exposure",
+      "name": "API3: Excessive Data Exposure",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/profile?include_sensitive=true&fields=*",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api2-broken-authentication"
+      ]
+    },
+    {
+      "id": "api4-lack-of-resources",
+      "name": "API4: Lack of Resources & Rate Limiting",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/export/all?limit=999999999",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api3-excessive-data-exposure"
+      ]
+    },
+    {
+      "id": "api5-broken-function-auth",
+      "name": "API5: Broken Function Level Authorization",
+      "stage": "exploitation",
+      "request": {
+        "method": "DELETE",
+        "url": "/api/admin/users/all",
+        "headers": {
+          "Authorization": "Bearer {{regular_user_token}}",
+          "X-Admin-Function": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api4-lack-of-resources"
+      ]
+    },
+    {
+      "id": "api6-mass-assignment",
+      "name": "API6: Mass Assignment",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/users/profile",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "name": "John Doe",
+          "role": "admin",
+          "is_verified": true,
+          "credit_balance": 999999,
+          "subscription_tier": "enterprise"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api5-broken-function-auth"
+      ]
+    },
+    {
+      "id": "api7-security-misconfiguration",
+      "name": "API7: Security Misconfiguration",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/.env",
+        "headers": {
+          "X-Debug": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api6-mass-assignment"
+      ]
+    },
+    {
+      "id": "api8-injection",
+      "name": "API8: Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/query",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "SELECT * FROM users WHERE id='1' OR '1'='1'--"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api7-security-misconfiguration"
+      ]
+    },
+    {
+      "id": "api9-improper-assets-mgmt",
+      "name": "API9: Improper Assets Management",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v0/admin/debug"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api8-injection"
+      ]
+    },
+    {
+      "id": "api10-insufficient-logging",
+      "name": "API10: Insufficient Logging & Monitoring",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "127.0.0.1",
+          "X-Real-IP": "::1",
+          "User-Agent": "() { :; }; /bin/bash -c 'cat /etc/passwd'"
+        },
+        "body": {
+          "username": "admin' OR 1=1--",
+          "password": "' OR '1'='1",
+          "log_bypass": true
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api9-improper-assets-mgmt"
+      ]
+    },
+    {
+      "id": "api11-bola-advanced",
+      "name": "Advanced BOLA Chain Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/transfer",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{attacker_token}}"
+        },
+        "body": {
+          "from_account": "VICTIM-ACC-12345",
+          "to_account": "ATTACKER-ACC-99999",
+          "amount": 100000
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api10-insufficient-logging"
+      ]
+    },
+    {
+      "id": "api12-unrestricted-consumption",
+      "name": "API12: Unrestricted Resource Consumption",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/compute/execute",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "operation": "factorial",
+          "input": 999999999,
+          "timeout": 0
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api11-bola-advanced"
+      ]
+    }
+  ]
+}

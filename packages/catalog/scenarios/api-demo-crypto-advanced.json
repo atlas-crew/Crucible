@@ -1,0 +1,289 @@
+{
+  "id": "api-demo-crypto-advanced",
+  "name": "Chimera Cryptographic & Advanced Attacks",
+  "category": "Cryptographic",
+  "difficulty": "Expert",
+  "description": "Advanced cryptographic attacks and sophisticated exploitation techniques",
+  "steps": [
+    {
+      "id": "jwt-kid-injection",
+      "name": "JWT kid Header Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/verify",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Ii4uLy4uLy4uL2V0Yy9wYXNzd2QifQ.eyJzdWIiOiJhZG1pbiJ9.fake"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "jwt-jku-url-injection",
+      "name": "JWT jku URL Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/secure/data",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImprdSI6Imh0dHA6Ly9ldmlsLmNvbS9qd2tzLmpzb24ifQ.eyJyb2xlIjoiYWRtaW4ifQ.fake"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-kid-injection"
+      ]
+    },
+    {
+      "id": "padding-oracle-attack",
+      "name": "Padding Oracle Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/decrypt",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ciphertext": "malformed_padding_block",
+          "iv": "0000000000000000"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-jku-url-injection"
+      ]
+    },
+    {
+      "id": "timing-attack-hmac",
+      "name": "HMAC Timing Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/verify-signature",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "message": "admin=true",
+          "signature": "a"
+        }
+      },
+      "execution": {
+        "delayMs": 50,
+        "iterations": 100
+      },
+      "dependsOn": [
+        "padding-oracle-attack"
+      ]
+    },
+    {
+      "id": "race-condition-voucher",
+      "name": "Race Condition Voucher Redemption",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/voucher/redeem",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "voucher_code": "LIMITED-100OFF"
+        }
+      },
+      "execution": {
+        "iterations": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "timing-attack-hmac"
+      ]
+    },
+    {
+      "id": "toctou-file-upload",
+      "name": "TOCTOU File Upload Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload/verify",
+        "headers": {
+          "Content-Type": "multipart/form-data"
+        },
+        "body": {
+          "file": "safe.txt",
+          "swap_after_check": "malicious.php"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "race-condition-voucher"
+      ]
+    },
+    {
+      "id": "deserialization-rce",
+      "name": "Insecure Deserialization RCE",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/import/data",
+        "headers": {
+          "Content-Type": "application/x-java-serialized-object"
+        },
+        "body": "rO0ABXNyABdqYXZhLmxhbmcuUHJvY2Vzc0J1aWxkZXIAAAAAAAAAAQIABFoAC3JlZGlyZWN0RXJyTAAJY29tbWFuZHN0ABVMamF2YS91dGlsL0FycmF5TGlzdDsMAGRpcmVjdG9yeXQAEkxqYXZhL2lvL0ZpbGU7"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "toctou-file-upload"
+      ]
+    },
+    {
+      "id": "prototype-pollution",
+      "name": "Prototype Pollution Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/merge",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "__proto__": {
+            "isAdmin": true,
+            "role": "superuser"
+          },
+          "constructor": {
+            "prototype": {
+              "isAdmin": true
+            }
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "deserialization-rce"
+      ]
+    },
+    {
+      "id": "cache-deception",
+      "name": "Web Cache Deception",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/user/profile/nonexistent.css",
+        "headers": {
+          "Authorization": "Bearer {{victim_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "prototype-pollution"
+      ]
+    },
+    {
+      "id": "http-request-smuggling",
+      "name": "HTTP Request Smuggling",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/data",
+        "headers": {
+          "Content-Length": "4",
+          "Transfer-Encoding": "chunked",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "0\r\n\r\nGET /admin HTTP/1.1\r\nHost: internal\r\n\r\n"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "cache-deception"
+      ]
+    },
+    {
+      "id": "websocket-hijacking",
+      "name": "WebSocket Connection Hijacking",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/ws",
+        "headers": {
+          "Upgrade": "websocket",
+          "Connection": "Upgrade",
+          "Sec-WebSocket-Version": "13",
+          "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+          "Cookie": "sessionid=stolen_session"
+        }
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "http-request-smuggling"
+      ]
+    },
+    {
+      "id": "side-channel-cpu",
+      "name": "CPU Side Channel Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/crypto/compare",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "secret_guess": "a",
+          "measure_cpu_cycles": true
+        }
+      },
+      "execution": {
+        "delayMs": 10,
+        "iterations": 1000
+      },
+      "dependsOn": [
+        "websocket-hijacking"
+      ]
+    }
+  ]
+}

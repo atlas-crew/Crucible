@@ -1,0 +1,79 @@
+{
+  "id": "cloud-native-s3-presigned-abuse",
+  "name": "Object Storage Pre-signed URL Abuse",
+  "category": "Cloud Native",
+  "difficulty": "Advanced",
+  "description": "Exploits logic flaws in pre-signed URL generation to gain unauthorized write access to cloud storage.",
+  "steps": [
+    {
+      "id": "request-view-url",
+      "name": "Request Read-only Pre-signed URL",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/infrastructure/storage/presign",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "file_id": "report-2024.pdf",
+          "action": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "extract": {
+        "view_url": { "from": "body", "path": "url" }
+      }
+    },
+    {
+      "id": "parameter-pollution-presign",
+      "name": "Presign URL Parameter Pollution (PUT)",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/infrastructure/storage/presign",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "file_id": "malicious.exe",
+          "action": "GET",
+          "method": "PUT"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "request-view-url"
+      ]
+    },
+    {
+      "id": "unauthorized-bucket-presign",
+      "name": "Cross-Bucket Pre-signed URL Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/infrastructure/storage/presign",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "file_id": "../another-bucket/secrets.txt",
+          "action": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

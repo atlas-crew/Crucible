@@ -1,0 +1,51 @@
+{
+  "id": "compliance-hipaa-emergency-access",
+  "name": "HIPAA Emergency Access (Break Glass) Abuse",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Tests the enforcement of justification and alerting for emergency access to PHI.",
+  "steps": [
+    {
+      "id": "emergency-access-no-justification",
+      "name": "Emergency Access Attempt without Justification",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/emergency-access",
+        "headers": {
+          "Authorization": "Bearer {{provider_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient_id": "P-12345"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "emergency-access-with-justification",
+      "name": "Emergency Access with Justification",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/emergency-access",
+        "headers": {
+          "Authorization": "Bearer {{provider_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient_id": "P-12345",
+          "justification": "Emergency life-saving procedure required."
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      }
+    }
+  ]
+}

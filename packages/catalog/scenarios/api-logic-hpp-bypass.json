@@ -1,0 +1,59 @@
+{
+  "id": "api-logic-hpp-bypass",
+  "name": "HTTP Parameter Pollution (HPP) Bypass",
+  "category": "API Logic",
+  "difficulty": "Intermediate",
+  "description": "Tests if sending duplicate parameters can bypass security filters (WAF) or cause logical discrepancies in the application.",
+  "steps": [
+    {
+      "id": "standard-request",
+      "name": "Standard Request",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/user/profile?id=123"
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "hpp-duplicate-id",
+      "name": "HPP Duplicate ID",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/user/profile?id=123&id=456"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "standard-request"
+      ]
+    },
+    {
+      "id": "hpp-admin-bypass",
+      "name": "HPP Admin Privilege Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/admin/settings",
+        "params": {
+          "admin": "false",
+          "user_id": "999",
+          "admin": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

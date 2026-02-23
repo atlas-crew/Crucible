@@ -1,0 +1,684 @@
+{
+  "id": "api-demo-defender-showcase",
+  "name": "API Defender Showcase - Advanced API Protection",
+  "category": "API Security",
+  "difficulty": "Advanced",
+  "description": "Demonstrates ThreatX API Defender capabilities including rate limiting, schema validation, anomaly detection, and behavioral analytics. Shows how API Defender protects against sophisticated API attacks.",
+  "steps": [
+    {
+      "id": "baseline-1",
+      "name": "Normal API Baseline - Anomaly Detection Health Check",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/anomaly-detection"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "baseline-2",
+      "name": "Normal API Baseline - Stats Retrieval",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/api-defender/stats"
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "baseline-1"
+      ]
+    },
+    {
+      "id": "baseline-3",
+      "name": "Normal API Baseline - Rate Limit Check",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/rate-limit-test"
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "baseline-2"
+      ]
+    },
+    {
+      "id": "baseline-4",
+      "name": "Normal API Baseline - Valid Card Validation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/card-validation",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "card_number": "4532015112830366",
+          "cvv": "123",
+          "expiry_month": "12",
+          "expiry_year": "2025"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "dependsOn": [
+        "baseline-3"
+      ]
+    },
+    {
+      "id": "baseline-5",
+      "name": "Normal API Baseline - Valid Purchase",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-12345",
+          "quantity": 1,
+          "price": 29.99,
+          "customer_id": "CUST-67890"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "baseline-4"
+      ]
+    },
+    {
+      "id": "rate-limit-1",
+      "name": "Rate Limit Test - Rapid Fire Burst",
+      "stage": "weaponization",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/rate-limit-test"
+      },
+      "execution": {
+        "delayMs": 50,
+        "iterations": 15
+      },
+      "dependsOn": [
+        "baseline-5"
+      ]
+    },
+    {
+      "id": "rate-limit-2",
+      "name": "Rate Limit Test - Threshold Breach",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/rate-limit-test"
+      },
+      "execution": {
+        "iterations": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-limit-1"
+      ]
+    },
+    {
+      "id": "rate-limit-3",
+      "name": "Rate Limit Test - IP Rotation Bypass Attempt",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/rate-limit-test",
+        "headers": {
+          "X-Forwarded-For": "{{random_ip}}",
+          "X-Real-IP": "{{random_ip}}",
+          "CF-Connecting-IP": "{{random_ip}}"
+        }
+      },
+      "execution": {
+        "delayMs": 100,
+        "iterations": 20
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-limit-2"
+      ]
+    },
+    {
+      "id": "rate-limit-4",
+      "name": "Rate Limit Test - Distributed Attack Simulation",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/rate-limit-test",
+        "headers": {
+          "X-Forwarded-For": "{{random_ip}}",
+          "User-Agent": "{{random_user_agent}}"
+        }
+      },
+      "execution": {
+        "delayMs": 50,
+        "iterations": 30
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-limit-3"
+      ]
+    },
+    {
+      "id": "rate-limit-5",
+      "name": "Rate Limit Test - Adaptive Rate Limiting Check",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/api-defender/stats"
+      },
+      "execution": {
+        "delayMs": 200,
+        "iterations": 10
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-limit-4"
+      ]
+    },
+    {
+      "id": "schema-1",
+      "name": "Schema Validation - Invalid JSON Structure",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "invalid_json_payload"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "rate-limit-5"
+      ]
+    },
+    {
+      "id": "schema-2",
+      "name": "Schema Validation - Wrong Data Type (String as Number)",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-12345",
+          "quantity": "not_a_number",
+          "price": "29.99",
+          "customer_id": "CUST-67890"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-1"
+      ]
+    },
+    {
+      "id": "schema-3",
+      "name": "Schema Validation - Missing Required Fields",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-12345"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-2"
+      ]
+    },
+    {
+      "id": "schema-4",
+      "name": "Schema Validation - Oversized Payload Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/card-validation",
+        "headers": {
+          "Content-Type": "application/json",
+          "Content-Length": "10485760"
+        },
+        "body": {
+          "card_number": "4532015112830366",
+          "cvv": "123",
+          "expiry_month": "12",
+          "expiry_year": "2025",
+          "extra_data": "{{large_payload_10mb}}"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-3"
+      ]
+    },
+    {
+      "id": "schema-5",
+      "name": "Schema Validation - Mass Assignment Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-12345",
+          "quantity": 1,
+          "price": 29.99,
+          "customer_id": "CUST-67890",
+          "is_admin": true,
+          "role": "super_admin",
+          "discount_override": 100,
+          "payment_bypass": true
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-4"
+      ]
+    },
+    {
+      "id": "schema-6",
+      "name": "Schema Validation - Negative Value Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-12345",
+          "quantity": -5,
+          "price": -99.99,
+          "customer_id": "CUST-67890"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-5"
+      ]
+    },
+    {
+      "id": "schema-7",
+      "name": "Schema Validation - Card Number Format Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/card-validation",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "card_number": "invalid_card_12345",
+          "cvv": "abc",
+          "expiry_month": "99",
+          "expiry_year": "9999"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-6"
+      ]
+    },
+    {
+      "id": "anomaly-1",
+      "name": "Anomaly Detection - Geo-Location Shift (US to Russia)",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/anomaly-detection",
+        "headers": {
+          "X-Forwarded-For": "94.142.241.111",
+          "X-Real-IP": "94.142.241.111",
+          "CF-IPCountry": "RU",
+          "Accept-Language": "ru-RU"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schema-7"
+      ]
+    },
+    {
+      "id": "anomaly-2",
+      "name": "Anomaly Detection - Geo-Location Shift (Russia to China)",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/anomaly-detection",
+        "headers": {
+          "X-Forwarded-For": "202.108.22.5",
+          "X-Real-IP": "202.108.22.5",
+          "CF-IPCountry": "CN",
+          "Accept-Language": "zh-CN"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-1"
+      ]
+    },
+    {
+      "id": "anomaly-3",
+      "name": "Anomaly Detection - Abnormal Request Sequence",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Request-Sequence": "out-of-order"
+        },
+        "body": {
+          "product_id": "PROD-99999",
+          "quantity": 999,
+          "price": 0.01,
+          "customer_id": "CUST-UNKNOWN"
+        }
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-2"
+      ]
+    },
+    {
+      "id": "anomaly-4",
+      "name": "Anomaly Detection - Suspicious User-Agent Combination",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/security/anomaly-detection",
+        "headers": {
+          "User-Agent": "curl/7.68.0",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept-Encoding": "gzip, deflate, br"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-3"
+      ]
+    },
+    {
+      "id": "anomaly-5",
+      "name": "Anomaly Detection - Abnormal Payload Size",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/security/anomaly-detection",
+        "headers": {
+          "Content-Type": "application/json",
+          "Content-Length": "524288"
+        },
+        "body": {
+          "test_data": "{{large_payload_512kb}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-4"
+      ]
+    },
+    {
+      "id": "anomaly-6",
+      "name": "Anomaly Detection - Time-Based Anomaly (Unusual Hour)",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/api-defender/stats",
+        "headers": {
+          "X-Request-Time": "03:47:22",
+          "X-Timezone": "UTC-8"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-5"
+      ]
+    },
+    {
+      "id": "anomaly-7",
+      "name": "Anomaly Detection - Behavioral Pattern Shift",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/card-validation",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Session-Age": "3"
+        },
+        "body": {
+          "card_number": "4532015112830366",
+          "cvv": "123",
+          "expiry_month": "12",
+          "expiry_year": "2025",
+          "cardholder_name": "DIFFERENT_PERSON"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-6"
+      ]
+    },
+    {
+      "id": "combined-1",
+      "name": "Combined Attack - Schema + Rate Limit Violation",
+      "stage": "command_control",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "{{random_ip}}"
+        },
+        "body": {
+          "product_id": "invalid",
+          "quantity": "not_a_number",
+          "price": -100
+        }
+      },
+      "execution": {
+        "iterations": 20
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "anomaly-7"
+      ]
+    },
+    {
+      "id": "combined-2",
+      "name": "Combined Attack - Schema + Geo Anomaly",
+      "stage": "command_control",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/card-validation",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "103.21.244.0",
+          "CF-IPCountry": "NK"
+        },
+        "body": {
+          "card_number": "invalid_format",
+          "cvv": "999999",
+          "extra_fields": true,
+          "is_admin": true
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "combined-1"
+      ]
+    },
+    {
+      "id": "combined-3",
+      "name": "Combined Attack - Rate Limit + Anomaly + Schema",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/checkout/purchase",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "{{random_ip}}",
+          "User-Agent": "AttackBot/1.0",
+          "CF-IPCountry": "IR"
+        },
+        "body": {
+          "product_id": null,
+          "quantity": -999999,
+          "price": "FREE",
+          "admin_override": true,
+          "sql_injection": "' OR '1'='1",
+          "xss_payload": "<script>alert('xss')</script>"
+        }
+      },
+      "execution": {
+        "delayMs": 50,
+        "iterations": 15
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "combined-2"
+      ]
+    },
+    {
+      "id": "combined-4",
+      "name": "Combined Attack - Distributed Multi-Vector Final Assault",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/security/anomaly-detection",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "{{random_ip}}",
+          "X-Real-IP": "{{random_ip}}",
+          "CF-Connecting-IP": "{{random_ip}}",
+          "User-Agent": "{{random_user_agent}}",
+          "CF-IPCountry": "{{random_country}}"
+        },
+        "body": {
+          "attack_vector": "multi-dimensional",
+          "bypass_attempt": true,
+          "payload_size": 999999,
+          "malicious_data": "{{injection_payload}}"
+        }
+      },
+      "execution": {
+        "delayMs": 100,
+        "iterations": 25
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "combined-3"
+      ]
+    }
+  ]
+}

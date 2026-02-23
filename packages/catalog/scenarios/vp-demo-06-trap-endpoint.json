@@ -1,0 +1,30 @@
+{
+  "id": "vp-demo-06-trap-endpoint",
+  "name": "06 - Trap Endpoint",
+  "category": "VP Demo",
+  "difficulty": "Beginner",
+  "description": "Honeypot endpoint probe to demonstrate trap detection.",
+  "kind": "campaign",
+  "tags": [
+    "campaign",
+    "vp-demo",
+    "honeypot",
+    "synapse",
+    "sequence-06"
+  ],
+  "sourceIp": "198.51.100.88",
+  "steps": [
+    {
+      "id": "trap-admin",
+      "name": "Trap Endpoint Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/wp-login.php"
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

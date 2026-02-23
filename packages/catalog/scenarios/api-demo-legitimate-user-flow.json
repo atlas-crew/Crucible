@@ -1,0 +1,169 @@
+{
+  "id": "api-demo-legitimate-user-flow",
+  "name": "Chimera Legitimate User Flow",
+  "category": "Benign Traffic",
+  "difficulty": "Beginner",
+  "description": "Simulates normal user behavior: checking auth methods, logging in, checking status, searching products, adding to cart",
+  "steps": [
+    {
+      "id": "check-auth-methods",
+      "name": "Check Available Auth Methods",
+      "stage": "initialization",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/methods"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "user-registration",
+      "name": "Register New User",
+      "stage": "authentication",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser_{{random}}",
+          "email": "testuser_{{random}}@example.com",
+          "password": "SecurePass123!",
+          "name": "Test User"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "check-auth-methods"
+      ]
+    },
+    {
+      "id": "user-login",
+      "name": "User Login",
+      "stage": "authentication",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser@example.com",
+          "password": "SecurePass123!"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "user-registration"
+      ]
+    },
+    {
+      "id": "check-auth-status",
+      "name": "Check Authentication Status",
+      "stage": "navigation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "dependsOn": [
+        "user-login"
+      ]
+    },
+    {
+      "id": "product-search",
+      "name": "Search Products",
+      "stage": "navigation",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop&category=electronics",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "dependsOn": [
+        "check-auth-status"
+      ]
+    },
+    {
+      "id": "add-to-cart",
+      "name": "Add Product to Cart",
+      "stage": "transaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "PROD-12345",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "product-search"
+      ]
+    },
+    {
+      "id": "check-inventory",
+      "name": "Check Inventory Availability",
+      "stage": "transaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/inventory/check",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_ids": [
+            "PROD-12345",
+            "PROD-67890"
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "add-to-cart"
+      ]
+    },
+    {
+      "id": "user-logout",
+      "name": "User Logout",
+      "stage": "cleanup",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/logout",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 200
+      },
+      "dependsOn": [
+        "check-inventory"
+      ]
+    }
+  ]
+}

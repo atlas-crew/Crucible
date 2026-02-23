@@ -1,0 +1,79 @@
+{
+  "id": "api-logic-graphql-dos",
+  "name": "GraphQL Depth & Complexity DoS",
+  "category": "API Logic",
+  "difficulty": "Advanced",
+  "description": "Exploits GraphQL endpoints with deeply nested and high-complexity queries to exhaust server resources.",
+  "steps": [
+    {
+      "id": "graphql-introspection",
+      "name": "Introspection Query",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/genai/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { __schema { types { name fields { name } } } }"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "graphql-deep-nesting",
+      "name": "Deeply Nested Query",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/genai/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { user { posts { comments { author { posts { comments { author { id } } } } } } } }"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "graphql-introspection"
+      ]
+    },
+    {
+      "id": "graphql-batching-attack",
+      "name": "GraphQL Query Batching",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/genai/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": [
+          { "query": "query { systemInfo { version } }" },
+          { "query": "query { systemInfo { version } }" },
+          { "query": "query { systemInfo { version } }" },
+          { "query": "query { systemInfo { version } }" },
+          { "query": "query { systemInfo { version } }" }
+        ]
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "graphql-deep-nesting"
+      ]
+    }
+  ]
+}

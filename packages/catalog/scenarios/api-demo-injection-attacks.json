@@ -1,0 +1,271 @@
+{
+  "id": "api-demo-injection-attacks",
+  "name": "Chimera Injection Attacks",
+  "category": "Injection",
+  "difficulty": "Advanced",
+  "description": "Comprehensive injection attacks including SQL, NoSQL, Command, LDAP, and XXE",
+  "steps": [
+    {
+      "id": "sql-union-discovery",
+      "name": "SQL Union Select Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop' UNION SELECT NULL--"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "sql-blind-boolean",
+      "name": "Blind SQL Boolean Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop' AND '1'='1"
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sql-union-discovery"
+      ]
+    },
+    {
+      "id": "sql-time-based",
+      "name": "Time-based SQL Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/check?username=admin' AND SLEEP(5)--"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sql-blind-boolean"
+      ]
+    },
+    {
+      "id": "nosql-injection-mongo",
+      "name": "NoSQL Injection MongoDB",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": {
+            "$ne": null
+          },
+          "password": {
+            "$ne": null
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sql-time-based"
+      ]
+    },
+    {
+      "id": "command-injection-ping",
+      "name": "OS Command Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/network/ping",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "host": "8.8.8.8; cat /etc/passwd"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "nosql-injection-mongo"
+      ]
+    },
+    {
+      "id": "ldap-injection",
+      "name": "LDAP Injection Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/users/search",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "filter": "(&(uid=*)(userPassword=*))"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "command-injection-ping"
+      ]
+    },
+    {
+      "id": "xxe-file-disclosure",
+      "name": "XXE File Disclosure",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/parse",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><data>&xxe;</data>"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ldap-injection"
+      ]
+    },
+    {
+      "id": "xxe-ssrf",
+      "name": "XXE to SSRF",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/import",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"http://169.254.169.254/latest/meta-data/\">]><data>&xxe;</data>"
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-file-disclosure"
+      ]
+    },
+    {
+      "id": "xpath-injection",
+      "name": "XPath Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/xml/query",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "//user[name/text()='' or '1'='1' and password/text()='']"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xxe-ssrf"
+      ]
+    },
+    {
+      "id": "template-injection",
+      "name": "Server-Side Template Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/templates/render",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "template": "{{7*7}}",
+          "name": "${7*7}",
+          "value": "#{7*7}"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "xpath-injection"
+      ]
+    },
+    {
+      "id": "header-injection-crlf",
+      "name": "HTTP Header Injection CRLF",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/redirect?url=http://example.com%0d%0aSet-Cookie:%20admin=true"
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "template-injection"
+      ]
+    },
+    {
+      "id": "json-injection",
+      "name": "JSON Injection Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/users/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"name\":\"user\",\"role\":\"user\",\"admin\":true,\"__proto__\":{\"isAdmin\":true}}"
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "header-injection-crlf"
+      ]
+    }
+  ]
+}

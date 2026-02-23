@@ -1,0 +1,350 @@
+{
+  "id": "healthcare-data-breach",
+  "name": "Healthcare Data Breach Campaign",
+  "category": "Healthcare Security",
+  "difficulty": "Expert",
+  "description": "Sophisticated healthcare data breach campaign targeting HIPAA-protected health information, medical records, insurance portability systems, and provider networks through coordinated multi-vector attacks",
+  "tags": [
+    "hipaa-violation",
+    "phi-breach",
+    "medical-records",
+    "health-insurance",
+    "provider-abuse"
+  ],
+  "steps": [
+    {
+      "id": "healthcare-recon-1",
+      "name": "Healthcare System Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/hipaa/directory",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; Medical-Research-Bot/1.0)"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      }
+    },
+    {
+      "id": "healthcare-recon-2",
+      "name": "Provider Network Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/providers/network/search",
+        "headers": {
+          "User-Agent": "HealthInsuranceBot/2.1 (+http://healthfinder.gov/)",
+          "Accept": "application/json"
+        },
+        "params": {
+          "specialty": "all",
+          "location": "nationwide",
+          "insurance_accepted": "all"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "healthcare-recon-1"
+      ]
+    },
+    {
+      "id": "healthcare-phi-probe-1",
+      "name": "PHI Access Point Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/phi/endpoints",
+        "headers": {
+          "User-Agent": "Healthcare-Integration-Service/3.2",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "dependsOn": [
+        "healthcare-recon-2"
+      ]
+    },
+    {
+      "id": "healthcare-auth-bypass-1",
+      "name": "Provider Authentication Bypass Attempt",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/providers/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "ProviderPortal/4.1.2"
+        },
+        "body": "{\"provider_id\": \"NPI1234567890\", \"credentials\": \"bypass\", \"auth_type\": \"emergency_access\", \"reason\": \"patient_critical_care\"}"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-phi-probe-1"
+      ]
+    },
+    {
+      "id": "healthcare-records-access-1",
+      "name": "Unauthorized Medical Records Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/hipaa/records/patient",
+        "headers": {
+          "User-Agent": "Medical-Records-System/5.0",
+          "Authorization": "Bearer fake_provider_token",
+          "X-Emergency-Access": "true"
+        },
+        "params": {
+          "patient_id": "all",
+          "date_range": "lifetime",
+          "include_sensitive": "true",
+          "export_format": "complete_medical_history"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-auth-bypass-1"
+      ]
+    },
+    {
+      "id": "healthcare-insurance-exploit-1",
+      "name": "Insurance Portability Data Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/insurance/portability/transfer",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compromised_insurance_token"
+        },
+        "body": "{\"source_policy\": \"POL123456789\", \"destination_policy\": \"attacker_controlled\", \"transfer_all_benefits\": true, \"bypass_waiting_period\": true, \"pre_existing_conditions\": \"clear\"}"
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-records-access-1"
+      ]
+    },
+    {
+      "id": "healthcare-provider-abuse-1",
+      "name": "Provider Network Resource Abuse",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/providers/network/billing",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Provider-ID": "NPI9999999999"
+        },
+        "body": "{\"procedure_codes\": [\"99999\", \"EXPERIMENTAL\"], \"billing_multiplier\": 10.0, \"insurance_override\": \"approve_all\", \"claim_amount\": 999999.99}"
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-insurance-exploit-1"
+      ]
+    },
+    {
+      "id": "healthcare-prescription-fraud-1",
+      "name": "Prescription System Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/medical/prescriptions/create",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer doctor_token_stolen"
+        },
+        "body": "{\"patient_id\": \"target_patient\", \"medication\": \"controlled_substances\", \"quantity\": 9999, \"refills\": 99, \"prescriber_override\": true, \"dea_number\": \"fake_dea_123\"}"
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-provider-abuse-1"
+      ]
+    },
+    {
+      "id": "healthcare-hipaa-violation-1",
+      "name": "Mass HIPAA Data Extraction",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/hipaa/export/bulk",
+        "headers": {
+          "User-Agent": "HIPAA-Compliance-Audit-Tool/1.0",
+          "Authorization": "Bearer escalated_admin_token"
+        },
+        "params": {
+          "patients": "all_active",
+          "data_types": "demographics,medical_history,prescriptions,insurance,lab_results,imaging",
+          "format": "unencrypted_csv",
+          "destination": "external_server"
+        }
+      },
+      "execution": {
+        "delayMs": 8000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-prescription-fraud-1"
+      ]
+    },
+    {
+      "id": "healthcare-genetic-data-1",
+      "name": "Genetic Information Theft",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/genetics/profiles",
+        "headers": {
+          "User-Agent": "Genomics-Research-Platform/2.3",
+          "Authorization": "Bearer research_access_token"
+        },
+        "params": {
+          "include_dna_sequences": "true",
+          "family_history": "complete",
+          "export_raw_data": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 6000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-hipaa-violation-1"
+      ]
+    },
+    {
+      "id": "healthcare-mental-health-1",
+      "name": "Mental Health Records Breach",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/mental-health/sessions",
+        "headers": {
+          "User-Agent": "Mental-Health-Analytics/1.5",
+          "Authorization": "Bearer therapist_token_compromised"
+        },
+        "params": {
+          "include_therapy_notes": "true",
+          "psychiatrist_notes": "true",
+          "patient_ids": "high_profile_targets"
+        }
+      },
+      "execution": {
+        "delayMs": 7000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-genetic-data-1"
+      ]
+    },
+    {
+      "id": "healthcare-exfiltration-1",
+      "name": "Healthcare Data Exfiltration via Encrypted Channel",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/hipaa/transfer/encrypted",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Secure-Medical-Transfer/3.0"
+        },
+        "body": "{\"destination\": \"https://dark-web-medical-marketplace.onion/upload\", \"encryption_key\": \"medical_master_key_2024\", \"data_classification\": \"phi_complete\", \"bypass_audit_log\": true, \"compression_ratio\": 0.1}"
+      },
+      "execution": {
+        "delayMs": 10000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-mental-health-1"
+      ]
+    },
+    {
+      "id": "healthcare-persistence-1",
+      "name": "Backdoor in Medical Records System",
+      "stage": "persistence",
+      "request": {
+        "method": "PUT",
+        "url": "/api/hipaa/system/configuration",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer system_admin_medical_token"
+        },
+        "body": "{\"audit_logging\": \"disabled\", \"access_controls\": \"bypass_for_emergency\", \"backup_system\": \"external_attacker_controlled\", \"encryption\": \"weakened_for_performance\"}"
+      },
+      "execution": {
+        "delayMs": 8500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-exfiltration-1"
+      ]
+    },
+    {
+      "id": "healthcare-cleanup-1",
+      "name": "Medical Audit Log Manipulation",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "DELETE",
+        "url": "/api/hipaa/audit-logs",
+        "headers": {
+          "User-Agent": "Medical-System-Maintenance/2.1",
+          "Authorization": "Bearer maintenance_token"
+        },
+        "params": {
+          "time_range": "last_24_hours",
+          "event_types": "data_access,phi_export,authentication_bypass,system_configuration",
+          "user_activities": "suspicious_patterns"
+        }
+      },
+      "execution": {
+        "delayMs": 6500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "healthcare-persistence-1"
+      ]
+    }
+  ]
+}

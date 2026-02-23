@@ -1,0 +1,313 @@
+{
+  "name": "Subdomain Discovery",
+  "description": "Subdomain enumeration via Host header manipulation over 10-15 minutes",
+  "category": "Reconnaissance",
+  "difficulty": "Beginner",
+  "tags": [
+    "subdomain",
+    "recon",
+    "low-risk",
+    "discovery",
+    "host-header"
+  ],
+  "metadata": {
+    "expectedBlocked": false,
+    "stage": "reconnaissance",
+    "estimatedDuration": "12-13 minutes",
+    "riskLevel": "minimal",
+    "detectionLikelihood": "low",
+    "targetTypes": [
+      "web-application",
+      "api",
+      "corporate"
+    ],
+    "techniques": [
+      "subdomain-enumeration",
+      "host-header-manipulation",
+      "passive-reconnaissance",
+      "infrastructure-mapping"
+    ],
+    "indicators": {
+      "requestRate": "0.03 req/sec",
+      "averageDelay": "37 seconds",
+      "totalRequests": 21,
+      "cumulativeWeight": 2.67
+    }
+  },
+  "id": "subdomain-reconnaissance",
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Test API subdomain endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "api.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Probe admin subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "admin.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Check development environment subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "dev.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Test staging environment subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "staging.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Probe test environment subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "test.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Check standard www subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "www.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Test mail server subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "mail.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Probe FTP subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "ftp.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Check VPN access subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "vpn.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Test customer portal subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "portal.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Probe dashboard subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "dashboard.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Check application subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "app.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Test mobile application subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "mobile.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Probe beta testing subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "beta.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Check CDN subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "cdn.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Test static content subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "static.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Probe assets subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "assets.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Check media storage subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "media.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-19",
+      "name": "Test blog subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "blog.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-20",
+      "name": "Probe e-commerce shop subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "shop.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-21",
+      "name": "Check alternative store subdomain",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Host": "store.target.com",
+          "User-Agent": "Mozilla/5.0 (compatible; SubdomainScanner/1.0)"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "crucible",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "nx run-many --target=build --all",
+    "test": "nx run-many --target=test --all",
+    "lint": "nx run-many --target=lint --all",
+    "type-check": "nx run-many --target=type-check --all"
+  },
+  "devDependencies": {
+    "nx": "21.6.4",
+    "@nx/js": "21.6.4",
+    "@nx/workspace": "21.6.4",
+    "typescript": "5.4.5",
+    "eslint": "8.57.1",
+    "prettier": "3.3.3"
+  }
+}

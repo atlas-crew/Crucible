@@ -1,0 +1,50 @@
+{
+  "id": "compliance-gdpr-consent-conflict",
+  "name": "GDPR Consent Preference Conflict Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Attempts to trigger a marketing event for a user who has explicitly opted out.",
+  "steps": [
+    {
+      "id": "get-consent-status",
+      "name": "Verify User Consent Status",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/user/consent",
+        "headers": {
+          "Authorization": "Bearer {{user_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "bodyContains": "\"marketing_opt_in\": false"
+      }
+    },
+    {
+      "id": "trigger-marketing-email",
+      "name": "Attempt to Trigger Marketing Email",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/marketing/send-promotion",
+        "headers": {
+          "Authorization": "Bearer {{admin_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "user_id": "{{user_id}}",
+          "campaign_id": "SUMMER_SALE_2024"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

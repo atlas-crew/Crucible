@@ -1,0 +1,386 @@
+{
+  "id": "insurance-claims-processing-fraud",
+  "name": "Insurance Claims Processing Fraud Campaign",
+  "category": "Insurance Fraud",
+  "difficulty": "Advanced",
+  "description": "Comprehensive insurance fraud attack targeting claims processing systems with policy manipulation, medical record tampering, duplicate claims submission, photo evidence forgery, and fraudulent claim escalation. Simulates real-world insurance fraud techniques including HIPAA violations and regulatory compliance bypasses.",
+  "tags": [
+    "insurance-fraud",
+    "claims-manipulation",
+    "medical-records",
+    "hipaa",
+    "duplicate-claims",
+    "photo-tampering",
+    "policy-fraud"
+  ],
+  "steps": [
+    {
+      "id": "fraud-recon-1",
+      "name": "Claims Portal Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/claims/portal",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "fraud-recon-2",
+      "name": "API Endpoint Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/claims/endpoints",
+        "headers": {
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "fraud-recon-1"
+      ]
+    },
+    {
+      "id": "fraud-recon-3",
+      "name": "Policy Information Gathering",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/policies/search",
+        "params": {
+          "policy_number": "../../../all_policies",
+          "include_sensitive": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-recon-2"
+      ]
+    },
+    {
+      "id": "fraud-recon-4",
+      "name": "Claims History Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/claims/history",
+        "headers": {
+          "Authorization": "Bearer fake_token_123",
+          "X-Policy-Override": "admin_access"
+        },
+        "params": {
+          "customer_id": "1' OR '1'='1",
+          "limit": "99999"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-recon-3"
+      ]
+    },
+    {
+      "id": "fraud-delivery-1",
+      "name": "Medical Record Injection",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/medical/records/update",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Provider-ID": "compromised_doctor_123"
+        },
+        "body": "{\"patient_id\": \"PAT-456789\", \"diagnosis\": \"Severe Chronic Pain Syndrome\", \"treatment_history\": \"Long-term disability required\", \"doctor_notes\": \"Patient unable to work - permanent disability recommended\", \"icd_codes\": [\"M79.3\", \"G89.4\"], \"backdated_entries\": true, \"override_audit\": true}"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-recon-4"
+      ]
+    },
+    {
+      "id": "fraud-delivery-2",
+      "name": "Photo Evidence Tampering",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/claims/photos/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data",
+          "X-Claim-Type": "auto_accident"
+        },
+        "body": "{\"claim_id\": \"CLM-789012\", \"photo_data\": \"data:image/jpeg;base64,/9j/fake_manipulated_damage_photo\", \"metadata\": {\"exif_stripped\": true, \"timestamp_modified\": \"2024-01-15T09:30:00Z\", \"original_timestamp\": \"2023-06-20T14:20:00Z\", \"manipulation_software\": \"photoshop\", \"damage_enhancement\": \"severe\"}, \"photo_type\": \"vehicle_damage\", \"verification_bypass\": true}"
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-delivery-1"
+      ]
+    },
+    {
+      "id": "fraud-exploit-1",
+      "name": "Inflated Claims Submission",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/claims/submit",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Emergency-Claim": "true",
+          "X-Fast-Track": "medical_emergency"
+        },
+        "body": "{\"policy_number\": \"POL-123456789\", \"claim_type\": \"medical_emergency\", \"incident_date\": \"2024-01-20\", \"claimed_amount\": 250000.00, \"actual_amount\": 2500.00, \"description\": \"Severe injuries requiring extensive treatment and permanent disability\", \"medical_provider\": \"Fraudulent Clinic LLC\", \"treatment_codes\": [\"99213\", \"99214\", \"99215\", \"29881\", \"64721\"], \"pre_existing_condition\": \"none\", \"override_deductible\": true, \"bypass_investigation\": true, \"rush_processing\": true}"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-delivery-2"
+      ]
+    },
+    {
+      "id": "fraud-exploit-2",
+      "name": "Duplicate Claims Submission",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/claims/submit",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Claim-Source": "mobile_app",
+          "X-Duplicate-Check": "bypass"
+        },
+        "body": "{\"policy_number\": \"POL-123456789\", \"claim_type\": \"medical_emergency\", \"incident_date\": \"2024-01-20\", \"claimed_amount\": 250000.00, \"reference_number\": \"REF-NEW-789\", \"description\": \"Additional complications from previous incident requiring emergency surgery\", \"provider_different\": true, \"claim_id_variation\": \"CLM-789013\", \"duplicate_detection_bypass\": \"system_migration\", \"force_approval\": true}"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-exploit-1"
+      ]
+    },
+    {
+      "id": "fraud-exploit-3",
+      "name": "Policy Limits Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/policies/POL-123456789/limits",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer admin_override_token",
+          "X-Policy-Admin": "emergency_adjustment"
+        },
+        "body": "{\"current_limits\": {\"medical\": 50000, \"disability\": 100000}, \"requested_limits\": {\"medical\": 500000, \"disability\": 1000000}, \"reason\": \"policy_upgrade_retroactive\", \"effective_date\": \"2023-01-01\", \"backdated\": true, \"audit_override\": true, \"compliance_bypass\": \"emergency_powers\"}"
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-exploit-2"
+      ]
+    },
+    {
+      "id": "fraud-exploit-4",
+      "name": "Provider Network Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/providers/register",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Provider-Verification": "expedited"
+        },
+        "body": "{\"provider_name\": \"Elite Medical Specialists\", \"license_number\": \"MD-FAKE-12345\", \"specialty\": \"Pain Management\", \"npi_number\": \"9999999999\", \"tax_id\": \"99-9999999\", \"address\": \"123 Fake Medical Plaza\", \"verification_bypass\": true, \"background_check\": \"skipped\", \"immediate_approval\": true, \"billing_rates\": {\"consultation\": 5000, \"procedure\": 25000, \"emergency\": 50000}}"
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-exploit-3"
+      ]
+    },
+    {
+      "id": "fraud-privilege-1",
+      "name": "Claims Adjuster Access Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/users/profile",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer user_token_456"
+        },
+        "body": "{\"user_id\": \"USR-789012\", \"role\": \"senior_claims_adjuster\", \"permissions\": [\"approve_unlimited\", \"override_investigation\", \"bypass_medical_review\", \"admin_access\"], \"approval_limits\": {\"individual_claim\": 999999999, \"daily_total\": 999999999}, \"investigation_bypass\": true, \"medical_review_override\": true}"
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-exploit-4"
+      ]
+    },
+    {
+      "id": "fraud-privilege-2",
+      "name": "System Administrator Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "POST",
+        "url": "/api/admin/users/create",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "emergency_access",
+          "Authorization": "Bearer escalated_token_789"
+        },
+        "body": "{\"username\": \"system_admin_backup\", \"email\": \"backup@claims-internal.com\", \"password\": \"TempAccess2024!\", \"role\": \"system_administrator\", \"permissions\": [\"*\"], \"bypass_mfa\": true, \"audit_exempt\": true, \"session_timeout\": \"never\", \"ip_restrictions\": \"none\"}"
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-privilege-1"
+      ]
+    },
+    {
+      "id": "fraud-persist-1",
+      "name": "Fraudulent Provider Relationship",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/providers/relationships",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer admin_token_001"
+        },
+        "body": "{\"provider_id\": \"PROV-FAKE-789\", \"relationship_type\": \"preferred_network\", \"billing_agreements\": {\"auto_approval\": true, \"payment_terms\": \"immediate\", \"investigation_exempt\": true}, \"kickback_percentage\": 15, \"fraudulent_claims_ignore\": true, \"audit_protection\": \"enabled\", \"compliance_override\": \"perpetual\"}"
+      },
+      "execution": {
+        "delayMs": 5500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-privilege-2"
+      ]
+    },
+    {
+      "id": "fraud-exfil-1",
+      "name": "Customer Database Extraction",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/customers/export",
+        "headers": {
+          "Authorization": "Bearer persistent_admin_token",
+          "Accept": "application/json"
+        },
+        "params": {
+          "format": "json",
+          "include": "pii,medical,financial,ssn",
+          "limit": "all",
+          "encryption": "none"
+        }
+      },
+      "execution": {
+        "delayMs": 6000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-persist-1"
+      ]
+    },
+    {
+      "id": "fraud-exfil-2",
+      "name": "Claims Processing Data Theft",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/claims/bulk-export",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer persistent_admin_token",
+          "X-Export-Override": "compliance_exempt"
+        },
+        "body": "{\"date_range\": {\"start\": \"2020-01-01\", \"end\": \"2024-12-31\"}, \"claim_types\": [\"all\"], \"include_sensitive\": true, \"include_medical\": true, \"include_financial\": true, \"format\": \"csv\", \"compression\": \"none\", \"audit_trail\": false, \"anonymization\": false, \"hipaa_override\": true}"
+      },
+      "execution": {
+        "delayMs": 7000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-exfil-1"
+      ]
+    },
+    {
+      "id": "fraud-exfil-3",
+      "name": "Fraudulent Payment Processing",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/process",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer persistent_admin_token",
+          "X-Payment-Override": "emergency_disbursement"
+        },
+        "body": "{\"claim_id\": \"CLM-789012\", \"payment_amount\": 250000.00, \"payee_account\": \"FRAUD-ACCT-999\", \"routing_number\": \"999999999\", \"account_number\": \"9999999999\", \"payment_method\": \"wire_transfer\", \"bypass_verification\": true, \"expedited_processing\": true, \"fraud_check_override\": true, \"compliance_bypass\": \"emergency_medical\", \"audit_exempt\": true}"
+      },
+      "execution": {
+        "delayMs": 8000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "fraud-exfil-2"
+      ]
+    }
+  ]
+}

