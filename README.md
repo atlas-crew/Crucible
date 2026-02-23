@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/crucible-banner.png" alt="Crucible — Open-source attack simulation and compliance assessment engine" />
+</p>
+
 # Crucible
 
 Next-generation security testing platform. Crucible provides a catalog of 80+ attack scenarios, a visual scenario editor, a real-time simulation engine, and pass/fail assessment scoring — all orchestrated through a web UI backed by WebSocket streaming.
