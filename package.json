@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
+    "dev": "pnpm --parallel --filter=web-client --filter=@crucible/demo-dashboard run dev",
     "build": "nx run-many --target=build --all",
     "test": "nx run-many --target=test --all",
     "lint": "nx run-many --target=lint --all",
