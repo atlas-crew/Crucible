@@ -7,6 +7,9 @@ dist-*/
 .env.local
 .envrc
 coverage/
+data/*.db
+data/*.db-wal
+data/*.db-shm
 
 # ---- Node ----
 # Logs

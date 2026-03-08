@@ -835,9 +835,9 @@ describe('ScenarioEngine', () => {
     });
   });
 
-  describe('cleanup', () => {
-    it('evicts terminal executions older than TTL', async () => {
-      const scenario = makeScenario('ttl-test', 1);
+  describe('cache eviction', () => {
+    it('evicts terminal executions from hot cache after delay', async () => {
+      const scenario = makeScenario('evict-test', 1);
       mockCatalog.getScenario.mockReturnValue(scenario);
 
       mockFetch.mockImplementation(() =>
@@ -845,43 +845,17 @@ describe('ScenarioEngine', () => {
       );
 
       const done = waitForEvent(engine, 'execution:completed');
-      const id = await engine.startScenario('ttl-test');
+      const id = await engine.startScenario('evict-test');
       await done;
 
+      // Still in cache immediately after completion
       expect(engine.getExecution(id)).toBeDefined();
 
-      // Advance past TTL (30 min) + cleanup interval (60s)
-      await vi.advanceTimersByTimeAsync(31 * 60_000);
+      // Advance past cache eviction delay (5s)
+      await vi.advanceTimersByTimeAsync(6_000);
 
+      // Evicted from hot cache
       expect(engine.getExecution(id)).toBeUndefined();
-    });
-
-    it('enforces max execution count', async () => {
-      const scenario = makeScenario('count-test', 1);
-      mockCatalog.getScenario.mockReturnValue(scenario);
-
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(mockResponse(200, 'ok')),
-      );
-
-      // Create 55 completed executions
-      const ids: string[] = [];
-      for (let i = 0; i < 55; i++) {
-        const done = waitForEvent(engine, 'execution:completed');
-        const id = await engine.startScenario('count-test');
-        ids.push(id);
-        await done;
-      }
-
-      // Trigger cleanup
-      await vi.advanceTimersByTimeAsync(61_000);
-
-      // Should be at most 50
-      let remaining = 0;
-      for (const id of ids) {
-        if (engine.getExecution(id)) remaining++;
-      }
-      expect(remaining).toBeLessThanOrEqual(50);
     });
   });
 
@@ -1765,10 +1739,8 @@ describe('ScenarioEngine', () => {
       ).rejects.toThrow('Scenario non-existent not found');
     });
 
-    it('destroy() clears the cleanup interval', () => {
-      const spy = vi.spyOn(global, 'clearInterval');
-      engine.destroy();
-      expect(spy).toHaveBeenCalled();
+    it('destroy() can be called without error', () => {
+      expect(() => engine.destroy()).not.toThrow();
     });
 
     it('AbortSignal on fetch propagates immediately without retry', async () => {

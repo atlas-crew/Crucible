@@ -52,3 +52,23 @@ export { validateScenario, type ValidationResult } from './validation/scenario-v
 
 // Service
 export { CatalogService } from './service/catalog-service.js';
+
+// Database
+export {
+  createDb,
+  type CrucibleDb,
+  executions,
+  executionSteps,
+  insertExecutionSchema,
+  selectExecutionSchema,
+  insertExecutionStepSchema,
+  selectExecutionStepSchema,
+  ExecutionRepository,
+  type ExecutionFilters,
+  type ScenarioExecution,
+  type ExecutionStepResult,
+  type ExecutionStatus,
+  type ExecutionMode,
+  type AssertionResult,
+  type PausedState,
+} from './db/index.js';

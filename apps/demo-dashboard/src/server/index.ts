@@ -1,9 +1,10 @@
+import { mkdirSync } from 'fs';
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import { config } from 'dotenv';
-import { CatalogService } from '@crucible/catalog';
+import { CatalogService, createDb, ExecutionRepository } from '@crucible/catalog';
 import { setupWebSocket } from './websocket.js';
 import { ScenarioEngine } from './engine.js';
 
@@ -18,8 +19,15 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
+// ── Database setup ───────────────────────────────────────────────────
+const dbPath = process.env.CRUCIBLE_DB_PATH || './data/crucible.db';
+mkdirSync(dbPath.replace(/\/[^/]+$/, ''), { recursive: true });
+const db = createDb(dbPath);
+const repo = new ExecutionRepository(db);
+repo.ensureTables();
+
 const catalog = new CatalogService();
-const engine = new ScenarioEngine(catalog);
+const engine = new ScenarioEngine(catalog, repo);
 
 // WebSocket setup
 setupWebSocket(wss, engine);
@@ -27,6 +35,42 @@ setupWebSocket(wss, engine);
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: Date.now(), scenarios: catalog.size, targetUrl: engine.targetUrl });
+});
+
+// ── Execution history ────────────────────────────────────────────────
+
+app.get('/api/executions', (req, res) => {
+  const { scenarioId, status, mode, since, until, limit, offset } = req.query;
+
+  const VALID_STATUSES = new Set(['pending', 'running', 'completed', 'failed', 'cancelled', 'paused', 'skipped']);
+  const VALID_MODES = new Set(['simulation', 'assessment']);
+  const MAX_LIMIT = 200;
+
+  if (mode && !VALID_MODES.has(mode as string)) {
+    return res.status(400).json({ error: `Invalid mode: ${mode}` });
+  }
+
+  let parsedStatuses: string[] | undefined;
+  if (status) {
+    parsedStatuses = (status as string).split(',');
+    const invalid = parsedStatuses.find((s) => !VALID_STATUSES.has(s));
+    if (invalid) {
+      return res.status(400).json({ error: `Invalid status: ${invalid}` });
+    }
+  }
+
+  const parsedLimit = Math.min(Math.max(1, limit ? Number(limit) : 50), MAX_LIMIT);
+
+  const executions = repo.listExecutions({
+    scenarioId: scenarioId as string | undefined,
+    status: parsedStatuses as never,
+    mode: mode as 'simulation' | 'assessment' | undefined,
+    since: since ? Number(since) : undefined,
+    until: until ? Number(until) : undefined,
+    limit: parsedLimit,
+    offset: offset ? Number(offset) : undefined,
+  });
+  res.json(executions);
 });
 
 // ── Global execution control routes (BEFORE parameterized routes) ────
@@ -149,5 +193,16 @@ app.get('/api/reports/:id', (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Demo Dashboard server running on port ${PORT} (${catalog.size} scenarios loaded, target: ${engine.targetUrl})`);
+  console.log(`Demo Dashboard server running on port ${PORT} (${catalog.size} scenarios loaded, target: ${engine.targetUrl}, db: ${dbPath})`);
 });
+
+// ── Graceful shutdown ─────────────────────────────────────────────────
+function shutdown() {
+  console.log('Shutting down…');
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { nanoid } from 'nanoid';
-import { CatalogService } from '@crucible/catalog';
+import { CatalogService, ExecutionRepository } from '@crucible/catalog';
 import type { Scenario, ScenarioStep } from '@crucible/catalog';
 import type {
   ScenarioExecution,
@@ -28,14 +28,13 @@ interface QueuedWaiter {
 
 const DEFAULT_TARGET_URL = 'http://localhost:8880';
 const DEFAULT_MAX_CONCURRENCY = 3;
-const CLEANUP_INTERVAL_MS = 60_000;
-const CLEANUP_TTL_MS = 30 * 60_000; // 30 minutes
-const CLEANUP_MAX_EXECUTIONS = 50;
+const CACHE_EVICT_DELAY_MS = 5_000;
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
 export class ScenarioEngine extends EventEmitter {
   private catalog: CatalogService;
+  private repo: ExecutionRepository | null;
   private executions: Map<string, ScenarioExecution>;
   private controls: Map<string, ExecutionControl> = new Map();
 
@@ -47,27 +46,20 @@ export class ScenarioEngine extends EventEmitter {
   private activeCount = 0;
   private queue: QueuedWaiter[] = [];
 
-  // Cleanup interval
-  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-  constructor(catalog: CatalogService) {
+  constructor(catalog: CatalogService, repo?: ExecutionRepository) {
     super();
     this.catalog = catalog;
+    this.repo = repo ?? null;
     this.executions = new Map();
     this.targetUrl = (process.env.CRUCIBLE_TARGET_URL ?? DEFAULT_TARGET_URL).replace(/\/+$/, '');
     this.maxConcurrency = parseInt(
       process.env.CRUCIBLE_MAX_CONCURRENCY ?? '',
       10,
     ) || DEFAULT_MAX_CONCURRENCY;
-
-    this.cleanupTimer = setInterval(() => this.cleanupExecutions(), CLEANUP_INTERVAL_MS);
   }
 
   destroy(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
+    // Reserved for future cleanup
   }
 
   // ── Concurrency semaphore ────────────────────────────────────────
@@ -91,35 +83,14 @@ export class ScenarioEngine extends EventEmitter {
     }
   }
 
-  // ── Cleanup ──────────────────────────────────────────────────────
+  // ── Cache eviction ──────────────────────────────────────────────
 
-  private cleanupExecutions(): void {
-    const now = Date.now();
-
-    // TTL pass: remove terminal executions older than TTL
-    for (const [id, exec] of this.executions) {
-      if (TERMINAL_STATUSES.has(exec.status) && exec.completedAt) {
-        if (now - exec.completedAt > CLEANUP_TTL_MS) {
-          this.executions.delete(id);
-          this.controls.delete(id);
-        }
-      }
-    }
-
-    // Max-count pass: evict oldest terminal executions until under limit
-    if (this.executions.size > CLEANUP_MAX_EXECUTIONS) {
-      const terminal = [...this.executions.entries()]
-        .filter(([, e]) => TERMINAL_STATUSES.has(e.status))
-        .sort((a, b) => (a[1].completedAt ?? 0) - (b[1].completedAt ?? 0));
-
-      let excess = this.executions.size - CLEANUP_MAX_EXECUTIONS;
-      for (const [id] of terminal) {
-        if (excess <= 0) break;
-        this.executions.delete(id);
-        this.controls.delete(id);
-        excess--;
-      }
-    }
+  /** Remove a terminal execution from the hot cache after a delay. */
+  private scheduleEviction(id: string): void {
+    setTimeout(() => {
+      this.executions.delete(id);
+      this.controls.delete(id);
+    }, CACHE_EVICT_DELAY_MS);
   }
 
   // ── Start scenario ───────────────────────────────────────────────
@@ -149,6 +120,7 @@ export class ScenarioEngine extends EventEmitter {
     };
 
     this.executions.set(executionId, execution);
+    this.repo?.insertExecution(execution);
 
     // Create control state for this execution
     this.controls.set(executionId, {
@@ -163,7 +135,13 @@ export class ScenarioEngine extends EventEmitter {
       execution.status = 'failed';
       execution.error = err instanceof Error ? err.message : String(err);
       execution.completedAt = Date.now();
+      this.repo?.updateExecution(executionId, {
+        status: 'failed',
+        error: execution.error,
+        completedAt: execution.completedAt,
+      });
       this.emit('execution:failed', execution);
+      this.scheduleEviction(executionId);
     });
 
     return executionId;
@@ -176,6 +154,7 @@ export class ScenarioEngine extends EventEmitter {
 
     try {
       execution.status = 'running';
+      this.repo?.updateExecution(execution.id, { status: 'running' });
       this.emit('execution:started', execution);
 
       const ctrl = this.controls.get(execution.id);
@@ -191,7 +170,9 @@ export class ScenarioEngine extends EventEmitter {
         if (ctrl?.abortController.signal.aborted) {
           execution.status = 'cancelled';
           execution.completedAt = Date.now();
+          this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
           this.emit('execution:cancelled', execution);
+          this.scheduleEviction(execution.id);
           return;
         }
 
@@ -207,6 +188,7 @@ export class ScenarioEngine extends EventEmitter {
               [...stepResults.entries()].map(([k, v]) => [k, { ...v }]),
             ),
           };
+          this.repo?.updateExecution(execution.id, { status: 'paused', pausedState: execution.pausedState });
           this.emit('execution:paused', execution);
 
           // Wait for resume signal
@@ -218,12 +200,15 @@ export class ScenarioEngine extends EventEmitter {
           if (ctrl.abortController.signal.aborted) {
             execution.status = 'cancelled';
             execution.completedAt = Date.now();
+            this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
             this.emit('execution:cancelled', execution);
+            this.scheduleEviction(execution.id);
             return;
           }
 
           execution.status = 'running';
           execution.pausedState = undefined;
+          this.repo?.updateExecution(execution.id, { status: 'running', pausedState: undefined });
           this.emit('execution:resumed', execution);
         }
 
@@ -253,6 +238,7 @@ export class ScenarioEngine extends EventEmitter {
                 stepResults.set(step.id, skipped);
                 execution.steps.push(skipped);
                 completedSteps.add(step.id);
+                this.repo?.upsertStep(execution.id, skipped);
                 this.emit('execution:updated', execution);
                 return;
               }
@@ -266,6 +252,7 @@ export class ScenarioEngine extends EventEmitter {
             };
             stepResults.set(step.id, result);
             execution.steps.push(result);
+            this.repo?.upsertStep(execution.id, result);
             this.emit('execution:updated', execution);
 
             const maxAttempts = (step.execution?.retries ?? 0) + 1;
@@ -302,6 +289,7 @@ export class ScenarioEngine extends EventEmitter {
                 result.duration = result.completedAt - result.startedAt!;
                 completedSteps.add(step.id);
                 passedSteps++;
+                this.repo?.upsertStep(execution.id, result);
                 this.emit('execution:updated', execution);
                 break; // success — no more retries
               } catch (err) {
@@ -310,6 +298,7 @@ export class ScenarioEngine extends EventEmitter {
                   result.status = 'cancelled';
                   result.completedAt = Date.now();
                   completedSteps.add(step.id);
+                  this.repo?.upsertStep(execution.id, result);
                   this.emit('execution:updated', execution);
                   return;
                 }
@@ -319,6 +308,7 @@ export class ScenarioEngine extends EventEmitter {
                   result.error = err instanceof Error ? err.message : String(err);
                   result.completedAt = Date.now();
                   completedSteps.add(step.id);
+                  this.repo?.upsertStep(execution.id, result);
                   this.emit('execution:updated', execution);
                 }
                 // else: retry
@@ -327,6 +317,7 @@ export class ScenarioEngine extends EventEmitter {
 
             // Snapshot context into execution for observability
             execution.context = Object.fromEntries(context);
+            this.repo?.updateExecution(execution.id, { context: execution.context });
           }),
         );
       }
@@ -335,7 +326,9 @@ export class ScenarioEngine extends EventEmitter {
       if (ctrl?.abortController.signal.aborted) {
         execution.status = 'cancelled';
         execution.completedAt = Date.now();
+        this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
         this.emit('execution:cancelled', execution);
+        this.scheduleEviction(execution.id);
         return;
       }
 
@@ -354,7 +347,14 @@ export class ScenarioEngine extends EventEmitter {
         };
       }
 
+      this.repo?.updateExecution(execution.id, {
+        status: 'completed',
+        completedAt: execution.completedAt,
+        duration: execution.duration,
+        report: execution.report,
+      });
       this.emit('execution:completed', execution);
+      this.scheduleEviction(execution.id);
     } finally {
       this.releaseSlot();
     }
@@ -609,7 +609,7 @@ export class ScenarioEngine extends EventEmitter {
   }
 
   async restartExecution(id: string): Promise<string | null> {
-    const execution = this.executions.get(id);
+    const execution = this.getExecution(id);
     if (!execution) return null;
 
     // Cancel if active
@@ -654,7 +654,7 @@ export class ScenarioEngine extends EventEmitter {
   // ── Queries ──────────────────────────────────────────────────────
 
   getExecution(executionId: string): ScenarioExecution | undefined {
-    return this.executions.get(executionId);
+    return this.executions.get(executionId) ?? this.repo?.getExecution(executionId);
   }
 }
 
