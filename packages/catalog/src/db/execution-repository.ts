@@ -117,10 +117,26 @@ export class ExecutionRepository {
         duration INTEGER,
         error TEXT,
         logs TEXT,
+        result TEXT,
         attempts INTEGER NOT NULL DEFAULT 0,
         assertions TEXT
       )
     `);
+    try {
+      this.db.run(sql`ALTER TABLE execution_steps ADD COLUMN result TEXT`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const causeMessage =
+        error && typeof error === 'object' && 'cause' in error
+          ? String((error as { cause?: unknown }).cause ?? '')
+          : '';
+      if (
+        !message.includes('duplicate column name')
+        && !causeMessage.includes('duplicate column name')
+      ) {
+        throw error;
+      }
+    }
     this.db.run(sql`CREATE INDEX IF NOT EXISTS idx_executions_scenario_started ON executions(scenario_id, started_at)`);
     this.db.run(sql`CREATE INDEX IF NOT EXISTS idx_executions_status_started ON executions(status, started_at)`);
     this.db.run(sql`CREATE INDEX IF NOT EXISTS idx_steps_execution_id ON execution_steps(execution_id)`);
@@ -157,6 +173,7 @@ export class ExecutionRepository {
           duration: step.duration ?? null,
           error: step.error ?? null,
           logs: step.logs ?? null,
+          result: step.result ?? null,
           attempts: step.attempts,
           assertions: step.assertions ?? null,
         }).run();
@@ -211,6 +228,7 @@ export class ExecutionRepository {
           duration: step.duration ?? null,
           error: step.error ?? null,
           logs: step.logs ?? null,
+          result: step.result ?? null,
           attempts: step.attempts,
           assertions: step.assertions ?? null,
         })
@@ -316,6 +334,7 @@ export class ExecutionRepository {
       duration: step.duration ?? null,
       error: step.error ?? null,
       logs: step.logs ?? null,
+      result: step.result ?? null,
       attempts: step.attempts,
       assertions: step.assertions ?? null,
     }).run();
@@ -338,6 +357,7 @@ export class ExecutionRepository {
         duration: s.duration ?? undefined,
         error: s.error ?? undefined,
         logs: (s.logs as string[] | null) ?? undefined,
+        result: (s.result as Record<string, unknown> | null) ?? undefined,
         attempts: s.attempts,
         assertions: (s.assertions as AssertionResult[] | null) ?? undefined,
       })),

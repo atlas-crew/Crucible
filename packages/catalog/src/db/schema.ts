@@ -51,6 +51,7 @@ export const executionSteps = sqliteTable('execution_steps', {
   duration: integer('duration'),
   error: text('error'),
   logs: text('logs', { mode: 'json' }).$type<string[]>(),
+  result: text('result', { mode: 'json' }).$type<Record<string, unknown>>(),
   attempts: integer('attempts').notNull().default(0),
   assertions: text('assertions', { mode: 'json' }).$type<
     { field: string; expected: unknown; actual: unknown; passed: boolean }[]

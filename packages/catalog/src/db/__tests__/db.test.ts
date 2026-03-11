@@ -56,6 +56,7 @@ describe('createDb', () => {
         duration INTEGER,
         error TEXT,
         logs TEXT,
+        result TEXT,
         attempts INTEGER NOT NULL DEFAULT 0,
         assertions TEXT
       );
@@ -109,6 +110,12 @@ describe('Zod schemas from drizzle-zod', () => {
       stepId: 'step-1',
       status: 'completed',
       attempts: 1,
+      result: {
+        response: {
+          status: 200,
+          body: { ok: true },
+        },
+      },
       assertions: [
         { field: 'status', expected: 200, actual: 200, passed: true },
       ],

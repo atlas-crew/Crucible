@@ -69,6 +69,10 @@ describe('ExecutionRepository', () => {
     expect(repo.getExecution('nope')).toBeUndefined();
   });
 
+  it('ensureTables is idempotent when new columns already exist', () => {
+    expect(() => repo.ensureTables()).not.toThrow();
+  });
+
   // ── Update ──────────────────────────────────────────────────────
 
   it('updates execution fields', () => {
@@ -252,6 +256,30 @@ describe('ExecutionRepository', () => {
 
     const retrieved = repo.getExecution(exec.id);
     expect(retrieved!.steps[0].assertions).toEqual(assertions);
+  });
+
+  it('round-trips step response result payloads', () => {
+    const result = {
+      response: {
+        status: 403,
+        headers: { 'content-type': 'application/json' },
+        body: { error: 'blocked' },
+      },
+      retention: {
+        policy: 'all',
+        truncated: false,
+        contentType: 'application/json',
+        originalBytes: 19,
+        storedBytes: 19,
+        bodyFormat: 'json',
+      },
+    };
+    const step = makeStep({ stepId: 'blocked', result });
+    const exec = makeExecution({ steps: [step] });
+    repo.insertExecution(exec);
+
+    const retrieved = repo.getExecution(exec.id);
+    expect(retrieved!.steps[0].result).toEqual(result);
   });
 
   // ── Delete + cascade ────────────────────────────────────────────

@@ -24,11 +24,23 @@ interface QueuedWaiter {
   resolve: () => void;
 }
 
+type StepBodyRetentionPolicy = 'all' | 'failed-only' | 'none';
+
+interface StepHttpResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: unknown;
+  bodyText: string;
+  contentType: string;
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const DEFAULT_TARGET_URL = 'http://localhost:8880';
 const DEFAULT_MAX_CONCURRENCY = 3;
 const CACHE_EVICT_DELAY_MS = 5_000;
+const DEFAULT_STEP_BODY_RETENTION: StepBodyRetentionPolicy = 'all';
+const DEFAULT_STEP_BODY_MAX_BYTES = 64 * 1024;
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
@@ -45,6 +57,8 @@ export class ScenarioEngine extends EventEmitter {
   private maxConcurrency: number;
   private activeCount = 0;
   private queue: QueuedWaiter[] = [];
+  private stepBodyRetention: StepBodyRetentionPolicy;
+  private stepBodyMaxBytes: number;
 
   constructor(catalog: CatalogService, repo?: ExecutionRepository) {
     super();
@@ -56,6 +70,11 @@ export class ScenarioEngine extends EventEmitter {
       process.env.CRUCIBLE_MAX_CONCURRENCY ?? '',
       10,
     ) || DEFAULT_MAX_CONCURRENCY;
+    this.stepBodyRetention = parseStepBodyRetention(process.env.CRUCIBLE_STEP_BODY_RETENTION);
+    this.stepBodyMaxBytes = parsePositiveInteger(
+      process.env.CRUCIBLE_STEP_BODY_MAX_BYTES,
+      DEFAULT_STEP_BODY_MAX_BYTES,
+    );
   }
 
   destroy(): void {
@@ -257,12 +276,14 @@ export class ScenarioEngine extends EventEmitter {
 
             const maxAttempts = (step.execution?.retries ?? 0) + 1;
             const signal = ctrl?.abortController.signal;
+            let latestResponse: StepHttpResponse | undefined;
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               result.attempts = attempt;
 
               try {
                 const response = await this.executeStep(step, context, signal);
+                latestResponse = response;
 
                 // ── Run extract rules ─────────────────────────────────
                 if (step.extract) {
@@ -285,6 +306,7 @@ export class ScenarioEngine extends EventEmitter {
                 }
 
                 result.status = 'completed';
+                result.result = this.buildPersistedStepResult(response, 'completed');
                 result.completedAt = Date.now();
                 result.duration = result.completedAt - result.startedAt!;
                 completedSteps.add(step.id);
@@ -306,7 +328,11 @@ export class ScenarioEngine extends EventEmitter {
                 if (attempt >= maxAttempts) {
                   result.status = 'failed';
                   result.error = err instanceof Error ? err.message : String(err);
+                  result.result = latestResponse
+                    ? this.buildPersistedStepResult(latestResponse, 'failed')
+                    : undefined;
                   result.completedAt = Date.now();
+                  result.duration = result.completedAt - result.startedAt!;
                   completedSteps.add(step.id);
                   this.repo?.upsertStep(execution.id, result);
                   this.emit('execution:updated', execution);
@@ -368,7 +394,7 @@ export class ScenarioEngine extends EventEmitter {
     step: ScenarioStep,
     context: Map<string, unknown>,
     signal?: AbortSignal,
-  ): Promise<{ status: number; headers: Record<string, string>; body: unknown }> {
+  ): Promise<StepHttpResponse> {
     console.log(`Executing step ${step.id}: ${step.name}`);
 
     // ── Delay + jitter ──────────────────────────────────────────────
@@ -399,7 +425,7 @@ export class ScenarioEngine extends EventEmitter {
 
     // ── Iterations ──────────────────────────────────────────────────
     const iterations = step.execution?.iterations ?? 1;
-    let lastResponse: { status: number; headers: Record<string, string>; body: unknown } | undefined;
+    let lastResponse: StepHttpResponse | undefined;
 
     for (let i = 0; i < iterations; i++) {
       try {
@@ -415,15 +441,24 @@ export class ScenarioEngine extends EventEmitter {
           responseHeaders[k] = v;
         });
 
-        let responseBody: unknown;
         const contentType = response.headers.get('content-type') ?? '';
+        const responseText = await response.text();
+        let responseBody: unknown = responseText;
         if (contentType.includes('application/json')) {
-          responseBody = await response.json();
-        } else {
-          responseBody = await response.text();
+          try {
+            responseBody = responseText.length > 0 ? JSON.parse(responseText) : null;
+          } catch {
+            responseBody = responseText;
+          }
         }
 
-        lastResponse = { status: response.status, headers: responseHeaders, body: responseBody };
+        lastResponse = {
+          status: response.status,
+          headers: responseHeaders,
+          body: responseBody,
+          bodyText: responseText,
+          contentType,
+        };
 
         console.log(`Step ${step.id} iteration ${i + 1}/${iterations}: ${response.status}`);
       } catch (err) {
@@ -439,6 +474,47 @@ export class ScenarioEngine extends EventEmitter {
     }
 
     return lastResponse;
+  }
+
+  private buildPersistedStepResult(
+    response: StepHttpResponse,
+    outcome: 'completed' | 'failed',
+  ): ExecutionStepResult['result'] | undefined {
+    if (this.stepBodyRetention === 'none') {
+      return undefined;
+    }
+    if (this.stepBodyRetention === 'failed-only' && outcome !== 'failed') {
+      return undefined;
+    }
+
+    const originalBytes = Buffer.byteLength(response.bodyText, 'utf8');
+    const truncated = originalBytes > this.stepBodyMaxBytes;
+    const bodyFormat = response.contentType.includes('application/json') && !truncated ? 'json' : 'text';
+    const storedBody = truncated
+      ? truncateUtf8(response.bodyText, this.stepBodyMaxBytes)
+      : bodyFormat === 'json'
+        ? response.body
+        : response.bodyText;
+    const storedBytes = Buffer.byteLength(
+      typeof storedBody === 'string' ? storedBody : JSON.stringify(storedBody ?? ''),
+      'utf8',
+    );
+
+    return {
+      response: {
+        status: response.status,
+        headers: response.headers,
+        body: storedBody,
+      },
+      retention: {
+        policy: this.stepBodyRetention,
+        truncated,
+        contentType: response.contentType,
+        originalBytes,
+        storedBytes,
+        bodyFormat,
+      },
+    };
   }
 
   /** Evaluate the `when` condition against a prior step's result. */
@@ -688,4 +764,24 @@ function getJsonPath(obj: unknown, path: string): unknown {
     current = (current as Record<string, unknown>)[part];
   }
   return current;
+}
+
+function parseStepBodyRetention(value: string | undefined): StepBodyRetentionPolicy {
+  switch (value) {
+    case 'all':
+    case 'failed-only':
+    case 'none':
+      return value;
+    default:
+      return DEFAULT_STEP_BODY_RETENTION;
+  }
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function truncateUtf8(value: string, maxBytes: number): string {
+  return Buffer.from(value, 'utf8').subarray(0, maxBytes).toString('utf8');
 }

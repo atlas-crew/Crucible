@@ -61,6 +61,8 @@ describe('ScenarioEngine', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     // Reset env between tests
     delete process.env.CRUCIBLE_MAX_CONCURRENCY;
+    delete process.env.CRUCIBLE_STEP_BODY_RETENTION;
+    delete process.env.CRUCIBLE_STEP_BODY_MAX_BYTES;
     engine = new ScenarioEngine(mockCatalog);
   });
 
@@ -937,6 +939,134 @@ describe('ScenarioEngine', () => {
 
       // Resolve fetches
       resolvers.forEach((r) => r(undefined));
+    });
+  });
+
+  describe('response body retention', () => {
+    it('captures successful step response bodies by default', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'retain-success',
+        name: 'Retain Success',
+        steps: [
+          {
+            id: 'fetch-profile',
+            name: 'Fetch Profile',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/profile' },
+            expect: { status: 200 },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(200, { profile: { id: 'user-1' } }, { 'content-type': 'application/json' }),
+      );
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('retain-success');
+      const execution = await done;
+
+      expect(execution.steps[0].result).toEqual({
+        response: {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          body: { profile: { id: 'user-1' } },
+        },
+        retention: expect.objectContaining({
+          policy: 'all',
+          truncated: false,
+          contentType: 'application/json',
+          bodyFormat: 'json',
+        }),
+      });
+    });
+
+    it('can limit body capture to failed steps only', async () => {
+      process.env.CRUCIBLE_STEP_BODY_RETENTION = 'failed-only';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'retain-failed-only',
+        name: 'Retain Failed Only',
+        steps: [
+          {
+            id: 'ok-step',
+            name: 'OK Step',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/ok' },
+            expect: { status: 200 },
+          },
+          {
+            id: 'blocked-step',
+            name: 'Blocked Step',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/blocked' },
+            expect: { blocked: true },
+            dependsOn: ['ok-step'],
+          },
+        ],
+      });
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(200, 'ok'))
+        .mockResolvedValueOnce(mockResponse(200, 'still allowed'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('retain-failed-only');
+      const execution = await done;
+
+      expect(execution.steps[0].result).toBeUndefined();
+      expect(execution.steps[1].result).toEqual({
+        response: {
+          status: 200,
+          headers: {},
+          body: 'still allowed',
+        },
+        retention: expect.objectContaining({
+          policy: 'failed-only',
+          truncated: false,
+          bodyFormat: 'text',
+        }),
+      });
+    });
+
+    it('truncates retained bodies when they exceed the configured byte cap', async () => {
+      process.env.CRUCIBLE_STEP_BODY_MAX_BYTES = '12';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'retain-truncated',
+        name: 'Retain Truncated',
+        steps: [
+          {
+            id: 'download',
+            name: 'Download',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/download' },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'abcdefghijklmnop'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('retain-truncated');
+      const execution = await done;
+      const result = execution.steps[0].result as {
+        response: { body: string };
+        retention: { truncated: boolean; storedBytes: number; originalBytes: number; bodyFormat: string };
+      };
+
+      expect(result.response.body).toBe('abcdefghijkl');
+      expect(result.retention).toEqual(expect.objectContaining({
+        policy: 'all',
+        truncated: true,
+        storedBytes: 12,
+        originalBytes: 16,
+        bodyFormat: 'text',
+      }));
     });
   });
 
