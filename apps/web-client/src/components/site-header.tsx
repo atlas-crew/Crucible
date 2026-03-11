@@ -12,6 +12,7 @@ const navItems = [
   { href: "/scenarios", label: "Scenarios" },
   { href: "/simulations", label: "Simulations" },
   { href: "/assessments", label: "Assessments" },
+  { href: "/history", label: "History", matchSubPaths: true },
 ];
 
 export function SiteHeader() {
@@ -46,8 +47,8 @@ export function SiteHeader() {
 
         {/* Navigation */}
         <nav className="flex items-center gap-1">
-          {navItems.map(({ href, label }) => {
-            const isActive = pathname === href;
+          {navItems.map(({ href, label, matchSubPaths }) => {
+            const isActive = pathname === href || (matchSubPaths ? pathname.startsWith(`${href}/`) : false);
             return (
               <Link
                 key={href}

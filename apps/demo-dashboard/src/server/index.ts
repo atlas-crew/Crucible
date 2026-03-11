@@ -90,6 +90,14 @@ app.post('/api/executions/cancel-all', (_req, res) => {
   res.json({ count });
 });
 
+app.get('/api/executions/:id', (req, res) => {
+  const execution = engine.getExecution(req.params.id);
+  if (!execution) {
+    return res.status(404).json({ error: 'Execution not found' });
+  }
+  res.json(execution);
+});
+
 // ── Per-execution control routes ─────────────────────────────────────
 
 app.post('/api/executions/:id/pause', (req, res) => {
