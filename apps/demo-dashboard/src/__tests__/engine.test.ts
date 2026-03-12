@@ -60,9 +60,12 @@ describe('ScenarioEngine', () => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     // Reset env between tests
+    delete process.env.CRUCIBLE_TARGET_URL;
+    delete process.env.CRUCIBLE_OUTBOUND_ALLOWLIST;
     delete process.env.CRUCIBLE_MAX_CONCURRENCY;
     delete process.env.CRUCIBLE_STEP_BODY_RETENTION;
     delete process.env.CRUCIBLE_STEP_BODY_MAX_BYTES;
+    process.env.CRUCIBLE_TARGET_URL = 'http://localhost';
     engine = new ScenarioEngine(mockCatalog);
   });
 
@@ -109,6 +112,288 @@ describe('ScenarioEngine', () => {
 
       expect(execution.status).toBe('completed');
       expect(execution.context).toHaveProperty('token', 'jwt-abc-123');
+    });
+  });
+
+  describe('outbound request validation', () => {
+    it('rejects invalid CRUCIBLE_TARGET_URL values', () => {
+      process.env.CRUCIBLE_TARGET_URL = 'ftp://localhost:8888';
+
+      expect(() => new ScenarioEngine(mockCatalog)).toThrow(
+        'CRUCIBLE_TARGET_URL must use http or https',
+      );
+    });
+
+    it('blocks absolute URLs outside the default allowlist', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-blocked',
+        name: 'SSRF Blocked',
+        steps: [
+          {
+            id: 'blocked',
+            name: 'Blocked',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://evil.example/internal' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-blocked');
+      const execution = await done;
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('Outbound request blocked');
+    });
+
+    it('allows configured domains and CIDR ranges', async () => {
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST = 'evil.example,10.0.0.0/8';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-allowlist',
+        name: 'SSRF Allowlist',
+        steps: [
+          {
+            id: 'domain-step',
+            name: 'Domain Step',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://evil.example/internal' },
+          },
+          {
+            id: 'cidr-step',
+            name: 'CIDR Step',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://10.24.8.9/status' },
+            dependsOn: ['domain-step'],
+          },
+        ],
+      });
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(200, 'ok'))
+        .mockResolvedValueOnce(mockResponse(200, 'ok'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-allowlist');
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[0][0]).toBe('http://evil.example/internal');
+      expect(mockFetch.mock.calls[1][0]).toBe('http://10.24.8.9/status');
+    });
+
+    it('allows explicit host:port entries without allowing the default port', async () => {
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST = 'evil.example:8443';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-explicit-port',
+        name: 'SSRF Explicit Port',
+        steps: [
+          {
+            id: 'allowed-port',
+            name: 'Allowed Port',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://evil.example:8443/internal' },
+          },
+          {
+            id: 'blocked-default-port',
+            name: 'Blocked Default Port',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://evil.example/internal' },
+            dependsOn: ['allowed-port'],
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'ok'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-explicit-port');
+      const execution = await done;
+      const blockedStep = execution.steps.find((step) => step.stepId === 'blocked-default-port');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0][0]).toBe('http://evil.example:8443/internal');
+      expect(blockedStep?.status).toBe('failed');
+      expect(blockedStep?.error).toContain('evil.example:80');
+    });
+
+    it('supports wildcard domains and IPv6 allowlist entries', async () => {
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST = '*.example.com,http://[::1]:8080';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-wildcard-ipv6',
+        name: 'SSRF Wildcard IPv6',
+        steps: [
+          {
+            id: 'wildcard-step',
+            name: 'Wildcard Step',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://api.example.com/status' },
+          },
+          {
+            id: 'ipv6-step',
+            name: 'IPv6 Step',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://[::1]:8080/health' },
+            dependsOn: ['wildcard-step'],
+          },
+        ],
+      });
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(200, 'ok'))
+        .mockResolvedValueOnce(mockResponse(200, 'ok'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-wildcard-ipv6');
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[0][0]).toBe('http://api.example.com/status');
+      expect(mockFetch.mock.calls[1][0]).toBe('http://[::1]:8080/health');
+    });
+
+    it('blocks allowlisted hosts on unexpected ports', async () => {
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST = 'evil.example';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-port-blocked',
+        name: 'SSRF Port Blocked',
+        steps: [
+          {
+            id: 'blocked',
+            name: 'Blocked',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://evil.example:8443/internal' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-port-blocked');
+      const execution = await done;
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('evil.example:8443');
+    });
+
+    it('blocks CIDR allowlist entries on non-default ports', async () => {
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST = '10.0.0.0/8';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-cidr-port-blocked',
+        name: 'SSRF CIDR Port Blocked',
+        steps: [
+          {
+            id: 'blocked',
+            name: 'Blocked',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://10.24.8.9:8080/status' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-cidr-port-blocked');
+      const execution = await done;
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('10.24.8.9:8080');
+    });
+
+    it('implicitly allowlists the configured https target origin only', async () => {
+      process.env.CRUCIBLE_TARGET_URL = 'https://target.example:8443/';
+      engine.destroy();
+      engine = new ScenarioEngine(mockCatalog);
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-https-target',
+        name: 'SSRF HTTPS Target',
+        steps: [
+          {
+            id: 'allowed-target',
+            name: 'Allowed Target',
+            stage: 'main',
+            request: { method: 'GET', url: '/secure' },
+          },
+          {
+            id: 'blocked-default-origin',
+            name: 'Blocked Default Origin',
+            stage: 'main',
+            request: { method: 'GET', url: 'https://target.example/secure' },
+            dependsOn: ['allowed-target'],
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'ok'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-https-target');
+      const execution = await done;
+      const blockedStep = execution.steps.find((step) => step.stepId === 'blocked-default-origin');
+
+      expect(engine.targetUrl).toBe('https://target.example:8443');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0][0]).toBe('https://target.example:8443/secure');
+      expect(blockedStep?.status).toBe('failed');
+      expect(blockedStep?.error).toContain('target.example:443');
+    });
+
+    it('validates the final resolved URL after template substitution', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-template-bypass',
+        name: 'SSRF Template Bypass',
+        steps: [
+          {
+            id: 'prepare',
+            name: 'Prepare',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/prepare' },
+            extract: { nextUrl: { from: 'body', path: 'next_url' } },
+          },
+          {
+            id: 'follow-up',
+            name: 'Follow Up',
+            stage: 'main',
+            request: { method: 'GET', url: '{{nextUrl}}' },
+            dependsOn: ['prepare'],
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          200,
+          { next_url: 'http://evil.example/metadata' },
+          { 'content-type': 'application/json' },
+        ),
+      );
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-template-bypass');
+      const execution = await done;
+      const followUpStep = execution.steps.find((step) => step.stepId === 'follow-up');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(followUpStep?.status).toBe('failed');
+      expect(followUpStep?.error).toContain('Outbound request blocked');
     });
   });
 

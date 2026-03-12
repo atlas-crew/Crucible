@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { BlockList, isIP } from 'node:net';
 import { nanoid } from 'nanoid';
 import { CatalogService, ExecutionRepository } from '@crucible/catalog';
 import type { Scenario, ScenarioStep } from '@crucible/catalog';
@@ -42,6 +43,13 @@ interface StepBatch {
   steps: ScenarioStep[];
 }
 
+interface OutboundAllowlist {
+  exactHosts: Set<string>;
+  exactHostPorts: Set<string>;
+  wildcardRules: Array<{ suffix: string; port: number | null }>;
+  ipBlockList: BlockList;
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const DEFAULT_TARGET_URL = 'http://localhost:8880';
@@ -49,6 +57,7 @@ const DEFAULT_MAX_CONCURRENCY = 3;
 const CACHE_EVICT_DELAY_MS = 5_000;
 const DEFAULT_STEP_BODY_RETENTION: StepBodyRetentionPolicy = 'all';
 const DEFAULT_STEP_BODY_MAX_BYTES = 64 * 1024;
+const ALLOWED_REQUEST_PROTOCOLS = new Set(['http:', 'https:']);
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
@@ -67,13 +76,16 @@ export class ScenarioEngine extends EventEmitter {
   private queue: QueuedWaiter[] = [];
   private stepBodyRetention: StepBodyRetentionPolicy;
   private stepBodyMaxBytes: number;
+  private outboundAllowlist: OutboundAllowlist;
 
   constructor(catalog: CatalogService, repo?: ExecutionRepository) {
     super();
     this.catalog = catalog;
     this.repo = repo ?? null;
     this.executions = new Map();
-    this.targetUrl = (process.env.CRUCIBLE_TARGET_URL ?? DEFAULT_TARGET_URL).replace(/\/+$/, '');
+    this.targetUrl = normalizeConfiguredTargetUrl(
+      process.env.CRUCIBLE_TARGET_URL ?? DEFAULT_TARGET_URL,
+    );
     this.maxConcurrency = parseInt(
       process.env.CRUCIBLE_MAX_CONCURRENCY ?? '',
       10,
@@ -82,6 +94,10 @@ export class ScenarioEngine extends EventEmitter {
     this.stepBodyMaxBytes = parsePositiveInteger(
       process.env.CRUCIBLE_STEP_BODY_MAX_BYTES,
       DEFAULT_STEP_BODY_MAX_BYTES,
+    );
+    this.outboundAllowlist = parseOutboundAllowlist(
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST,
+      this.targetUrl,
     );
   }
 
@@ -421,7 +437,10 @@ export class ScenarioEngine extends EventEmitter {
     // ── Resolve templates ───────────────────────────────────────────
     const resolvedUrl = resolveTemplates(step.request.url, context, this.targetUrl);
     // Prepend target URL to relative paths
-    const url = resolvedUrl.startsWith('/') ? `${this.targetUrl}${resolvedUrl}` : resolvedUrl;
+    const url = validateOutboundRequestUrl(
+      resolvedUrl.startsWith('/') ? `${this.targetUrl}${resolvedUrl}` : resolvedUrl,
+      this.outboundAllowlist,
+    );
     const headers: Record<string, string> = {};
     if (step.request.headers) {
       for (const [k, v] of Object.entries(step.request.headers)) {
@@ -874,7 +893,7 @@ function areStepsBatchCompatible(
   }
 
   if (mode === 'legacy') {
-    return candidateStep.executionMode === undefined;
+    return getStepBatchMode(candidateStep) === 'legacy';
   }
 
   return candidateStep.id === anchorStep.id;
@@ -926,4 +945,248 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
 
 function truncateUtf8(value: string, maxBytes: number): string {
   return Buffer.from(value, 'utf8').subarray(0, maxBytes).toString('utf8');
+}
+
+function normalizeConfiguredTargetUrl(rawTargetUrl: string): string {
+  const trimmedTargetUrl = rawTargetUrl.trim();
+  if (!trimmedTargetUrl) {
+    throw new Error('CRUCIBLE_TARGET_URL must not be empty');
+  }
+
+  parseValidatedAbsoluteUrl(trimmedTargetUrl, 'CRUCIBLE_TARGET_URL');
+  return trimmedTargetUrl.replace(/\/+$/, '');
+}
+
+function parseValidatedAbsoluteUrl(rawUrl: string, label: string): URL {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    throw new Error(`${label} must be a valid absolute URL`);
+  }
+
+  if (!ALLOWED_REQUEST_PROTOCOLS.has(parsedUrl.protocol)) {
+    throw new Error(`${label} must use http or https`);
+  }
+
+  if (!parsedUrl.hostname) {
+    throw new Error(`${label} must include a hostname`);
+  }
+
+  if (parsedUrl.username || parsedUrl.password) {
+    throw new Error(`${label} must not include credentials`);
+  }
+
+  if (parsedUrl.hash) {
+    throw new Error(`${label} must not include a fragment`);
+  }
+
+  return parsedUrl;
+}
+
+function parseOutboundAllowlist(
+  rawAllowlist: string | undefined,
+  targetUrl: string,
+): OutboundAllowlist {
+  const allowlist: OutboundAllowlist = {
+    exactHosts: new Set(),
+    exactHostPorts: new Set(),
+    wildcardRules: [],
+    ipBlockList: new BlockList(),
+  };
+
+  const target = parseValidatedAbsoluteUrl(targetUrl, 'CRUCIBLE_TARGET_URL');
+  addExactHostPort(
+    normalizeHostname(target.hostname),
+    getNormalizedPort(target),
+    allowlist,
+  );
+
+  for (const entry of (rawAllowlist ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    addAllowlistEntry(entry, allowlist, 'CRUCIBLE_OUTBOUND_ALLOWLIST');
+  }
+
+  return allowlist;
+}
+
+function addAllowlistEntry(
+  rawEntry: string,
+  allowlist: OutboundAllowlist,
+  sourceLabel: string,
+): void {
+  const normalizedEntry = rawEntry.toLowerCase();
+
+  if (normalizedEntry.includes('://')) {
+    const parsedUrl = parseValidatedAbsoluteUrl(rawEntry, sourceLabel);
+    addExactHostPort(
+      normalizeHostname(parsedUrl.hostname),
+      getNormalizedPort(parsedUrl),
+      allowlist,
+    );
+    return;
+  }
+
+  const hostPortEntry = parseHostPortEntry(normalizedEntry);
+  if (hostPortEntry) {
+    const family = toIpFamily(hostPortEntry.host);
+    if (family) {
+      addExactHostPort(hostPortEntry.host, hostPortEntry.port, allowlist);
+    } else if (hostPortEntry.host.startsWith('*.')) {
+      allowlist.wildcardRules.push({
+        suffix: `.${hostPortEntry.host.slice(2)}`,
+        port: hostPortEntry.port,
+      });
+    } else if (!/^[a-z0-9.-]+$/.test(hostPortEntry.host)) {
+      throw new Error(`${sourceLabel} entry "${rawEntry}" must be a hostname, wildcard domain, IP, or CIDR`);
+    } else {
+      allowlist.exactHostPorts.add(formatHostPortKey(hostPortEntry.host, hostPortEntry.port));
+    }
+    return;
+  }
+
+  const cidrMatch = normalizedEntry.match(/^(.+)\/(\d{1,3})$/);
+  if (cidrMatch) {
+    const [, network, prefix] = cidrMatch;
+    const normalizedNetwork = normalizeHostname(network);
+    const family = toIpFamily(normalizedNetwork);
+    if (!family) {
+      throw new Error(`${sourceLabel} entry "${rawEntry}" must use a valid IP or CIDR`);
+    }
+    allowlist.ipBlockList.addSubnet(normalizedNetwork, Number(prefix), family);
+    return;
+  }
+
+  const normalizedHost = normalizeHostname(normalizedEntry);
+  const family = toIpFamily(normalizedHost);
+  if (family) {
+    allowlist.ipBlockList.addAddress(normalizedHost, family);
+    return;
+  }
+
+  if (normalizedHost.startsWith('*.') && normalizedHost.length > 2) {
+    allowlist.wildcardRules.push({
+      suffix: `.${normalizedHost.slice(2)}`,
+      port: null,
+    });
+    return;
+  }
+
+  if (!/^[a-z0-9.-]+$/.test(normalizedHost)) {
+    throw new Error(`${sourceLabel} entry "${rawEntry}" must be a hostname, wildcard domain, IP, or CIDR`);
+  }
+
+  allowlist.exactHosts.add(normalizedHost);
+}
+
+function validateOutboundRequestUrl(rawUrl: string, allowlist: OutboundAllowlist): string {
+  const parsedUrl = parseValidatedAbsoluteUrl(rawUrl, 'Resolved step URL');
+  const hostname = normalizeHostname(parsedUrl.hostname);
+  const port = getNormalizedPort(parsedUrl);
+
+  // This validation runs before fetch performs DNS resolution. Prefer exact IP
+  // or CIDR allowlist entries plus network-layer controls for sensitive targets.
+  if (!isAllowedEndpoint(hostname, parsedUrl.protocol, port, allowlist)) {
+    throw new Error(`Outbound request blocked for endpoint "${formatHostPortKey(hostname, port)}"`);
+  }
+
+  return rawUrl;
+}
+
+function isAllowedEndpoint(
+  hostname: string,
+  protocol: string,
+  port: number,
+  allowlist: OutboundAllowlist,
+): boolean {
+  if (allowlist.exactHostPorts.has(formatHostPortKey(hostname, port))) {
+    return true;
+  }
+
+  const usesDefaultPort = port === defaultPortForProtocol(protocol);
+  const family = toIpFamily(hostname);
+  if (family) {
+    return usesDefaultPort && allowlist.ipBlockList.check(hostname, family);
+  }
+
+  if (usesDefaultPort && allowlist.exactHosts.has(hostname)) {
+    return true;
+  }
+
+  return allowlist.wildcardRules.some(
+    (rule) => hostname.endsWith(rule.suffix) && (rule.port === null ? usesDefaultPort : rule.port === port),
+  );
+}
+
+function addExactHostPort(hostname: string, port: number, allowlist: OutboundAllowlist): void {
+  allowlist.exactHostPorts.add(formatHostPortKey(hostname, port));
+}
+
+function parseHostPortEntry(rawEntry: string): { host: string; port: number } | null {
+  const ipv6Match = rawEntry.match(/^\[([^\]]+)\]:(\d{1,5})$/);
+  if (ipv6Match) {
+    return {
+      host: normalizeHostname(ipv6Match[1]),
+      port: parsePort(ipv6Match[2], rawEntry),
+    };
+  }
+
+  const hostMatch = rawEntry.match(/^([^/:]+):(\d{1,5})$/);
+  if (!hostMatch) {
+    return null;
+  }
+
+  return {
+    host: normalizeHostname(hostMatch[1]),
+    port: parsePort(hostMatch[2], rawEntry),
+  };
+}
+
+function parsePort(rawPort: string, rawEntry: string): number {
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`CRUCIBLE_OUTBOUND_ALLOWLIST entry "${rawEntry}" must use a valid port`);
+  }
+  return port;
+}
+
+function normalizeHostname(value: string): string {
+  if (value.startsWith('[') && value.endsWith(']')) {
+    return value.slice(1, -1).toLowerCase();
+  }
+
+  return value.toLowerCase();
+}
+
+function formatHostPortKey(hostname: string, port: number): string {
+  return hostname.includes(':') ? `[${hostname}]:${port}` : `${hostname}:${port}`;
+}
+
+function getNormalizedPort(parsedUrl: URL): number {
+  if (parsedUrl.port) {
+    return Number(parsedUrl.port);
+  }
+
+  return defaultPortForProtocol(parsedUrl.protocol);
+}
+
+function defaultPortForProtocol(protocol: string): number {
+  switch (protocol) {
+    case 'http:':
+      return 80;
+    case 'https:':
+      return 443;
+    default:
+      throw new Error(`Unsupported protocol "${protocol}"`);
+  }
+}
+
+function toIpFamily(value: string): 'ipv4' | 'ipv6' | null {
+  const version = isIP(normalizeHostname(value));
+  if (version === 4) return 'ipv4';
+  if (version === 6) return 'ipv6';
+  return null;
 }
