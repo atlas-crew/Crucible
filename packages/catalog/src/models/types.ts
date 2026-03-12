@@ -59,6 +59,10 @@ export const WhenConditionSchema = z.object({
 
 export type WhenCondition = z.infer<typeof WhenConditionSchema>;
 
+export const StepExecutionModeSchema = z.enum(['sequential', 'parallel']);
+
+export type StepExecutionMode = z.infer<typeof StepExecutionModeSchema>;
+
 // ── Scenario Step ───────────────────────────────────────────────────
 
 export const ScenarioStepSchema = z.object({
@@ -80,8 +84,18 @@ export const ScenarioStepSchema = z.object({
   extract: ExtractSchema.optional(),
 
   // flow control
+  executionMode: StepExecutionModeSchema.optional(),
+  parallelGroup: z.number().int().min(0).optional(),
   dependsOn: z.array(z.string()).optional(),
   when: WhenConditionSchema.optional(),
+}).superRefine((step, ctx) => {
+  if (step.parallelGroup !== undefined && step.executionMode !== 'parallel') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['parallelGroup'],
+      message: 'parallelGroup requires executionMode "parallel"',
+    });
+  }
 });
 
 export type ScenarioStep = z.infer<typeof ScenarioStepSchema>;

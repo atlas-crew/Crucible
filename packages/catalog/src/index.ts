@@ -6,6 +6,7 @@ export {
   ExtractRuleSchema,
   ExtractSchema,
   WhenConditionSchema,
+  StepExecutionModeSchema,
   ScenarioSchema,
   ScenarioStepSchema,
   type Request,
@@ -14,6 +15,7 @@ export {
   type ExtractRule,
   type Extract,
   type WhenCondition,
+  type StepExecutionMode,
   type Scenario,
   type ScenarioStep,
 } from './models/types.js';

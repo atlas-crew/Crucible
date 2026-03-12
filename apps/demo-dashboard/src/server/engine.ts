@@ -34,6 +34,14 @@ interface StepHttpResponse {
   contentType: string;
 }
 
+type StepBatchMode = 'legacy' | 'sequential' | 'parallel';
+
+interface StepBatch {
+  mode: StepBatchMode;
+  parallelGroup: number | null;
+  steps: ScenarioStep[];
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const DEFAULT_TARGET_URL = 'http://localhost:8880';
@@ -169,6 +177,8 @@ export class ScenarioEngine extends EventEmitter {
   // ── Main execution loop ──────────────────────────────────────────
 
   private async executeScenario(execution: ScenarioExecution, scenario: Scenario): Promise<void> {
+    validateScenarioDependencies(scenario);
+
     await this.acquireSlot();
 
     try {
@@ -231,18 +241,21 @@ export class ScenarioEngine extends EventEmitter {
           this.emit('execution:resumed', execution);
         }
 
-        const executableSteps = scenario.steps.filter(
-          (step) =>
-            pendingSteps.has(step.id) &&
-            (step.dependsOn || []).every((dep) => completedSteps.has(dep)),
-        );
+        const nextBatch = getNextExecutableBatch(scenario.steps, pendingSteps, completedSteps);
 
-        if (executableSteps.length === 0) {
-          throw new Error('Deadlock detected or invalid dependencies');
+        if (!nextBatch) {
+          const remainingSteps = scenario.steps
+            .filter((step) => pendingSteps.has(step.id))
+            .map((step) => step.id);
+          // Defensive invariant guard: upfront validation should prevent us from
+          // reaching a state where pending work exists but no batch is runnable.
+          throw new Error(
+            `Deadlock detected while resolving scenario graph. Remaining steps: ${remainingSteps.join(', ')}`,
+          );
         }
 
         await Promise.all(
-          executableSteps.map(async (step) => {
+          nextBatch.steps.map(async (step) => {
             pendingSteps.delete(step.id);
 
             // ── Evaluate `when` conditional ───────────────────────────
@@ -737,6 +750,135 @@ export class ScenarioEngine extends EventEmitter {
 // ── Helpers ───────────────────────────────────────────────────────────
 
 const TEMPLATE_RE = /\{\{(\w+)\}\}/g;
+
+function validateScenarioDependencies(scenario: Scenario): void {
+  const stepIds = new Set(scenario.steps.map((step) => step.id));
+  const missingDependencies: string[] = [];
+
+  for (const step of scenario.steps) {
+    for (const dependency of step.dependsOn ?? []) {
+      if (!stepIds.has(dependency)) {
+        missingDependencies.push(`${step.id} -> ${dependency}`);
+      }
+    }
+  }
+
+  if (missingDependencies.length > 0) {
+    throw new Error(
+      `Unknown dependency reference(s): ${missingDependencies.join(', ')}`,
+    );
+  }
+
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+
+  for (const step of scenario.steps) {
+    inDegree.set(step.id, 0);
+    adjacency.set(step.id, []);
+  }
+
+  for (const step of scenario.steps) {
+    for (const dependency of step.dependsOn ?? []) {
+      adjacency.get(dependency)!.push(step.id);
+      inDegree.set(step.id, (inDegree.get(step.id) ?? 0) + 1);
+    }
+  }
+
+  const queue = [...inDegree.entries()]
+    .filter(([, degree]) => degree === 0)
+    .map(([stepId]) => stepId);
+
+  let visitedCount = 0;
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    visitedCount++;
+
+    for (const neighbor of adjacency.get(current) ?? []) {
+      const nextDegree = (inDegree.get(neighbor) ?? 1) - 1;
+      inDegree.set(neighbor, nextDegree);
+      if (nextDegree === 0) {
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  if (visitedCount !== scenario.steps.length) {
+    const cycleSteps = [...inDegree.entries()]
+      .filter(([, degree]) => degree > 0)
+      .map(([stepId]) => stepId);
+    throw new Error(`Dependency cycle detected among steps: ${cycleSteps.join(', ')}`);
+  }
+}
+
+function getNextExecutableBatch(
+  steps: ScenarioStep[],
+  pendingSteps: Set<string>,
+  completedSteps: Set<string>,
+): StepBatch | null {
+  const executableSteps = steps.filter(
+    (step) =>
+      pendingSteps.has(step.id)
+      && (step.dependsOn ?? []).every((dependency) => completedSteps.has(dependency)),
+  );
+
+  if (executableSteps.length === 0) {
+    return null;
+  }
+
+  const [anchorStep] = executableSteps;
+  const mode = getStepBatchMode(anchorStep);
+
+  if (mode === 'sequential') {
+    return {
+      mode,
+      parallelGroup: normalizeParallelGroup(anchorStep),
+      steps: [anchorStep],
+    };
+  }
+
+  return {
+    mode,
+    parallelGroup: normalizeParallelGroup(anchorStep),
+    // Schedule one compatible batch at a time. Scenario declaration order is
+    // the tiebreaker for ready steps with different modes or parallel groups,
+    // so mixed-mode execution remains predictable and testable.
+    steps: executableSteps.filter((step) => areStepsBatchCompatible(anchorStep, step, mode)),
+  };
+}
+
+function getStepBatchMode(step: ScenarioStep): StepBatchMode {
+  if (step.executionMode === 'parallel') {
+    return 'parallel';
+  }
+
+  if (step.executionMode === 'sequential') {
+    return 'sequential';
+  }
+
+  return 'legacy';
+}
+
+function normalizeParallelGroup(step: ScenarioStep): number | null {
+  return step.parallelGroup ?? null;
+}
+
+function areStepsBatchCompatible(
+  anchorStep: ScenarioStep,
+  candidateStep: ScenarioStep,
+  mode: StepBatchMode,
+): boolean {
+  if (mode === 'parallel') {
+    return candidateStep.executionMode === 'parallel'
+      && normalizeParallelGroup(candidateStep) === normalizeParallelGroup(anchorStep);
+  }
+
+  if (mode === 'legacy') {
+    return candidateStep.executionMode === undefined;
+  }
+
+  return candidateStep.id === anchorStep.id;
+}
 
 /** Replace {{varName}} tokens in a string using context values. */
 function resolveTemplates(input: string, context: Map<string, unknown>, targetUrl: string): string {

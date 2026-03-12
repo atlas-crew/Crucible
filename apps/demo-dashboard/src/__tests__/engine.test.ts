@@ -1549,7 +1549,7 @@ describe('ScenarioEngine', () => {
       const execution = await failed;
 
       expect(execution.status).toBe('failed');
-      expect(execution.error).toContain('Deadlock');
+      expect(execution.error).toContain('Dependency cycle detected');
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -1573,7 +1573,7 @@ describe('ScenarioEngine', () => {
       const execution = await failed;
 
       expect(execution.status).toBe('failed');
-      expect(execution.error).toContain('Deadlock');
+      expect(execution.error).toContain('Dependency cycle detected');
     });
 
     it('detects deep circular chain (A→B→C→A)', async () => {
@@ -1610,7 +1610,31 @@ describe('ScenarioEngine', () => {
       const execution = await failed;
 
       expect(execution.status).toBe('failed');
-      expect(execution.error).toContain('Deadlock');
+      expect(execution.error).toContain('Dependency cycle detected');
+    });
+
+    it('fails gracefully when a dependency references a missing step', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'deadlock-missing',
+        name: 'Missing Dependency',
+        steps: [
+          {
+            id: 'step-a',
+            name: 'Step A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/a' },
+            dependsOn: ['step-missing'],
+          },
+        ],
+      });
+
+      const failed = waitForEvent(engine, 'execution:failed');
+      await engine.startScenario('deadlock-missing');
+      const execution = await failed;
+
+      expect(execution.status).toBe('failed');
+      expect(execution.error).toContain('Unknown dependency reference');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     // ── TASK-9: Conditional execution edge cases ──────────────────────
@@ -1797,6 +1821,390 @@ describe('ScenarioEngine', () => {
 
       expect(execution.status).toBe('completed');
       expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('execution groups', () => {
+    it('keeps pure legacy ready steps concurrent', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'legacy-ready',
+        name: 'Legacy Ready',
+        steps: [
+          {
+            id: 'step-a',
+            name: 'Step A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/legacy-a' },
+          },
+          {
+            id: 'step-b',
+            name: 'Step B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/legacy-b' },
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('legacy-ready');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/legacy-a',
+          'http://localhost/legacy-b',
+        ]),
+      );
+
+      resolvers.get('http://localhost/legacy-a')?.shift()?.();
+      resolvers.get('http://localhost/legacy-b')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('runs sequential-mode ready steps one at a time', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'sequential-ready',
+        name: 'Sequential Ready',
+        steps: [
+          {
+            id: 'step-a',
+            name: 'Step A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/a' },
+            executionMode: 'sequential',
+          },
+          {
+            id: 'step-b',
+            name: 'Step B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/b' },
+            executionMode: 'sequential',
+          },
+        ],
+      });
+
+      const resolvers: Array<() => void> = [];
+      mockFetch.mockImplementation(() =>
+        new Promise((resolve) => {
+          resolvers.push(() => resolve(mockResponse(200, 'ok')));
+        }),
+      );
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('sequential-ready');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(resolvers).toHaveLength(1);
+
+      resolvers[0]();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(resolvers).toHaveLength(2);
+
+      resolvers[1]();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('runs same parallelGroup steps concurrently after dependencies complete', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'parallel-group',
+        name: 'Parallel Group',
+        steps: [
+          {
+            id: 'setup',
+            name: 'Setup',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/setup' },
+          },
+          {
+            id: 'step-a',
+            name: 'Step A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/a' },
+            dependsOn: ['setup'],
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'step-b',
+            name: 'Step B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/b' },
+            dependsOn: ['setup'],
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'final',
+            name: 'Final',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/final' },
+            dependsOn: ['step-a', 'step-b'],
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        return new Promise((resolve) => {
+          const urlResolvers = resolvers.get(url) ?? [];
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('parallel-group');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(['http://localhost/setup']);
+
+      resolvers.get('http://localhost/setup')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/setup',
+          'http://localhost/a',
+          'http://localhost/b',
+        ]),
+      );
+      expect(startedUrls).not.toContain('http://localhost/final');
+
+      resolvers.get('http://localhost/a')?.shift()?.();
+      resolvers.get('http://localhost/b')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toContain('http://localhost/final');
+
+      resolvers.get('http://localhost/final')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('serializes distinct parallel groups into separate scheduling ticks', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'parallel-groups-separate',
+        name: 'Parallel Groups Separate',
+        steps: [
+          {
+            id: 'group-1-a',
+            name: 'Group 1 A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/g1-a' },
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'group-1-b',
+            name: 'Group 1 B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/g1-b' },
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'group-2-a',
+            name: 'Group 2 A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/g2-a' },
+            executionMode: 'parallel',
+            parallelGroup: 2,
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('parallel-groups-separate');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/g1-a',
+          'http://localhost/g1-b',
+        ]),
+      );
+      expect(startedUrls).not.toContain('http://localhost/g2-a');
+
+      resolvers.get('http://localhost/g1-a')?.shift()?.();
+      resolvers.get('http://localhost/g1-b')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toContain('http://localhost/g2-a');
+
+      resolvers.get('http://localhost/g2-a')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('batches parallel-mode steps without a group together', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'parallel-no-group',
+        name: 'Parallel No Group',
+        steps: [
+          {
+            id: 'parallel-a',
+            name: 'Parallel A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/no-group-a' },
+            executionMode: 'parallel',
+          },
+          {
+            id: 'parallel-b',
+            name: 'Parallel B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/no-group-b' },
+            executionMode: 'parallel',
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('parallel-no-group');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/no-group-a',
+          'http://localhost/no-group-b',
+        ]),
+      );
+
+      resolvers.get('http://localhost/no-group-a')?.shift()?.();
+      resolvers.get('http://localhost/no-group-b')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('segregates mixed legacy, sequential, and parallel-ready steps by batch mode', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'mixed-modes',
+        name: 'Mixed Modes',
+        steps: [
+          {
+            id: 'legacy',
+            name: 'Legacy',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/legacy' },
+          },
+          {
+            id: 'sequential',
+            name: 'Sequential',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/sequential' },
+            executionMode: 'sequential',
+          },
+          {
+            id: 'parallel-a',
+            name: 'Parallel A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/parallel-a' },
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'parallel-b',
+            name: 'Parallel B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/parallel-b' },
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('mixed-modes');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(['http://localhost/legacy']);
+
+      resolvers.get('http://localhost/legacy')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual([
+        'http://localhost/legacy',
+        'http://localhost/sequential',
+      ]);
+
+      resolvers.get('http://localhost/sequential')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/legacy',
+          'http://localhost/sequential',
+          'http://localhost/parallel-a',
+          'http://localhost/parallel-b',
+        ]),
+      );
+
+      resolvers.get('http://localhost/parallel-a')?.shift()?.();
+      resolvers.get('http://localhost/parallel-b')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(4);
     });
   });
 

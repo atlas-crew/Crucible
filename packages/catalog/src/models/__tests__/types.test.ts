@@ -59,6 +59,8 @@ describe('ScenarioSchema', () => {
           execution: { delayMs: 500, retries: 3, jitter: 100, iterations: 5 },
           expect: { status: 200, blocked: false, bodyContains: 'ok', headerPresent: 'X-Id' },
           extract: { token: { from: 'body', path: 'data.token' } },
+          executionMode: 'parallel',
+          parallelGroup: 1,
           dependsOn: [],
           when: { step: 'prev', succeeded: true },
         },
@@ -153,6 +155,25 @@ describe('ScenarioStepSchema', () => {
       expect(r.data.expect).toBeUndefined();
       expect(r.data.extract).toBeUndefined();
     }
+  });
+
+  it('rejects negative parallelGroup values', () => {
+    expect(
+      ScenarioStepSchema.safeParse(
+        minimalStep({ executionMode: 'parallel', parallelGroup: -1 }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('rejects parallelGroup when executionMode is not parallel', () => {
+    expect(
+      ScenarioStepSchema.safeParse(minimalStep({ parallelGroup: 1 })).success,
+    ).toBe(false);
+    expect(
+      ScenarioStepSchema.safeParse(
+        minimalStep({ executionMode: 'sequential', parallelGroup: 1 }),
+      ).success,
+    ).toBe(false);
   });
 });
 
