@@ -147,6 +147,29 @@ describe('ScenarioEngine', () => {
       expect(execution.steps[0].error).toContain('Outbound request blocked');
     });
 
+    it('blocks step URLs with embedded credentials', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'ssrf-credentials',
+        name: 'SSRF Credentials',
+        steps: [
+          {
+            id: 'blocked',
+            name: 'Blocked',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://user:pass@localhost/private' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('ssrf-credentials');
+      const execution = await done;
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('must not include credentials');
+    });
+
     it('allows configured domains and CIDR ranges', async () => {
       process.env.CRUCIBLE_OUTBOUND_ALLOWLIST = 'evil.example,10.0.0.0/8';
       engine.destroy();
@@ -2490,6 +2513,245 @@ describe('ScenarioEngine', () => {
 
       expect(execution.status).toBe('completed');
       expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('reactively starts newly unblocked legacy work before the previous batch fully drains', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'reactive-legacy',
+        name: 'Reactive Legacy',
+        steps: [
+          {
+            id: 'seed-a',
+            name: 'Seed A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-a' },
+          },
+          {
+            id: 'peer-b',
+            name: 'Peer B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-b' },
+          },
+          {
+            id: 'follow-up',
+            name: 'Follow Up',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-c' },
+            dependsOn: ['seed-a'],
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('reactive-legacy');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/reactive-a',
+          'http://localhost/reactive-b',
+        ]),
+      );
+      expect(startedUrls).not.toContain('http://localhost/reactive-c');
+
+      resolvers.get('http://localhost/reactive-a')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/reactive-a',
+          'http://localhost/reactive-b',
+          'http://localhost/reactive-c',
+        ]),
+      );
+
+      resolvers.get('http://localhost/reactive-b')?.shift()?.();
+      resolvers.get('http://localhost/reactive-c')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('reactively starts newly unblocked parallel-group work before sibling steps finish', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'reactive-parallel-group',
+        name: 'Reactive Parallel Group',
+        steps: [
+          {
+            id: 'setup',
+            name: 'Setup',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-setup' },
+          },
+          {
+            id: 'group-a',
+            name: 'Group A',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-group-a' },
+            dependsOn: ['setup'],
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'group-b',
+            name: 'Group B',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-group-b' },
+            dependsOn: ['setup'],
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'group-c',
+            name: 'Group C',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-group-c' },
+            dependsOn: ['group-a'],
+            executionMode: 'parallel',
+            parallelGroup: 1,
+          },
+          {
+            id: 'final',
+            name: 'Final',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/reactive-final' },
+            dependsOn: ['group-b', 'group-c'],
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('reactive-parallel-group');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(['http://localhost/reactive-setup']);
+
+      resolvers.get('http://localhost/reactive-setup')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toEqual(
+        expect.arrayContaining([
+          'http://localhost/reactive-setup',
+          'http://localhost/reactive-group-a',
+          'http://localhost/reactive-group-b',
+        ]),
+      );
+      expect(startedUrls).not.toContain('http://localhost/reactive-group-c');
+
+      resolvers.get('http://localhost/reactive-group-a')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toContain('http://localhost/reactive-group-c');
+      expect(startedUrls).not.toContain('http://localhost/reactive-final');
+
+      resolvers.get('http://localhost/reactive-group-b')?.shift()?.();
+      resolvers.get('http://localhost/reactive-group-c')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toContain('http://localhost/reactive-final');
+
+      resolvers.get('http://localhost/reactive-final')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+    });
+
+    it('re-anchors on declaration order after a sequential group drains', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'sequential-group-anchor',
+        name: 'Sequential Group Anchor',
+        steps: [
+          {
+            id: 'seq-group-1',
+            name: 'Sequential Group 1',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/seq-group-1' },
+            executionMode: 'sequential',
+            parallelGroup: 1,
+          },
+          {
+            id: 'legacy-next',
+            name: 'Legacy Next',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/legacy-next' },
+          },
+          {
+            id: 'seq-group-2',
+            name: 'Sequential Group 2',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/seq-group-2' },
+            executionMode: 'sequential',
+            parallelGroup: 2,
+          },
+        ],
+      });
+
+      const startedUrls: string[] = [];
+      const resolvers = new Map<string, Array<() => void>>();
+      mockFetch.mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        startedUrls.push(url);
+        const urlResolvers = resolvers.get(url) ?? [];
+        return new Promise((resolve) => {
+          urlResolvers.push(() => resolve(mockResponse(200, 'ok')));
+          resolvers.set(url, urlResolvers);
+        });
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('sequential-group-anchor');
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(startedUrls).toEqual(['http://localhost/seq-group-1']);
+
+      resolvers.get('http://localhost/seq-group-1')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toEqual([
+        'http://localhost/seq-group-1',
+        'http://localhost/legacy-next',
+      ]);
+
+      resolvers.get('http://localhost/legacy-next')?.shift()?.();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(startedUrls).toEqual([
+        'http://localhost/seq-group-1',
+        'http://localhost/legacy-next',
+        'http://localhost/seq-group-2',
+      ]);
+
+      resolvers.get('http://localhost/seq-group-2')?.shift()?.();
+      const execution = await done;
+
+      expect(execution.status).toBe('completed');
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     });
   });
 

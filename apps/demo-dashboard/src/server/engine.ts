@@ -37,10 +37,9 @@ interface StepHttpResponse {
 
 type StepBatchMode = 'legacy' | 'sequential' | 'parallel';
 
-interface StepBatch {
+interface ActiveBatch {
   mode: StepBatchMode;
   parallelGroup: number | null;
-  steps: ScenarioStep[];
 }
 
 interface OutboundAllowlist {
@@ -205,104 +204,120 @@ export class ScenarioEngine extends EventEmitter {
       const ctrl = this.controls.get(execution.id);
 
       const context = new Map<string, unknown>();
+      const stepOrder = new Map(scenario.steps.map((step, index) => [step.id, index]));
+      const stepById = new Map(scenario.steps.map((step) => [step.id, step]));
+      const dependents = buildDependentsMap(scenario.steps);
+      const unresolvedDependencies = new Map(
+        scenario.steps.map((step) => [step.id, (step.dependsOn ?? []).length]),
+      );
       const pendingSteps = new Set(scenario.steps.map((s) => s.id));
       const completedSteps = new Set<string>();
       const stepResults = new Map<string, ExecutionStepResult>();
+      const readyQueue = scenario.steps
+        .filter((step) => (step.dependsOn ?? []).length === 0)
+        .map((step) => step.id);
+      const queuedReadySteps = new Set(readyQueue);
+      const activeSteps = new Set<string>();
+      let activeBatch: ActiveBatch | null = null;
+      let fatalExecutionError: Error | null = null;
       let passedSteps = 0;
+      let schedulerVersion = 0;
+      let schedulerWaiter: (() => void) | null = null;
 
-      while (pendingSteps.size > 0) {
-        // ── Cancel checkpoint ──────────────────────────────────────
-        if (ctrl?.abortController.signal.aborted) {
-          execution.status = 'cancelled';
-          execution.completedAt = Date.now();
-          this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
-          this.emit('execution:cancelled', execution);
-          this.scheduleEviction(execution.id);
+      const notifyScheduler = (): void => {
+        schedulerVersion++;
+        const waiter = schedulerWaiter;
+        schedulerWaiter = null;
+        waiter?.();
+      };
+
+      const waitForSchedulerChange = async (seenVersion: number): Promise<void> => {
+        if (schedulerVersion !== seenVersion) {
+          return;
+        }
+        // Single-consumer: only the main scheduler loop awaits scheduler changes.
+        await new Promise<void>((resolve) => {
+          schedulerWaiter = resolve;
+        });
+      };
+
+      const insertReadyStep = (stepId: string): void => {
+        if (!pendingSteps.has(stepId) || activeSteps.has(stepId) || queuedReadySteps.has(stepId)) {
           return;
         }
 
-        // ── Pause checkpoint ───────────────────────────────────────
-        if (ctrl?.paused) {
-          execution.status = 'paused';
-          execution.pausedState = {
-            pendingStepIds: [...pendingSteps],
-            completedStepIds: [...completedSteps],
-            context: Object.fromEntries(context),
-            passedSteps,
-            stepResults: Object.fromEntries(
-              [...stepResults.entries()].map(([k, v]) => [k, { ...v }]),
-            ),
-          };
-          this.repo?.updateExecution(execution.id, { status: 'paused', pausedState: execution.pausedState });
-          this.emit('execution:paused', execution);
+        const insertIndex = readyQueue.findIndex(
+          (queuedStepId) =>
+            (stepOrder.get(queuedStepId) ?? Number.MAX_SAFE_INTEGER)
+            > (stepOrder.get(stepId) ?? Number.MAX_SAFE_INTEGER),
+        );
 
-          // Wait for resume signal
-          if (ctrl.pausePromise) {
-            await ctrl.pausePromise;
-          }
-
-          // After resume, check for cancel
-          if (ctrl.abortController.signal.aborted) {
-            execution.status = 'cancelled';
-            execution.completedAt = Date.now();
-            this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
-            this.emit('execution:cancelled', execution);
-            this.scheduleEviction(execution.id);
-            return;
-          }
-
-          execution.status = 'running';
-          execution.pausedState = undefined;
-          this.repo?.updateExecution(execution.id, { status: 'running', pausedState: undefined });
-          this.emit('execution:resumed', execution);
+        if (insertIndex === -1) {
+          readyQueue.push(stepId);
+        } else {
+          readyQueue.splice(insertIndex, 0, stepId);
         }
 
-        const nextBatch = getNextExecutableBatch(scenario.steps, pendingSteps, completedSteps);
+        queuedReadySteps.add(stepId);
+      };
 
-        if (!nextBatch) {
-          const remainingSteps = scenario.steps
-            .filter((step) => pendingSteps.has(step.id))
-            .map((step) => step.id);
-          // Defensive invariant guard: upfront validation should prevent us from
-          // reaching a state where pending work exists but no batch is runnable.
-          throw new Error(
-            `Deadlock detected while resolving scenario graph. Remaining steps: ${remainingSteps.join(', ')}`,
-          );
+      const completeStep = (stepId: string): void => {
+        pendingSteps.delete(stepId);
+        activeSteps.delete(stepId);
+        completedSteps.add(stepId);
+
+        for (const dependentId of dependents.get(stepId) ?? []) {
+          const remainingDependencies = (unresolvedDependencies.get(dependentId) ?? 0) - 1;
+          unresolvedDependencies.set(dependentId, remainingDependencies);
+          if (remainingDependencies === 0) {
+            insertReadyStep(dependentId);
+          }
         }
 
-        await Promise.all(
-          nextBatch.steps.map(async (step) => {
-            pendingSteps.delete(step.id);
+        execution.context = Object.fromEntries(context);
+        this.repo?.updateExecution(execution.id, { context: execution.context });
+        notifyScheduler();
+      };
 
-            // ── Evaluate `when` conditional ───────────────────────────
-            if (step.when) {
-              const refResult = stepResults.get(step.when.step);
-              if (!this.evaluateWhen(step.when, refResult)) {
-                const skipped: ExecutionStepResult = {
-                  stepId: step.id,
-                  status: 'skipped',
-                  attempts: 0,
-                };
-                stepResults.set(step.id, skipped);
-                execution.steps.push(skipped);
-                completedSteps.add(step.id);
-                this.repo?.upsertStep(execution.id, skipped);
-                this.emit('execution:updated', execution);
-                return;
-              }
-            }
+      const startStep = (step: ScenarioStep): void => {
+        queuedReadySteps.delete(step.id);
+        const readyIndex = readyQueue.indexOf(step.id);
+        if (readyIndex !== -1) {
+          readyQueue.splice(readyIndex, 1);
+        }
 
-            const result: ExecutionStepResult = {
+        if (step.when) {
+          const refResult = stepResults.get(step.when.step);
+          if (!this.evaluateWhen(step.when, refResult)) {
+            const skipped: ExecutionStepResult = {
               stepId: step.id,
-              status: 'running',
-              startedAt: Date.now(),
+              status: 'skipped',
               attempts: 0,
             };
-            stepResults.set(step.id, result);
-            execution.steps.push(result);
-            this.repo?.upsertStep(execution.id, result);
+            stepResults.set(step.id, skipped);
+            execution.steps.push(skipped);
+            this.repo?.upsertStep(execution.id, skipped);
             this.emit('execution:updated', execution);
+            completeStep(step.id);
+            return;
+          }
+        }
 
+        const result: ExecutionStepResult = {
+          stepId: step.id,
+          status: 'running',
+          startedAt: Date.now(),
+          attempts: 0,
+        };
+        stepResults.set(step.id, result);
+        execution.steps.push(result);
+        activeSteps.add(step.id);
+        this.repo?.upsertStep(execution.id, result);
+        this.emit('execution:updated', execution);
+        notifyScheduler();
+
+        void (async () => {
+          try {
             const maxAttempts = (step.execution?.retries ?? 0) + 1;
             const signal = ctrl?.abortController.signal;
             let latestResponse: StepHttpResponse | undefined;
@@ -314,12 +329,10 @@ export class ScenarioEngine extends EventEmitter {
                 const response = await this.executeStep(step, context, signal);
                 latestResponse = response;
 
-                // ── Run extract rules ─────────────────────────────────
                 if (step.extract) {
                   this.runExtract(step.extract, response, context);
                 }
 
-                // ── Evaluate assertions ───────────────────────────────
                 const assertions = this.evaluateAssertions(step, response);
                 if (assertions.length > 0) {
                   result.assertions = assertions;
@@ -338,19 +351,18 @@ export class ScenarioEngine extends EventEmitter {
                 result.result = this.buildPersistedStepResult(response, 'completed');
                 result.completedAt = Date.now();
                 result.duration = result.completedAt - result.startedAt!;
-                completedSteps.add(step.id);
                 passedSteps++;
                 this.repo?.upsertStep(execution.id, result);
                 this.emit('execution:updated', execution);
-                break; // success — no more retries
+                completeStep(step.id);
+                return;
               } catch (err) {
-                // If aborted, propagate immediately
                 if (signal?.aborted) {
                   result.status = 'cancelled';
                   result.completedAt = Date.now();
-                  completedSteps.add(step.id);
                   this.repo?.upsertStep(execution.id, result);
                   this.emit('execution:updated', execution);
+                  completeStep(step.id);
                   return;
                 }
 
@@ -362,19 +374,129 @@ export class ScenarioEngine extends EventEmitter {
                     : undefined;
                   result.completedAt = Date.now();
                   result.duration = result.completedAt - result.startedAt!;
-                  completedSteps.add(step.id);
                   this.repo?.upsertStep(execution.id, result);
                   this.emit('execution:updated', execution);
+                  completeStep(step.id);
+                  return;
                 }
-                // else: retry
               }
             }
+          } catch (err) {
+            fatalExecutionError = err instanceof Error ? err : new Error(String(err));
+            notifyScheduler();
+          }
+        })();
+      };
 
-            // Snapshot context into execution for observability
-            execution.context = Object.fromEntries(context);
-            this.repo?.updateExecution(execution.id, { context: execution.context });
-          }),
-        );
+      const dispatchReadySteps = (): void => {
+        if (ctrl?.paused || ctrl?.abortController.signal.aborted) {
+          return;
+        }
+
+        while (readyQueue.length > 0) {
+          if (!activeBatch) {
+            activeBatch = getBatchState(stepById.get(readyQueue[0])!);
+          }
+
+          const nextReadyIds = readyQueue.filter((stepId) =>
+            isStepCompatibleWithBatch(stepById.get(stepId)!, activeBatch!),
+          );
+
+          if (nextReadyIds.length === 0) {
+            if (activeSteps.size === 0) {
+              activeBatch = null;
+              continue;
+            }
+            return;
+          }
+
+          const stepsToStart = activeBatch.mode === 'sequential'
+            ? (activeSteps.size === 0 ? nextReadyIds.slice(0, 1) : [])
+            : nextReadyIds;
+
+          if (stepsToStart.length === 0) {
+            return;
+          }
+
+          for (const stepId of stepsToStart) {
+            startStep(stepById.get(stepId)!);
+          }
+
+          if (activeBatch.mode === 'sequential') {
+            return;
+          }
+        }
+      };
+
+      while (pendingSteps.size > 0) {
+        if (fatalExecutionError) {
+          throw fatalExecutionError;
+        }
+
+        if (ctrl?.paused && activeSteps.size === 0) {
+          execution.status = 'paused';
+          execution.pausedState = {
+            pendingStepIds: [...pendingSteps],
+            completedStepIds: [...completedSteps],
+            context: Object.fromEntries(context),
+            passedSteps,
+            stepResults: Object.fromEntries(
+              [...stepResults.entries()].map(([k, v]) => [k, { ...v }]),
+            ),
+          };
+          this.repo?.updateExecution(execution.id, { status: 'paused', pausedState: execution.pausedState });
+          this.emit('execution:paused', execution);
+
+          if (ctrl.pausePromise) {
+            await ctrl.pausePromise;
+          }
+
+          if (ctrl.abortController.signal.aborted) {
+            execution.status = 'cancelled';
+            execution.completedAt = Date.now();
+            this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
+            this.emit('execution:cancelled', execution);
+            this.scheduleEviction(execution.id);
+            return;
+          }
+
+          execution.status = 'running';
+          execution.pausedState = undefined;
+          this.repo?.updateExecution(execution.id, { status: 'running', pausedState: undefined });
+          this.emit('execution:resumed', execution);
+        }
+
+        dispatchReadySteps();
+
+        if (pendingSteps.size === 0) {
+          break;
+        }
+
+        if (ctrl?.abortController.signal.aborted && activeSteps.size === 0) {
+          execution.status = 'cancelled';
+          execution.completedAt = Date.now();
+          this.repo?.updateExecution(execution.id, { status: 'cancelled', completedAt: execution.completedAt });
+          this.emit('execution:cancelled', execution);
+          this.scheduleEviction(execution.id);
+          return;
+        }
+
+        if (activeSteps.size === 0) {
+          if (readyQueue.length === 0) {
+            const remainingSteps = scenario.steps
+              .filter((step) => pendingSteps.has(step.id))
+              .map((step) => step.id);
+            throw new Error(
+              `Deadlock detected while resolving scenario graph. Remaining steps: ${remainingSteps.join(', ')}`,
+            );
+          }
+
+          activeBatch = null;
+          continue;
+        }
+
+        const seenVersion = schedulerVersion;
+        await waitForSchedulerChange(seenVersion);
       }
 
       // Check one more time after all steps complete
@@ -830,39 +952,26 @@ function validateScenarioDependencies(scenario: Scenario): void {
   }
 }
 
-function getNextExecutableBatch(
-  steps: ScenarioStep[],
-  pendingSteps: Set<string>,
-  completedSteps: Set<string>,
-): StepBatch | null {
-  const executableSteps = steps.filter(
-    (step) =>
-      pendingSteps.has(step.id)
-      && (step.dependsOn ?? []).every((dependency) => completedSteps.has(dependency)),
-  );
+function buildDependentsMap(steps: ScenarioStep[]): Map<string, string[]> {
+  const dependents = new Map<string, string[]>();
 
-  if (executableSteps.length === 0) {
-    return null;
+  for (const step of steps) {
+    dependents.set(step.id, []);
   }
 
-  const [anchorStep] = executableSteps;
-  const mode = getStepBatchMode(anchorStep);
-
-  if (mode === 'sequential') {
-    return {
-      mode,
-      parallelGroup: normalizeParallelGroup(anchorStep),
-      steps: [anchorStep],
-    };
+  for (const step of steps) {
+    for (const dependency of step.dependsOn ?? []) {
+      dependents.get(dependency)!.push(step.id);
+    }
   }
 
+  return dependents;
+}
+
+function getBatchState(step: ScenarioStep): ActiveBatch {
   return {
-    mode,
-    parallelGroup: normalizeParallelGroup(anchorStep),
-    // Schedule one compatible batch at a time. Scenario declaration order is
-    // the tiebreaker for ready steps with different modes or parallel groups,
-    // so mixed-mode execution remains predictable and testable.
-    steps: executableSteps.filter((step) => areStepsBatchCompatible(anchorStep, step, mode)),
+    mode: getStepBatchMode(step),
+    parallelGroup: normalizeParallelGroup(step),
   };
 }
 
@@ -882,21 +991,21 @@ function normalizeParallelGroup(step: ScenarioStep): number | null {
   return step.parallelGroup ?? null;
 }
 
-function areStepsBatchCompatible(
-  anchorStep: ScenarioStep,
+function isStepCompatibleWithBatch(
   candidateStep: ScenarioStep,
-  mode: StepBatchMode,
+  batch: ActiveBatch,
 ): boolean {
-  if (mode === 'parallel') {
+  if (batch.mode === 'parallel') {
     return candidateStep.executionMode === 'parallel'
-      && normalizeParallelGroup(candidateStep) === normalizeParallelGroup(anchorStep);
+      && normalizeParallelGroup(candidateStep) === batch.parallelGroup;
   }
 
-  if (mode === 'legacy') {
+  if (batch.mode === 'legacy') {
     return getStepBatchMode(candidateStep) === 'legacy';
   }
 
-  return candidateStep.id === anchorStep.id;
+  return candidateStep.executionMode === 'sequential'
+    && normalizeParallelGroup(candidateStep) === batch.parallelGroup;
 }
 
 /** Replace {{varName}} tokens in a string using context values. */
