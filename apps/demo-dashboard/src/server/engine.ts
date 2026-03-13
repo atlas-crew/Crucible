@@ -527,8 +527,8 @@ export class ScenarioEngine extends EventEmitter {
           passed: score >= 80,
           score,
           artifacts: [
-            `/api/reports/${execution.id}/${ReportService.PDF_SUFFIX}`,
-            `/api/reports/${execution.id}/${ReportService.JSON_SUFFIX}`,
+            `/api/reports/${execution.id}?format=${ReportService.HTML_SUFFIX}`,
+            `/api/reports/${execution.id}?format=${ReportService.JSON_SUFFIX}`,
           ],
         };
 

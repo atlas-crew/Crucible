@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import dynamic from "next/dynamic";
 import {
   CheckCircle2,
   XCircle,
@@ -28,9 +29,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useCatalogStore } from "@/store/useCatalogStore";
-import { RemoteTerminal } from "@/components/remote-terminal";
 import type { ExecutionStepResult, ExecutionStatus, ScenarioExecution } from "@/store/useCatalogStore";
 import type { Scenario, ScenarioStep } from "@crucible/catalog";
+
+const RemoteTerminal = dynamic(
+  () => import("@/components/remote-terminal").then((mod) => mod.RemoteTerminal),
+  { ssr: false },
+);
 
 // ── Status helpers ──────────────────────────────────────────────────
 
@@ -75,6 +80,27 @@ function generateCurl(step: ScenarioStep, targetUrl?: string): string {
   }
   
   return curl;
+}
+
+function getArtifactPresentation(url: string): { label: string; icon: typeof FileText } {
+  try {
+    const [pathname, queryString = ""] = url.split("?");
+    const format = new URLSearchParams(queryString).get("format") ?? pathname.split("/").pop() ?? "";
+
+    if (format === "json") {
+      return { label: "Download JSON report", icon: FileJson };
+    }
+    if (format === "html") {
+      return { label: "Download HTML report", icon: FileText };
+    }
+    if (format === "pdf") {
+      return { label: "Download PDF report", icon: FileText };
+    }
+  } catch {
+    // Fall through to a generic label when the artifact URL is malformed.
+  }
+
+  return { label: "Download report artifact", icon: FileText };
 }
 
 // ── Step card ───────────────────────────────────────────────────────
@@ -370,7 +396,7 @@ function StepCard({
                   </div>
                 ) : (
                   <div className="bg-muted/30 border border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center">
-                    <TerminalIcon className="h-8 w-8 text-muted-foreground/20 mb-3" />
+                    <Terminal className="h-8 w-8 text-muted-foreground/20 mb-3" />
                     <p className="text-xs font-medium text-muted-foreground">Sandbox terminal only available during active execution</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-1">This execution has ended and the sandbox has been reclaimed.</p>
                   </div>
@@ -594,11 +620,19 @@ export function ExecutionTimeline({ execution, scenario }: ExecutionTimelineProp
                   <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Artifacts</p>
                     <div className="flex flex-wrap gap-2">
-                      {execution.report.artifacts.map((art, i) => (
-                        <Button key={i} variant="link" className="p-0 h-auto text-[10px] text-primary">
-                          {art.split('/').pop()}
-                        </Button>
-                      ))}
+                      {execution.report.artifacts.map((art, i) => {
+                        const presentation = getArtifactPresentation(art);
+                        const ArtifactIcon = presentation.icon;
+
+                        return (
+                          <Button key={i} asChild variant="outline" size="xs" className="gap-1.5">
+                            <a href={art} download>
+                              <ArtifactIcon className="h-3 w-3" />
+                              {presentation.label}
+                            </a>
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

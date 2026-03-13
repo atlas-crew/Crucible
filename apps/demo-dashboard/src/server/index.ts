@@ -1,5 +1,5 @@
-import { mkdirSync, realpathSync } from 'fs';
-import { join, basename, resolve, sep } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { join, basename, resolve } from 'path';
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -206,43 +206,36 @@ app.get('/api/reports/:id', (req, res) => {
   if (!execution || execution.mode !== 'assessment') {
     return res.status(404).json({ error: 'Report not found' });
   }
+
+  const requestedFormat =
+    req.query.format === ReportService.JSON_SUFFIX || req.query.format === ReportService.HTML_SUFFIX
+      ? req.query.format
+      : undefined;
+
   if (execution.status !== 'completed' && execution.status !== 'failed') {
-    return res.status(202).json(execution);
+    return requestedFormat
+      ? res.status(202).json({ error: 'Report is still being generated', execution })
+      : res.status(202).json(execution);
   }
-  res.json(execution.report || execution);
+
+  if (!requestedFormat) {
+    return res.json(execution.report || execution);
+  }
+
+  return sendReportFile(req.params.id, requestedFormat, res);
 });
 
 app.get(`/api/reports/:id/${ReportService.JSON_SUFFIX}`, (req, res) => {
-  const { id } = req.params;
-  const execution = engine.getExecution(id);
-  if (!execution || execution.mode !== 'assessment') {
-    return res.status(404).json({ error: 'Report not found' });
-  }
-
-  // Sanitize ID and construct path
-  const safeId = basename(id);
-  const fileName = `${safeId}.${ReportService.JSON_SUFFIX}`;
-  
-  res.sendFile(fileName, { root: reportsDir }, (err) => {
-    if (err) res.status(404).json({ error: 'JSON report file not found' });
-  });
+  return sendReportFile(req.params.id, ReportService.JSON_SUFFIX, res);
 });
 
-app.get(`/api/reports/:id/${ReportService.PDF_SUFFIX}`, (req, res) => {
-  const { id } = req.params;
-  const execution = engine.getExecution(id);
-  if (!execution || execution.mode !== 'assessment') {
-    return res.status(404).json({ error: 'Report not found' });
-  }
+app.get(`/api/reports/:id/${ReportService.HTML_SUFFIX}`, (req, res) => {
+  return sendReportFile(req.params.id, ReportService.HTML_SUFFIX, res);
+});
 
-  // Sanitize ID and construct path
-  const safeId = basename(id);
-  const fileName = `${safeId}.${ReportService.PDF_SUFFIX}`;
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.sendFile(fileName, { root: reportsDir }, (err) => {
-    if (err) res.status(404).json({ error: 'PDF report file not found' });
-  });
+// Legacy compatibility for older persisted assessment artifacts.
+app.get('/api/reports/:id/pdf', (req, res) => {
+  return sendReportFile(req.params.id, 'pdf', res);
 });
 
 server.listen(PORT, () => {
@@ -259,3 +252,55 @@ function shutdown() {
 }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+function sendReportFile(
+  id: string,
+  format: typeof ReportService.JSON_SUFFIX | typeof ReportService.HTML_SUFFIX | 'pdf',
+  res: express.Response,
+) {
+  const execution = engine.getExecution(id);
+  if (!execution || execution.mode !== 'assessment') {
+    return res.status(404).json({ error: 'Report not found' });
+  }
+
+  if (execution.status !== 'completed' && execution.status !== 'failed') {
+    return res.status(202).json({ error: 'Report is still being generated', execution });
+  }
+
+  const safeId = basename(id);
+  const fileName = `${safeId}.${format}`;
+  const filePath = join(reportsDir, fileName);
+
+  if (format === ReportService.HTML_SUFFIX) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  } else if (format === ReportService.JSON_SUFFIX) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  } else {
+    res.setHeader('Content-Type', 'application/pdf');
+  }
+
+  if (!existsSync(filePath)) {
+    return res.status(202).json({ error: 'Report is still being generated', execution });
+  }
+
+  res.setHeader('Content-Disposition', `attachment; filename="${safeId}-report.${format}"`);
+  return res.sendFile(fileName, { root: reportsDir }, (err) => {
+    if (!err) {
+      return;
+    }
+
+    if (!res.headersSent) {
+      const statusCode =
+        typeof err === 'object' && err != null && 'code' in err && err.code === 'ENOENT'
+          ? 202
+          : 404;
+      res.status(statusCode).json({
+        error:
+          statusCode === 202
+            ? 'Report is still being generated'
+            : `${format.toUpperCase()} report file not found`,
+        execution,
+      });
+    }
+  });
+}

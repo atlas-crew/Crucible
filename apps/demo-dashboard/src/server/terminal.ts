@@ -1,6 +1,5 @@
 import * as pty from 'node-pty';
 import { EventEmitter } from 'events';
-import { os } from 'node:os';
 
 interface TerminalSession {
   id: string;
