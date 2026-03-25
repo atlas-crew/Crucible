@@ -158,3 +158,6 @@ vite.config.ts.timestamp-*
 .vite/
 
 **/data/
+
+# Jekyll
+docs/_site/

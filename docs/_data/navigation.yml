@@ -1,0 +1,17 @@
+guides:
+  - title: Getting Started
+    url: /user-guides/getting-started
+  - title: Running Scenarios
+    url: /user-guides/running-scenarios
+  - title: Editing Scenarios
+    url: /user-guides/editing-scenarios
+
+architecture:
+  - title: System Overview
+    url: /architecture/system-overview
+  - title: Scenario Engine
+    url: /architecture/scenario-engine
+
+development:
+  - title: Testing Guide
+    url: /development/testing/testing-guide

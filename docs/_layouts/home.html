@@ -1,0 +1,87 @@
+---
+layout: default
+---
+<div class="home">
+  <section class="hero">
+    <img src="{{ '/assets/crucible-banner.png' | relative_url }}" alt="Crucible — Next-generation security testing platform" class="hero-banner">
+  </section>
+
+  <section class="intro">
+    <p class="intro-text">Next-generation security testing platform with 80+ attack scenarios, a visual editor, real-time simulations, and pass/fail assessment scoring.</p>
+    <div class="intro-actions">
+      <a href="{{ '/user-guides/getting-started' | relative_url }}" class="btn btn-primary">Get Started</a>
+      <a href="https://github.com/NickCrew/Crucible" class="btn btn-outline">View on GitHub</a>
+    </div>
+  </section>
+
+  <section class="features-grid">
+    <div class="feature-card">
+      <h3>80+ Attack Scenarios</h3>
+      <p>Pre-built security test scenarios spanning injection, auth bypass, SSRF, business logic, and more across industry verticals.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Visual Scenario Editor</h3>
+      <p>Create and modify scenario definitions with a drag-and-drop editor. Configure steps, assertions, and extraction chains.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Real-Time Simulations</h3>
+      <p>Execute scenarios with live WebSocket streaming. Watch each step execute, observe responses, and track assertion results.</p>
+    </div>
+    <div class="feature-card">
+      <h3>DAG Execution Engine</h3>
+      <p>Directed acyclic graph scheduling with dependency resolution, parallel execution, and variable extraction between steps.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Assessment Scoring</h3>
+      <p>Pass/fail grading with detailed assertion breakdowns. Track security posture across runs and identify regressions.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Scenario Catalog</h3>
+      <p>Browse, filter, and search a structured catalog of scenarios organized by category, severity, and target domain.</p>
+    </div>
+  </section>
+
+  <section class="quickstart">
+    <h2>Quick Start</h2>
+    <div class="quickstart-options">
+      <div class="quickstart-option">
+        <h4>Docker</h4>
+        <pre><code>docker pull ghcr.io/nickcrew/crucible/web-client:latest
+docker run -p 3000:3000 ghcr.io/nickcrew/crucible/web-client</code></pre>
+      </div>
+      <div class="quickstart-option">
+        <h4>From Source</h4>
+        <pre><code>git clone https://github.com/NickCrew/Crucible.git
+cd Crucible &amp;&amp; pnpm install
+pnpm dev</code></pre>
+      </div>
+      <div class="quickstart-option">
+        <h4>Build</h4>
+        <pre><code>pnpm build
+pnpm start</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="explore">
+    <h2>Explore</h2>
+    <div class="explore-links">
+      <a href="{{ '/user-guides/running-scenarios' | relative_url }}" class="explore-card">
+        <h4>Running Scenarios</h4>
+        <p>Browse the catalog, run simulations, and review assessments</p>
+      </a>
+      <a href="{{ '/user-guides/editing-scenarios' | relative_url }}" class="explore-card">
+        <h4>Editing Scenarios</h4>
+        <p>Create and modify scenario definitions with the visual editor</p>
+      </a>
+      <a href="{{ '/architecture/system-overview' | relative_url }}" class="explore-card">
+        <h4>System Overview</h4>
+        <p>Component map, data flow, and communication protocols</p>
+      </a>
+      <a href="{{ '/architecture/scenario-engine' | relative_url }}" class="explore-card">
+        <h4>Scenario Engine</h4>
+        <p>DAG scheduling, step execution, and assertion model</p>
+      </a>
+    </div>
+  </section>
+</div>
