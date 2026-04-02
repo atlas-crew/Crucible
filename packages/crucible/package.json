@@ -1,6 +1,6 @@
 {
   "name": "@atlascrew/crucible",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Unified Crucible application package with the web UI, execution backend, and scenario catalog.",
   "type": "module",
   "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
