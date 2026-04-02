@@ -1,6 +1,7 @@
 # ── Stage 1: Install dependencies ─────────────────────────────────────────────
 FROM node:22-alpine AS deps
 
+RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 WORKDIR /app
