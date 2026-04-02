@@ -18,6 +18,7 @@ Next-generation security testing platform. Crucible provides a catalog of 80+ at
 
 ```
 crucible/
+├── packages/crucible       # @atlascrew/crucible — unified publishable package (npm + Docker)
 ├── packages/catalog        # @crucible/catalog — scenario schemas, validation, and loader
 ├── apps/web-client         # Next.js 16 web UI (scenarios, assessments, simulations)
 └── apps/demo-dashboard     # Express + WebSocket simulation orchestrator
@@ -25,25 +26,56 @@ crucible/
 
 | Package | Stack | Description |
 |---------|-------|-------------|
+| `@atlascrew/crucible` | Express, Next.js, SQLite | Unified package — bundles the UI, API, engine, and scenario catalog into a single installable |
 | `@crucible/catalog` | TypeScript, Zod | Scenario type definitions, JSON schema validation, runbook parser |
 | `web-client` | Next.js 16, React 19, Tailwind 4, Radix UI | Primary web interface for browsing and editing scenarios |
 | `@crucible/demo-dashboard` | Express, WebSocket | Real-time scenario execution engine with live dashboard |
 
-## Quick Start
+## Installation
+
+### npm (recommended)
+
+```bash
+npm install -g @atlascrew/crucible
+crucible start
+```
+
+Open **http://localhost:3000**. The UI, REST API, and WebSocket endpoint are all served from a single process.
+
+### Docker
+
+```bash
+docker run -p 3000:3000 nickcrew/crucible:latest
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port |
+| `CRUCIBLE_DB_PATH` | `./data/crucible.db` | SQLite database location |
+| `CRUCIBLE_REPORTS_DIR` | `./data/reports` | Assessment report output directory |
+| `CRUCIBLE_TARGET_URL` | — | Base URL of the system under test |
+| `CRUCIBLE_SCENARIOS_DIR` | *(built-in catalog)* | Path to a custom scenarios directory |
+| `CRUCIBLE_MAX_CONCURRENCY` | `3` | Max concurrent scenario executions |
+
+## Development
 
 ### Prerequisites
 
 - **Node.js** 22+
 - **pnpm** 9.15.4 (activated via `corepack enable`)
 
-### Install and run
+### Run from source
 
 ```bash
+git clone https://github.com/NickCrew/Crucible.git
+cd Crucible
 pnpm install
 pnpm build
 ```
 
-Start both servers (in separate terminals):
+Start the backend and frontend in separate terminals:
 
 ```bash
 # Backend — scenario engine + REST API + WebSocket (port 3001)
@@ -55,20 +87,7 @@ pnpm --filter web-client dev
 
 Open **http://localhost:3000** and verify the **CONNECTED** indicator appears in the header.
 
-### Install from npm
-
-```bash
-npm install -g @atlascrew/crucible
-crucible start
-```
-
-The published package serves the UI, API, and WebSocket endpoint from one port. Set `PORT` to change the listener and use `CRUCIBLE_DB_PATH`, `CRUCIBLE_REPORTS_DIR`, or `CRUCIBLE_TARGET_URL` to override runtime storage and target defaults.
-
-### Run with Docker
-
-```bash
-docker run -p 3000:3000 nickcrew/crucible:latest
-```
+> **Note**: In development mode the frontend and backend run on separate ports. The environment variables `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` configure the frontend to reach the backend (defaults to `localhost:3001`).
 
 ## Documentation
 

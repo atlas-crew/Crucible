@@ -1,28 +1,77 @@
 # Getting Started
 
-This guide walks you through installing and running Crucible locally.
+This guide walks you through installing and running Crucible. Choose the method that fits your needs — npm and Docker are the fastest paths; source installs give you the full development environment.
 
-## Prerequisites
+## Option A: Install from npm (recommended)
+
+Requires **Node.js 22+**.
+
+```bash
+npm install -g @atlascrew/crucible
+crucible start
+```
+
+Open **http://localhost:3000**. The UI, REST API, and WebSocket endpoint are all served from a single process on one port.
+
+### Configuration
+
+Customize the runtime with environment variables:
+
+```bash
+PORT=8080 \
+CRUCIBLE_TARGET_URL=https://api.example.com \
+crucible start
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port |
+| `CRUCIBLE_DB_PATH` | `./data/crucible.db` | SQLite database location |
+| `CRUCIBLE_REPORTS_DIR` | `./data/reports` | Assessment report output directory |
+| `CRUCIBLE_TARGET_URL` | — | Base URL of the system under test |
+| `CRUCIBLE_SCENARIOS_DIR` | *(built-in catalog)* | Path to a custom scenarios directory |
+| `CRUCIBLE_MAX_CONCURRENCY` | `3` | Max concurrent scenario executions |
+
+---
+
+## Option B: Run with Docker
+
+```bash
+docker run -p 3000:3000 nickcrew/crucible:latest
+```
+
+Open **http://localhost:3000**. Same unified server as the npm package.
+
+Pass environment variables with `-e`:
+
+```bash
+docker run -p 8080:8080 \
+  -e PORT=8080 \
+  -e CRUCIBLE_TARGET_URL=https://api.example.com \
+  -v crucible-data:/app/data \
+  nickcrew/crucible:latest
+```
+
+Available tags: `latest`, `0.2`, `0.2.4`, `sha-<commit>`.
+
+---
+
+## Option C: Run from Source
+
+Use this option when you want to develop Crucible itself or need fine-grained control over individual components.
+
+### Prerequisites
 
 | Requirement | Version |
 |-------------|---------|
 | Node.js | 22+ |
 | pnpm | 9.15.4 |
-| Docker *(optional)* | 20+ |
 
-### Enable pnpm via Corepack
-
-Node.js ships with Corepack, which can activate the correct pnpm version automatically:
+Enable pnpm via Corepack (reads the `packageManager` field from root `package.json`):
 
 ```bash
 corepack enable
 ```
-
-Corepack reads the `packageManager` field in the root `package.json` and installs `pnpm@9.15.4` on first use.
-
----
-
-## Option A: Run from Source
 
 ### 1. Clone and install
 
@@ -69,45 +118,7 @@ The UI opens at **http://localhost:3000**. It connects to the backend via WebSoc
 
 Look at the top-right corner of the web UI. You should see a green **CONNECTED** indicator. If it shows **OFFLINE**, confirm the backend is running on port 3001.
 
----
-
-## Option B: Run with Docker
-
-```bash
-docker run -p 3000:3000 nickcrew/crucible:latest
-```
-
-Open **http://localhost:3000**.
-
-The Docker image now serves the UI, API, and WebSocket endpoint together on one port.
-
-## Option C: Install from npm
-
-```bash
-npm install -g @atlascrew/crucible
-crucible start
-```
-
-The published package serves the UI, API, and WebSocket endpoint together on one port. Use `PORT` to change the listener and `CRUCIBLE_DB_PATH`, `CRUCIBLE_REPORTS_DIR`, or `CRUCIBLE_TARGET_URL` to customize runtime paths and defaults.
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3001` | Backend server port |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:3001/api` | Backend API URL for source development builds |
-| `NEXT_PUBLIC_WS_URL` | `ws://localhost:3001` | WebSocket URL for source development builds |
-| `CRUCIBLE_MAX_CONCURRENCY` | `3` | Max concurrent scenario executions |
-
-To point the web client at a different backend:
-
-```bash
-NEXT_PUBLIC_API_URL=http://my-server:3001/api \
-NEXT_PUBLIC_WS_URL=ws://my-server:3001 \
-pnpm --filter web-client dev
-```
+> **Note**: In development mode the frontend and backend run on separate ports. Use `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to point the frontend at a different backend.
 
 ---
 
@@ -115,6 +126,7 @@ pnpm --filter web-client dev
 
 ```
 crucible/
+├── packages/crucible/         # @atlascrew/crucible — unified publishable package
 ├── packages/catalog/          # Scenario schemas, validation, JSON loader
 │   ├── src/                   # TypeScript source
 │   └── scenarios/             # 80+ pre-built scenario JSON files

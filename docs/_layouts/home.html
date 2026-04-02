@@ -45,20 +45,19 @@ layout: default
     <h2>Quick Start</h2>
     <div class="quickstart-options">
       <div class="quickstart-option">
+        <h4>npm</h4>
+        <pre><code>npm install -g @atlascrew/crucible
+crucible start</code></pre>
+      </div>
+      <div class="quickstart-option">
         <h4>Docker</h4>
-        <pre><code>docker pull nickcrew/crucible:latest
-docker run -p 3000:3000 nickcrew/crucible</code></pre>
+        <pre><code>docker run -p 3000:3000 nickcrew/crucible</code></pre>
       </div>
       <div class="quickstart-option">
         <h4>From Source</h4>
         <pre><code>git clone https://github.com/NickCrew/Crucible.git
-cd Crucible &amp;&amp; pnpm install
+cd Crucible &amp;&amp; pnpm install &amp;&amp; pnpm build
 pnpm dev</code></pre>
-      </div>
-      <div class="quickstart-option">
-        <h4>Build</h4>
-        <pre><code>pnpm build
-pnpm start</code></pre>
       </div>
     </div>
   </section>
