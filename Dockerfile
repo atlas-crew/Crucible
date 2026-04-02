@@ -18,6 +18,7 @@ RUN pnpm install --frozen-lockfile
 # ── Stage 2: Build ────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
+RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 WORKDIR /app
