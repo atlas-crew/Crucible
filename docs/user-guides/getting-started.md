@@ -74,7 +74,7 @@ Look at the top-right corner of the web UI. You should see a green **CONNECTED**
 ## Option B: Run with Docker
 
 ```bash
-docker run -p 3000:3000 atlascrew/crucible:latest
+docker run -p 3000:3000 nickcrew/crucible:latest
 ```
 
 Open **http://localhost:3000**.

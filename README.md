@@ -67,7 +67,7 @@ The published package serves the UI, API, and WebSocket endpoint from one port. 
 ### Run with Docker
 
 ```bash
-docker run -p 3000:3000 atlascrew/crucible:latest
+docker run -p 3000:3000 nickcrew/crucible:latest
 ```
 
 ## Documentation
@@ -110,7 +110,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-This publishes `@atlascrew/crucible` to npmjs and `atlascrew/crucible` to Docker Hub with tags derived from the version (for example `0.2.0`, `0.2`, and `latest`). The release workflow expects `NPM_TOKEN`, `DOCKERHUB_USERNAME`, and `DOCKERHUB_TOKEN` repository secrets.
+This publishes `@atlascrew/crucible` to npmjs and `nickcrew/crucible` to Docker Hub with tags derived from the version (for example `0.2.0`, `0.2`, and `latest`). The release workflow expects `NPM_TOKEN`, `DOCKERHUB_USERNAME`, and `DOCKERHUB_TOKEN` repository secrets.
 
 ## Project Commands
 
