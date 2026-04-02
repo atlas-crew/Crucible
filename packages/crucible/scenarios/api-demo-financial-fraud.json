@@ -1,0 +1,263 @@
+{
+  "id": "api-demo-financial-fraud",
+  "name": "Banking Account Takeover & Money Movement",
+  "category": "Industry Attacks",
+  "difficulty": "Expert",
+  "description": "Complete financial fraud kill chain from account enumeration to money laundering, simulating organized crime tactics",
+  "steps": [
+    {
+      "id": "banking-login-page",
+      "name": "Banking Login Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/banking/login"
+      },
+      "execution": {
+        "delayMs": 1000
+      }
+    },
+    {
+      "id": "account-enumeration",
+      "name": "Account Number Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts/enumerate",
+        "headers": {
+          "X-Originating-IP": "192.168.1.1"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "banking-login-page"
+      ]
+    },
+    {
+      "id": "credential-stuffing",
+      "name": "Credential Stuffing Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "{{random_ip}}"
+        },
+        "body": {
+          "username": "john.doe@bank.com",
+          "password": "Password123!"
+        }
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "dependsOn": [
+        "account-enumeration"
+      ]
+    },
+    {
+      "id": "session-hijack",
+      "name": "Session Token Replay",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts",
+        "headers": {
+          "Cookie": "session_id=stolen_session_abc123xyz",
+          "X-Real-IP": "10.0.0.5"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "credential-stuffing"
+      ]
+    },
+    {
+      "id": "balance-check",
+      "name": "Check Account Balances",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/balance",
+        "headers": {
+          "Authorization": "Bearer {{compromised_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "session-hijack"
+      ]
+    },
+    {
+      "id": "transaction-history",
+      "name": "Harvest Transaction History",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/transactions?limit=1000&include_sensitive=true",
+        "headers": {
+          "Authorization": "Bearer {{compromised_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "balance-check"
+      ]
+    },
+    {
+      "id": "small-test-transfer",
+      "name": "Small Test Transfer",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/banking/transfer",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{compromised_token}}"
+        },
+        "body": {
+          "from_account": "ACC-123456",
+          "to_account": "MULE-001",
+          "amount": 0.01,
+          "currency": "USD"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "transaction-history"
+      ]
+    },
+    {
+      "id": "card-activation",
+      "name": "Activate Stolen Cards",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/banking/cards/activate",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{compromised_token}}"
+        },
+        "body": {
+          "card_number": "4111111111111111",
+          "activation_code": "STOLEN"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "small-test-transfer"
+      ]
+    },
+    {
+      "id": "bulk-transfer-setup",
+      "name": "Bulk Money Transfer Setup",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/banking/transfer/bulk",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{compromised_token}}"
+        },
+        "body": {
+          "transfers": [
+            {
+              "from": "ACC-123456",
+              "to": "MULE-001",
+              "amount": 9999
+            },
+            {
+              "from": "ACC-123456",
+              "to": "MULE-002",
+              "amount": 9999
+            },
+            {
+              "from": "ACC-123456",
+              "to": "MULE-003",
+              "amount": 9999
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "card-activation"
+      ]
+    },
+    {
+      "id": "reset-balance-backdoor",
+      "name": "Internal API Balance Manipulation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/banking/internal/reset-balance",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Internal-Key": "guessed_internal_key"
+        },
+        "body": {
+          "account": "MULE-001",
+          "new_balance": 1000000
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "bulk-transfer-setup"
+      ]
+    },
+    {
+      "id": "statement-tampering",
+      "name": "Statement History Tampering",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/statements?start_date=2020-01-01&end_date=2024-12-31&format=pdf",
+        "headers": {
+          "Authorization": "Bearer {{compromised_token}}",
+          "X-Admin-Override": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "reset-balance-backdoor"
+      ]
+    }
+  ]
+}

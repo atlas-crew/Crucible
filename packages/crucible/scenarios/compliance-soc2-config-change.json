@@ -1,0 +1,51 @@
+{
+  "id": "compliance-soc2-config-change",
+  "name": "SOC 2 Unauthorized Configuration Change",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Attempts to change security configurations without a valid change management ticket ID.",
+  "steps": [
+    {
+      "id": "disable-mfa-no-ticket",
+      "name": "Attempt to Disable MFA without Ticket",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/config",
+        "headers": {
+          "Authorization": "Bearer {{admin_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "mfa_enforced": false
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "disable-mfa-with-ticket",
+      "name": "Disable MFA with Change Ticket",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/config",
+        "headers": {
+          "Authorization": "Bearer {{admin_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "mfa_enforced": false,
+          "change_ticket_id": "CHG-2024-999"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      }
+    }
+  ]
+}

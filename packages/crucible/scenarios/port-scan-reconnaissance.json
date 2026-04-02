@@ -1,0 +1,315 @@
+{
+  "name": "Network Port Scanning",
+  "category": "Reconnaissance",
+  "difficulty": "Beginner",
+  "description": "Slow port enumeration reconnaissance simulating attacker probing for open services over 10-15 minutes",
+  "tags": [
+    "port-scan",
+    "recon",
+    "low-risk",
+    "enumeration"
+  ],
+  "id": "port-scan-reconnaissance",
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Probe SSH Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:22"
+      },
+      "execution": {
+        "delayMs": 45000
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Probe FTP Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:21"
+      },
+      "execution": {
+        "delayMs": 52000
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Probe Telnet Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:23"
+      },
+      "execution": {
+        "delayMs": 38000
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Probe SMTP Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:25"
+      },
+      "execution": {
+        "delayMs": 47000
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Probe DNS Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:53"
+      },
+      "execution": {
+        "delayMs": 41000
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Probe HTTP Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:80"
+      },
+      "execution": {
+        "delayMs": 56000
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Probe Alternative HTTP",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:8080"
+      },
+      "execution": {
+        "delayMs": 33000
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Probe HTTPS Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:443"
+      },
+      "execution": {
+        "delayMs": 49000
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Probe Alternative HTTPS",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:8443"
+      },
+      "execution": {
+        "delayMs": 44000
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Probe MySQL Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:3306"
+      },
+      "execution": {
+        "delayMs": 51000
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Probe PostgreSQL Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:5432"
+      },
+      "execution": {
+        "delayMs": 39000
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Probe Redis Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:6379"
+      },
+      "execution": {
+        "delayMs": 46000
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Probe MongoDB Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:27017"
+      },
+      "execution": {
+        "delayMs": 54000
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Probe Elasticsearch Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:9200"
+      },
+      "execution": {
+        "delayMs": 42000
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Probe Jenkins Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:8080/jenkins"
+      },
+      "execution": {
+        "delayMs": 48000
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Probe Prometheus Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:9090"
+      },
+      "execution": {
+        "delayMs": 36000
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Probe Grafana Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:3000"
+      },
+      "execution": {
+        "delayMs": 50000
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Probe RDP Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:3389"
+      },
+      "execution": {
+        "delayMs": 43000
+      }
+    },
+    {
+      "id": "step-19",
+      "name": "Probe SMB Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:445"
+      },
+      "execution": {
+        "delayMs": 55000
+      }
+    },
+    {
+      "id": "step-20",
+      "name": "Probe Docker API",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:2375"
+      },
+      "execution": {
+        "delayMs": 37000
+      }
+    },
+    {
+      "id": "step-21",
+      "name": "Probe Kubernetes API",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:6443"
+      },
+      "execution": {
+        "delayMs": 53000
+      }
+    },
+    {
+      "id": "step-22",
+      "name": "Probe Memcached Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:11211"
+      },
+      "execution": {
+        "delayMs": 40000
+      }
+    },
+    {
+      "id": "step-23",
+      "name": "Probe RabbitMQ Management",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/:15672"
+      },
+      "execution": {
+        "delayMs": 48000
+      }
+    },
+    {
+      "id": "step-24",
+      "name": "Probe WebSocket Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:8081"
+      },
+      "execution": {
+        "delayMs": 35000
+      }
+    },
+    {
+      "id": "step-25",
+      "name": "Probe Proxy Port",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/:3128"
+      },
+      "execution": {
+        "delayMs": 58000
+      }
+    }
+  ]
+}

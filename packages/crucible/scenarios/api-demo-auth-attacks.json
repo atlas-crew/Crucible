@@ -1,0 +1,250 @@
+{
+  "id": "api-demo-auth-attacks",
+  "name": "Chimera Authentication Attack Chain",
+  "category": "API Security",
+  "difficulty": "Advanced",
+  "description": "Comprehensive authentication and authorization attack chain targeting JWT, OAuth, and password reset flows",
+  "steps": [
+    {
+      "id": "auth-enum-1",
+      "name": "Authentication Methods Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/methods"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "user-enum-timing",
+      "name": "User Enumeration via Timing Attack",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/forgot",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "email": "admin@demo.com"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "auth-enum-1"
+      ]
+    },
+    {
+      "id": "weak-password-attempt",
+      "name": "Weak Password Login Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin",
+          "password": "admin123"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "user-enum-timing"
+      ]
+    },
+    {
+      "id": "jwt-none-algorithm",
+      "name": "JWT None Algorithm Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VyX2lkIjoiMSIsInVzZXJuYW1lIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE5OTk5OTk5OTl9.",
+          "X-JWT-Algorithm": "none"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "weak-password-attempt"
+      ]
+    },
+    {
+      "id": "sqli-auth-bypass",
+      "name": "SQL Injection Authentication Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin' --",
+          "password": "anything"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-none-algorithm"
+      ]
+    },
+    {
+      "id": "oauth-redirect-uri-bypass",
+      "name": "OAuth Redirect URI Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/oauth/authorize?client_id=demo-client&redirect_uri=https://evil.com/callback&response_type=code&state=xyz"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-auth-bypass"
+      ]
+    },
+    {
+      "id": "api-key-weak-gen",
+      "name": "Create Weak API Key",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/apikeys/create",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "name": "Test Key",
+          "expires_in_days": 365
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "oauth-redirect-uri-bypass"
+      ]
+    },
+    {
+      "id": "mfa-bypass-attempt",
+      "name": "MFA Bypass via Backup Codes",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/mfa/verify",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "challenge_id": "test-challenge",
+          "code": "000000"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-key-weak-gen"
+      ]
+    },
+    {
+      "id": "password-reset-token-predict",
+      "name": "Predictable Password Reset Token",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/reset",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "reset_token": "5d41402abc4b2a76b9719d911017c592",
+          "new_password": "HackedPassword123"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "mfa-bypass-attempt"
+      ]
+    },
+    {
+      "id": "saml-assertion-forge",
+      "name": "SAML Assertion Forgery",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/saml/callback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "SAMLResponse": "{\"nameid\":\"admin@target.com\",\"role\":\"super_admin\"}",
+          "RelayState": "/"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "password-reset-token-predict"
+      ]
+    },
+    {
+      "id": "refresh-token-replay",
+      "name": "Refresh Token Replay Attack",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/refresh",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "refresh_token": "expired_or_stolen_token_abc123"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "saml-assertion-forge"
+      ]
+    }
+  ]
+}

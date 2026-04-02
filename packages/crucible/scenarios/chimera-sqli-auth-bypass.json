@@ -1,0 +1,113 @@
+{
+  "id": "chimera-sqli-auth-bypass",
+  "name": "Chimera SQL Injection Authentication Bypass",
+  "category": "SQL Injection",
+  "difficulty": "Beginner",
+  "description": "SQL injection authentication bypass attempts against Chimera's login endpoint using classic payloads including OR-based, comment-based, and UNION-based injection vectors.",
+  "tags": [
+    "chimera",
+    "sqli",
+    "authentication",
+    "owasp-a03"
+  ],
+  "steps": [
+    {
+      "id": "normal-login-attempt",
+      "name": "Normal Login Attempt with Invalid Credentials",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser",
+          "password": "wrongpass"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "status": 401
+      }
+    },
+    {
+      "id": "sqli-auth-bypass",
+      "name": "OR-Based SQL Injection Auth Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin' OR '1'='1",
+          "password": "anything"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "injection"
+      },
+      "dependsOn": [
+        "normal-login-attempt"
+      ]
+    },
+    {
+      "id": "sqli-comment-bypass",
+      "name": "Comment-Based SQL Injection Auth Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin'--",
+          "password": ""
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-auth-bypass"
+      ]
+    },
+    {
+      "id": "sqli-union-login",
+      "name": "UNION-Based SQL Injection Login",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "' UNION SELECT 1,2,3--",
+          "password": "x"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-comment-bypass"
+      ]
+    }
+  ]
+}

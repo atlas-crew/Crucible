@@ -1,0 +1,66 @@
+{
+  "name": "@atlascrew/crucible",
+  "version": "0.2.0",
+  "description": "Unified Crucible application package with the web UI, execution backend, and scenario catalog.",
+  "type": "module",
+  "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
+  "homepage": "https://crucible.atlascrew.dev",
+  "bugs": {
+    "url": "https://github.com/NickCrew/Crucible/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "crucible": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "scenarios",
+    "web-client",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist scenarios web-client",
+    "build:web": "NEXT_PUBLIC_API_URL=/api NEXT_PUBLIC_WS_URL=auto NEXT_TELEMETRY_DISABLED=1 pnpm --dir ../.. --filter web-client build && node ./scripts/copy-web-client.mjs",
+    "build:server": "tsup",
+    "build": "pnpm run clean && pnpm run build:web && pnpm run build:server",
+    "type-check": "tsc --noEmit -p tsconfig.json",
+    "prepack": "pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.45.1",
+    "drizzle-zod": "^0.8.3",
+    "express": "^4.21.0",
+    "lucide-react": "^0.575.0",
+    "nanoid": "^5.0.7",
+    "next": "16.1.6",
+    "node-pty": "^1.1.0",
+    "pdfkit": "^0.17.2",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.5.0",
+    "ws": "^8.18.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "xterm-addon-web-links": "^0.9.0",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "typescript": "5.8.3"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "id": "compliance-hipaa-audit-suppression",
+  "name": "HIPAA Audit Log Suppression Attempt",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Attempts to perform a PHI export while suppressing audit logging, violating HIPAA's accounting of disclosures requirement.",
+  "steps": [
+    {
+      "id": "phi-export-standard",
+      "name": "Standard PHI Export",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/export",
+        "headers": {
+          "Authorization": "Bearer {{provider_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient_ids": ["P-12345"],
+          "format": "pdf"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "audit-suppression-header",
+      "name": "PHI Export with Audit Suppression Header",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/export",
+        "headers": {
+          "Authorization": "Bearer {{provider_token}}",
+          "X-Skip-Audit": "true",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient_ids": ["P-12345"],
+          "format": "json"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "phi-export-standard"
+      ]
+    },
+    {
+      "id": "suspend-audit-api",
+      "name": "Attempt to Suspend Global Auditing",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/audit/suspend",
+        "headers": {
+          "Authorization": "Bearer {{provider_token}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "duration_minutes": 10,
+          "reason": "Maintenance"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

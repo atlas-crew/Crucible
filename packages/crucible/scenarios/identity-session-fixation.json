@@ -1,0 +1,77 @@
+{
+  "id": "identity-session-fixation",
+  "name": "Session Fixation via Refresh Tokens",
+  "category": "Identity",
+  "difficulty": "Advanced",
+  "description": "Simulates an attack where a victim is forced to use a known refresh token, allowing the attacker to hijack the session.",
+  "steps": [
+    {
+      "id": "generate-known-token",
+      "name": "Generate Attacker-Controlled Token",
+      "stage": "initialization",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "attacker",
+          "password": "attacker-password"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "extract": {
+        "attacker_refresh_token": { "from": "body", "path": "refresh_token" }
+      }
+    },
+    {
+      "id": "inject-token-victim",
+      "name": "Attempt to Inject Token into Victim Session",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/session/fixate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "refresh_token": "{{attacker_refresh_token}}",
+          "victim_id": "V-999"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "generate-known-token"
+      ]
+    },
+    {
+      "id": "use-hijacked-session",
+      "name": "Attempt to Use Hijacked Session",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/token/refresh",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "refresh_token": "{{attacker_refresh_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

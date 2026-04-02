@@ -55,10 +55,19 @@ pnpm --filter web-client dev
 
 Open **http://localhost:3000** and verify the **CONNECTED** indicator appears in the header.
 
+### Install from npm
+
+```bash
+npm install -g @atlascrew/crucible
+crucible start
+```
+
+The published package serves the UI, API, and WebSocket endpoint from one port. Set `PORT` to change the listener and use `CRUCIBLE_DB_PATH`, `CRUCIBLE_REPORTS_DIR`, or `CRUCIBLE_TARGET_URL` to override runtime storage and target defaults.
+
 ### Run with Docker
 
 ```bash
-docker run -p 3000:3000 ghcr.io/nickcrew/crucible/web-client:latest
+docker run -p 3000:3000 atlascrew/crucible:latest
 ```
 
 ## Documentation
@@ -92,22 +101,23 @@ See the full [Documentation Navigator](docs/NAVIGATOR.md) for all available docs
 
 Every PR to `main` runs build, type-check, and test via [GitHub Actions](.github/workflows/ci.yml).
 
-### Docker Release
+### Package And Docker Release
 
-Pushing a semver tag triggers a Docker build and push to GitHub Container Registry:
+Pushing a semver tag that matches `packages/crucible/package.json` triggers npm and Docker publishing:
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-This publishes `ghcr.io/nickcrew/crucible/web-client` with tags derived from the version (e.g. `0.2.0`, `0.2`, `latest`).
+This publishes `@atlascrew/crucible` to npmjs and `atlascrew/crucible` to Docker Hub with tags derived from the version (for example `0.2.0`, `0.2`, and `latest`). The release workflow expects `NPM_TOKEN`, `DOCKERHUB_USERNAME`, and `DOCKERHUB_TOKEN` repository secrets.
 
 ## Project Commands
 
 | Command | Description |
 |---------|-------------|
 | `pnpm build` | Build all packages (Nx orchestrated) |
+| `pnpm build:release` | Build the publishable `@atlascrew/crucible` package |
 | `pnpm test` | Run all test suites |
 | `pnpm type-check` | TypeScript type checking across all packages |
 | `pnpm lint` | Lint all packages |

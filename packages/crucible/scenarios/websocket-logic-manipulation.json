@@ -1,0 +1,36 @@
+{
+  "id": "websocket-logic-manipulation",
+  "name": "WebSocket Logic & Security Manipulation",
+  "category": "Real-time API",
+  "difficulty": "Advanced",
+  "description": "Tests for security vulnerabilities in WebSocket handshakes and message processing logic.",
+  "steps": [
+    {
+      "id": "ws-message-tampering",
+      "name": "WebSocket Message Frame Tampering",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/integrations/ws/simulate-frame",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "type": "message",
+          "data": {
+            "from": "user_123",
+            "to": "user_456",
+            "text": "Hello",
+            "admin_override": true
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

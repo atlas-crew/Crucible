@@ -1,0 +1,64 @@
+{
+  "id": "privacy-forget-me-bypass",
+  "name": "Right-to-be-Forgotten Residual Data Probe",
+  "category": "Privacy",
+  "difficulty": "Advanced",
+  "description": "Probes if user data is still accessible via legacy or analytics endpoints after account deletion.",
+  "steps": [
+    {
+      "id": "request-deletion",
+      "name": "Request Account Deletion (GDPR)",
+      "stage": "initialization",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/delete",
+        "headers": {
+          "Authorization": "Bearer {{user_token}}"
+        },
+        "body": {
+          "reason": "GDPR Right to be Forgotten",
+          "confirm": true
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      }
+    },
+    {
+      "id": "probe-legacy-api",
+      "name": "Probe Telecom API for Deleted User Data",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/telecom/subscribers/{{deleted_user_id}}/profile",
+        "headers": {
+          "Authorization": "Bearer {{admin_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "request-deletion"
+      ]
+    },
+    {
+      "id": "probe-analytics-store",
+      "name": "Probe Analytics for Residual PII",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/integrations/analytics/data"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

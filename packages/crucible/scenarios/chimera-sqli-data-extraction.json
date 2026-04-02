@@ -1,0 +1,118 @@
+{
+  "id": "chimera-sqli-data-extraction",
+  "name": "Chimera SQL Injection Data Extraction",
+  "category": "SQL Injection",
+  "difficulty": "Advanced",
+  "description": "SQL injection data extraction attempts via healthcare record search using UNION-based, error-based, blind boolean, and time-based techniques.",
+  "tags": [
+    "chimera",
+    "sqli",
+    "data-extraction",
+    "healthcare",
+    "owasp-a03"
+  ],
+  "steps": [
+    {
+      "id": "normal-search",
+      "name": "Normal Healthcare Records Search",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search",
+        "params": {
+          "q": "diabetes"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "id": "sqli-union-extract",
+      "name": "UNION-Based Data Extraction",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search",
+        "params": {
+          "q": "UNION SELECT * FROM users--"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "normal-search"
+      ]
+    },
+    {
+      "id": "sqli-error-based",
+      "name": "Error-Based SQL Injection Extraction",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search",
+        "params": {
+          "q": "' AND 1=CONVERT(int,(SELECT TOP 1 username FROM users))--"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-union-extract"
+      ]
+    },
+    {
+      "id": "sqli-blind-boolean",
+      "name": "Blind Boolean-Based SQL Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search",
+        "params": {
+          "q": "' AND 1=1--"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-error-based"
+      ]
+    },
+    {
+      "id": "sqli-time-based",
+      "name": "Time-Based Blind SQL Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search",
+        "params": {
+          "q": "' AND SLEEP(5)--"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "sqli-blind-boolean"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "id": "chimera-negative-quantity-cart",
+  "name": "Negative Quantity Cart Manipulation",
+  "category": "Business Logic",
+  "difficulty": "Beginner",
+  "description": "Business logic flaw allowing negative quantity in shopping cart to obtain free items or manipulate order totals",
+  "tags": ["chimera", "business-logic", "ecommerce", "cart-manipulation", "owasp-a04"],
+  "steps": [
+    {
+      "id": "add-item-to-cart",
+      "name": "Add Item to Cart",
+      "stage": "initialization",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-001",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "id": "add-expensive-item",
+      "name": "Add Expensive Item to Cart",
+      "stage": "initialization",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-002",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "status": 200
+      },
+      "dependsOn": [
+        "add-item-to-cart"
+      ]
+    },
+    {
+      "id": "negative-quantity-attack",
+      "name": "Negative Quantity Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-001",
+          "quantity": -10
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "add-expensive-item"
+      ]
+    },
+    {
+      "id": "zero-quantity-attack",
+      "name": "Zero Quantity Removal",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-002",
+          "quantity": 0
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "status": 200
+      },
+      "dependsOn": [
+        "negative-quantity-attack"
+      ]
+    },
+    {
+      "id": "extreme-quantity",
+      "name": "Extreme Quantity Overflow",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "PROD-001",
+          "quantity": 999999999
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "zero-quantity-attack"
+      ]
+    }
+  ]
+}

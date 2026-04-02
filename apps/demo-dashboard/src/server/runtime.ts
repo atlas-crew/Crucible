@@ -29,6 +29,7 @@ export function createCrucibleRuntime(
 ): CrucibleRuntime {
   const port = options.port ?? Number(process.env.PORT ?? 3001);
   const configuredDbPath = options.dbPath ?? process.env.CRUCIBLE_DB_PATH ?? './data/crucible.db';
+  const scenariosDir = options.scenariosDir ?? process.env.CRUCIBLE_SCENARIOS_DIR;
   const dbPath = configuredDbPath === ':memory:' ? configuredDbPath : resolve(configuredDbPath);
   if (dbPath !== ':memory:') {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -43,7 +44,7 @@ export function createCrucibleRuntime(
 
   const baseUrl = options.baseUrl ?? process.env.CRUCIBLE_BASE_URL ?? `http://localhost:${port}`;
   const reportService = new ReportService({ reportsDir, baseUrl });
-  const catalog = new CatalogService(options.scenariosDir);
+  const catalog = new CatalogService(scenariosDir);
   const engine = new ScenarioEngine(
     catalog,
     repo,

@@ -1,0 +1,99 @@
+{
+  "id": "vp-demo-03-behavioral-trigger",
+  "name": "03 - Behavioral Trigger",
+  "category": "VP Demo",
+  "difficulty": "Intermediate",
+  "description": "Mixed attack sequence from a single source to push risk over threshold and trigger global blocking.",
+  "kind": "campaign",
+  "tags": [
+    "campaign",
+    "vp-demo",
+    "behavioral",
+    "synapse",
+    "sequence-03"
+  ],
+  "sourceIp": "203.0.113.45",
+  "steps": [
+    {
+      "id": "behavioral-sqli",
+      "name": "SQLi Escalation",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/api/users",
+        "params": {
+          "id": "1' OR '1'='1"
+        }
+      },
+      "execution": {
+        "delayMs": 250
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "behavioral-xss",
+      "name": "XSS Follow-up",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/search",
+        "params": {
+          "q": "<script>alert(1)</script>"
+        }
+      },
+      "execution": {
+        "delayMs": 250
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "behavioral-sqli"
+      ]
+    },
+    {
+      "id": "behavioral-traversal",
+      "name": "Path Traversal Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/api/files",
+        "params": {
+          "path": "../../etc/passwd"
+        }
+      },
+      "execution": {
+        "delayMs": 250
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "behavioral-xss"
+      ]
+    },
+    {
+      "id": "behavioral-command",
+      "name": "Command Injection Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/api/system",
+        "params": {
+          "cmd": "$(cat /etc/passwd)"
+        }
+      },
+      "execution": {
+        "delayMs": 250
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "behavioral-traversal"
+      ]
+    }
+  ]
+}

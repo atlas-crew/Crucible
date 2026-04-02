@@ -1,0 +1,227 @@
+{
+  "id": "api-demo-idor-access-control",
+  "name": "Chimera IDOR & Access Control Bypass",
+  "category": "Access Control",
+  "difficulty": "Intermediate",
+  "description": "Insecure Direct Object References and authorization bypass attacks",
+  "steps": [
+    {
+      "id": "user-enum-incremental",
+      "name": "User ID Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/profile/1"
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "idor-sequential-scan",
+      "name": "Sequential ID Scanning",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/profile/{{sequential_id}}",
+        "headers": {
+          "Authorization": "Bearer {{low_privilege_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 200,
+        "iterations": 10
+      },
+      "dependsOn": [
+        "user-enum-incremental"
+      ]
+    },
+    {
+      "id": "idor-vendor-data",
+      "name": "Access Other Vendor Data",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/VENDOR-002/financial",
+        "headers": {
+          "Authorization": "Bearer {{vendor_001_token}}",
+          "X-Vendor-ID": "VENDOR-001"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "idor-sequential-scan"
+      ]
+    },
+    {
+      "id": "privilege-escalation-header",
+      "name": "Privilege Escalation via Headers",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/users",
+        "headers": {
+          "Authorization": "Bearer {{user_token}}",
+          "X-Admin-Override": "true",
+          "X-User-Role": "admin",
+          "X-Privilege-Level": "9999"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "idor-vendor-data"
+      ]
+    },
+    {
+      "id": "uuid-prediction",
+      "name": "UUID Prediction Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/orders/550e8400-e29b-41d4-a716-446655440000",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "privilege-escalation-header"
+      ]
+    },
+    {
+      "id": "horizontal-privilege-bypass",
+      "name": "Horizontal Privilege Escalation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/users/profile/update",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}",
+          "X-User-ID": "admin"
+        },
+        "body": {
+          "user_id": "2",
+          "email": "hacked@attacker.com",
+          "role": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "uuid-prediction"
+      ]
+    },
+    {
+      "id": "path-traversal-idor",
+      "name": "Path Traversal IDOR",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/files/download?id=../../admin/sensitive.pdf",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "horizontal-privilege-bypass"
+      ]
+    },
+    {
+      "id": "mass-assignment-role",
+      "name": "Mass Assignment Role Change",
+      "stage": "exploitation",
+      "request": {
+        "method": "PATCH",
+        "url": "/api/users/profile",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "name": "John Doe",
+          "email": "john@example.com",
+          "role": "super_admin",
+          "verified": true,
+          "premium": true,
+          "credit_limit": 999999
+        }
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "path-traversal-idor"
+      ]
+    },
+    {
+      "id": "api-key-other-tenant",
+      "name": "Cross-Tenant API Key Usage",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/tenants/TENANT-B/data",
+        "headers": {
+          "X-API-Key": "TENANT-A-API-KEY-12345",
+          "X-Tenant-ID": "TENANT-B"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "mass-assignment-role"
+      ]
+    },
+    {
+      "id": "forced-browsing-admin",
+      "name": "Forced Browsing to Admin Panel",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/dashboard",
+        "headers": {
+          "Authorization": "Bearer {{regular_user_token}}",
+          "User-Agent": "AdminBot/1.0"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-key-other-tenant"
+      ]
+    }
+  ]
+}

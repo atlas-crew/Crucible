@@ -1,0 +1,140 @@
+{
+  "id": "api-security-audit",
+  "name": "API Security Audit",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "Comprehensive API security testing including authentication bypass, parameter pollution, and business logic flaws",
+  "steps": [
+    {
+      "id": "api-enum-1",
+      "name": "API Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/swagger.json"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "api-enum-2",
+      "name": "GraphQL Introspection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "{ __schema { types { name } } }"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-enum-1"
+      ]
+    },
+    {
+      "id": "api-auth-1",
+      "name": "JWT Token Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/users/me",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VyIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4ifQ."
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-enum-2"
+      ]
+    },
+    {
+      "id": "api-inject-1",
+      "name": "NoSQL Injection via API",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/users/search",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": {
+            "$ne": null
+          },
+          "password": {
+            "$ne": null
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-auth-1"
+      ]
+    },
+    {
+      "id": "api-abuse-1",
+      "name": "Rate Limit Bypass via X-Forwarded-For",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/login",
+        "headers": {
+          "X-Forwarded-For": "192.168.1.100",
+          "X-Real-IP": "10.0.0.5",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin",
+          "password": "password123"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "api-inject-1"
+      ]
+    },
+    {
+      "id": "api-bola-1",
+      "name": "BOLA (IDOR) Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/users/1234/orders",
+        "headers": {
+          "Authorization": "Bearer valid_user_token_for_different_user"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-abuse-1"
+      ]
+    }
+  ]
+}

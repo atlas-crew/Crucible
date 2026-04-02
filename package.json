@@ -1,13 +1,18 @@
 {
-  "name": "crucible",
+  "name": "crucible-workspace",
   "private": true,
+  "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
+  "keywords": ["security-research", "network-simulation", "security-testing", "synapse", "horizon"],
+  "homepage": "https://crucible.atlascrew.dev",
+  "bugs": "https://github.com/NickCrew/Crucible/issues",
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "pnpm --parallel --filter=web-client --filter=@crucible/demo-dashboard run dev",
     "build": "nx run-many --target=build --all",
     "test": "nx run-many --target=test --all",
     "lint": "nx run-many --target=lint --all",
-    "type-check": "nx run-many --target=type-check --all"
+    "type-check": "nx run-many --target=type-check --all",
+    "build:release": "pnpm --filter @atlascrew/crucible build"
   },
   "devDependencies": {
     "nx": "21.6.4",
@@ -15,6 +20,7 @@
     "@nx/workspace": "21.6.4",
     "typescript": "5.8.3",
     "eslint": "8.57.1",
-    "prettier": "3.3.3"
+    "prettier": "3.3.3",
+    "tsup": "^8.3.6"
   }
 }

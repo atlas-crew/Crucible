@@ -1,0 +1,68 @@
+{
+  "id": "api-logic-unicode-normalization",
+  "name": "Unicode Normalization Bypass",
+  "category": "API Logic",
+  "difficulty": "Advanced",
+  "description": "Uses different Unicode representations to bypass regex-based security filters or perform account takeovers.",
+  "steps": [
+    {
+      "id": "standard-login",
+      "name": "Standard Login Attempt",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin",
+          "password": "password"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "unicode-homograph-attack",
+      "name": "Unicode Homograph Login Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "adm\u0131n",
+          "password": "password"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "standard-login"
+      ]
+    },
+    {
+      "id": "unicode-normalization-path-traversal",
+      "name": "Unicode Normalization Path Traversal",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/files/download?path=%ef%bc%8e%ef%bc%8e%ef%bc%8fetc/passwd"
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

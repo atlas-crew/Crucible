@@ -1,0 +1,256 @@
+{
+  "id": "api-demo-ssrf-redirect",
+  "name": "Chimera SSRF & Open Redirect Chains",
+  "category": "SSRF",
+  "difficulty": "Advanced",
+  "description": "Server-Side Request Forgery and redirect-based attacks",
+  "steps": [
+    {
+      "id": "ssrf-basic-probe",
+      "name": "Basic SSRF Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/fetch/url",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://localhost:80"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "ssrf-metadata-aws",
+      "name": "AWS Metadata SSRF",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/webhook/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "callback_url": "http://169.254.169.254/latest/meta-data/"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-basic-probe"
+      ]
+    },
+    {
+      "id": "ssrf-gopher-protocol",
+      "name": "Gopher Protocol SSRF",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/import/feed",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "feed_url": "gopher://localhost:6379/_GET%20keys%20*"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-metadata-aws"
+      ]
+    },
+    {
+      "id": "ssrf-file-protocol",
+      "name": "File Protocol SSRF",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/avatar/upload-url",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "image_url": "file:///etc/passwd"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-gopher-protocol"
+      ]
+    },
+    {
+      "id": "ssrf-dns-rebinding",
+      "name": "DNS Rebinding Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/external/validate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://rebind.attacker.com/admin"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-file-protocol"
+      ]
+    },
+    {
+      "id": "open-redirect-basic",
+      "name": "Basic Open Redirect",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/redirect?url=https://evil.com"
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-dns-rebinding"
+      ]
+    },
+    {
+      "id": "redirect-parameter-pollution",
+      "name": "Parameter Pollution Redirect",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/redirect?url=https://trusted.com&url=https://evil.com"
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "open-redirect-basic"
+      ]
+    },
+    {
+      "id": "redirect-url-encoding",
+      "name": "URL Encoding Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/redirect?url=https%3A%2F%2Fevil.com%2F%40trusted.com"
+      },
+      "execution": {
+        "delayMs": 350
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "redirect-parameter-pollution"
+      ]
+    },
+    {
+      "id": "ssrf-via-redirect",
+      "name": "SSRF via Open Redirect",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/fetch/safe",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "https://trusted.com/redirect?to=http://169.254.169.254/"
+        }
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "redirect-url-encoding"
+      ]
+    },
+    {
+      "id": "ssrf-port-scan",
+      "name": "Internal Port Scanning",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/healthcheck",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "target": "http://10.0.0.1:{{port}}"
+        }
+      },
+      "execution": {
+        "delayMs": 200,
+        "iterations": 10
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-via-redirect"
+      ]
+    },
+    {
+      "id": "ssrf-cloud-metadata-gcp",
+      "name": "GCP Metadata SSRF",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/proxy/fetch",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://metadata.google.internal/computeMetadata/v1/",
+          "headers": {
+            "Metadata-Flavor": "Google"
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-port-scan"
+      ]
+    }
+  ]
+}

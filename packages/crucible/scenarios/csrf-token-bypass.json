@@ -1,0 +1,110 @@
+{
+  "id": "csrf-token-bypass",
+  "name": "CSRF Token Bypass Campaign",
+  "category": "Web Attacks",
+  "difficulty": "Intermediate",
+  "description": "Cross-Site Request Forgery attacks targeting token validation mechanisms and state-changing operations",
+  "steps": [
+    {
+      "id": "csrf-recon-1",
+      "name": "Form Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/account/settings"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "csrf-recon-2",
+      "name": "Token Pattern Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/csrf-token"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "csrf-recon-1"
+      ]
+    },
+    {
+      "id": "csrf-exploit-1",
+      "name": "Missing Token Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/account/change-email",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Origin": "https://attacker.com",
+          "Referer": "https://attacker.com/csrf.html"
+        },
+        "body": "email=attacker@evil.com&confirm=yes"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csrf-recon-2"
+      ]
+    },
+    {
+      "id": "csrf-exploit-2",
+      "name": "Token Reuse Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/account/change-password",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": "expired-token-123"
+        },
+        "body": {
+          "old_password": "dummy",
+          "new_password": "hacked123",
+          "csrf_token": "expired-token-123"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csrf-exploit-1"
+      ]
+    },
+    {
+      "id": "csrf-exploit-3",
+      "name": "Double Submit Cookie Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/admin/users/delete",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Cookie": "csrf-token=fake123; session=valid_session"
+        },
+        "body": "user_id=1&csrf_token=fake123&confirm=true"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csrf-exploit-2"
+      ]
+    }
+  ]
+}

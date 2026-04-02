@@ -3,9 +3,22 @@
 import { useEffect, useRef } from "react";
 import { useCatalogStore } from "@/store/useCatalogStore";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
 const MIN_RECONNECT_DELAY = 1000;
 const MAX_RECONNECT_DELAY = 30000;
+
+function resolveWebSocketUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_WS_URL;
+  if (configuredUrl && configuredUrl !== "auto") {
+    return configuredUrl;
+  }
+
+  if (configuredUrl === "auto" && typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}/ws`;
+  }
+
+  return "ws://localhost:3001";
+}
 
 /**
  * Maintains a singleton WebSocket connection to the demo-dashboard server.
@@ -22,7 +35,7 @@ export function useWebSocket() {
     function connect() {
       if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(resolveWebSocketUrl());
       wsRef.current = ws;
 
       ws.onopen = () => {

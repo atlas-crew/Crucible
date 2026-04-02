@@ -1,0 +1,315 @@
+{
+  "id": "api-demo-supply-chain-attack",
+  "name": "Supply Chain Vendor Compromise Campaign",
+  "category": "Industry Attacks",
+  "difficulty": "Advanced",
+  "description": "Supply chain attack targeting vendor ecosystem, similar to SolarWinds/Kaseya attacks with vendor backdoors and downstream compromise",
+  "steps": [
+    {
+      "id": "vendor-discovery",
+      "name": "Vendor Ecosystem Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/marketplace"
+      },
+      "execution": {
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "vendor-registration",
+      "name": "Malicious Vendor Registration",
+      "stage": "resource-development",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "name": "TechSolutions Provider Inc",
+          "category": "software",
+          "trusted": false
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "vendor-discovery"
+      ]
+    },
+    {
+      "id": "vendor-document-upload",
+      "name": "Upload Malicious Vendor Documents",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/documents/upload",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "vendor_id": "{{malicious_vendor_id}}",
+          "documents": [
+            {
+              "name": "compliance_cert.pdf",
+              "type": "application/pdf",
+              "malware": true
+            },
+            {
+              "name": "integration_guide.docx",
+              "type": "application/vnd.openxmlformats",
+              "macro": true
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-registration"
+      ]
+    },
+    {
+      "id": "vendor-auth-takeover",
+      "name": "Vendor Authentication Takeover",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/auth/takeover",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "vendor_id": "TRUSTED-VENDOR-001",
+          "method": "password_reset_bypass"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-document-upload"
+      ]
+    },
+    {
+      "id": "product-listing-inject",
+      "name": "Inject Malicious Product Listings",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/products/listings",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{vendor_token}}"
+        },
+        "body": {
+          "listings": [
+            {
+              "name": "Enterprise Security Suite",
+              "price": 0,
+              "download_url": "https://evil.com/backdoor.exe"
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-auth-takeover"
+      ]
+    },
+    {
+      "id": "vendor-privilege-escalate",
+      "name": "Vendor Privilege Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/vendors/privileges/escalate",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{vendor_token}}"
+        },
+        "body": {
+          "vendor_id": "{{compromised_vendor}}",
+          "privilege": "trusted_partner"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "product-listing-inject"
+      ]
+    },
+    {
+      "id": "customer-data-access",
+      "name": "Access Customer Data via Vendor Portal",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/customers/data?include_pii=true",
+        "headers": {
+          "Authorization": "Bearer {{escalated_vendor_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-privilege-escalate"
+      ]
+    },
+    {
+      "id": "downstream-vendor-compromise",
+      "name": "Compromise Downstream Vendors",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/relationships/exploit",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_vendor_token}}"
+        },
+        "body": {
+          "target_vendors": [
+            "VENDOR-002",
+            "VENDOR-003",
+            "VENDOR-004"
+          ],
+          "exploit_method": "shared_credentials"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "customer-data-access"
+      ]
+    },
+    {
+      "id": "inventory-sabotage",
+      "name": "Supply Chain Inventory Sabotage",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/inventory/sabotage",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_vendor_token}}"
+        },
+        "body": {
+          "vendor_id": "ALL_COMPETITORS",
+          "action": "zero_out_critical_components"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "downstream-vendor-compromise"
+      ]
+    },
+    {
+      "id": "vendor-backdoor-install",
+      "name": "Install Persistent Vendor Backdoors",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/backdoor",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_vendor_token}}"
+        },
+        "body": {
+          "vendor_id": "{{target_vendor}}",
+          "backdoor_type": "api_key",
+          "callback_url": "https://c2.evil.com/vendor"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "inventory-sabotage"
+      ]
+    },
+    {
+      "id": "financial-data-harvest",
+      "name": "Harvest Vendor Financial Data",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/financial/export",
+        "headers": {
+          "Authorization": "Bearer {{escalated_vendor_token}}",
+          "X-Include-Banking": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "dependsOn": [
+        "vendor-backdoor-install"
+      ]
+    },
+    {
+      "id": "supply-chain-ransomware",
+      "name": "Deploy Ransomware Through Supply Chain",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/software/update",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_vendor_token}}"
+        },
+        "body": {
+          "update_package": "critical_security_update_v2.1.exe",
+          "payload": "ransomware_encrypted",
+          "targets": [
+            "all_customers"
+          ],
+          "auto_install": true
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "financial-data-harvest"
+      ]
+    }
+  ]
+}

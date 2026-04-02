@@ -1,0 +1,30 @@
+{
+  "id": "vp-demo-04-clean-request-after-ban",
+  "name": "04 - Clean Request After Ban",
+  "category": "VP Demo",
+  "difficulty": "Beginner",
+  "description": "Legitimate request from a previously flagged IP to demonstrate behavioral blocking.",
+  "kind": "campaign",
+  "tags": [
+    "campaign",
+    "vp-demo",
+    "behavioral",
+    "synapse",
+    "sequence-04"
+  ],
+  "sourceIp": "203.0.113.45",
+  "steps": [
+    {
+      "id": "clean-after-ban",
+      "name": "Clean Health Check",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/api/health"
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

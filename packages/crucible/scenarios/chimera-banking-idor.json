@@ -1,0 +1,122 @@
+{
+  "id": "chimera-banking-idor",
+  "name": "Chimera Banking IDOR Access",
+  "category": "IDOR",
+  "difficulty": "Beginner",
+  "description": "Insecure Direct Object Reference attacks against Chimera's banking endpoints to access other users' accounts, transaction histories, and financial data.",
+  "tags": [
+    "chimera",
+    "idor",
+    "banking",
+    "owasp-a01"
+  ],
+  "steps": [
+    {
+      "id": "own-accounts",
+      "name": "Access Own Banking Accounts",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts",
+        "params": {
+          "user_id": "user-001"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "status": 200
+      },
+      "extract": {
+        "account_id": {
+          "from": "body",
+          "path": "accounts.0.account_id"
+        }
+      }
+    },
+    {
+      "id": "other-user-accounts",
+      "name": "Access Other User Accounts via IDOR",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts",
+        "params": {
+          "user_id": "user-002"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "balance"
+      },
+      "dependsOn": [
+        "own-accounts"
+      ]
+    },
+    {
+      "id": "account-detail-idor",
+      "name": "Access Other User Account Details",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts/ACC-user002-001"
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "routing_number"
+      },
+      "dependsOn": [
+        "other-user-accounts"
+      ]
+    },
+    {
+      "id": "transaction-history-idor",
+      "name": "Access Other User Transaction History",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/transactions",
+        "params": {
+          "account_id": "ACC-user002-001"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "account-detail-idor"
+      ]
+    },
+    {
+      "id": "sequential-account-scan",
+      "name": "Sequential Account ID Scanning",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts",
+        "params": {
+          "user_id": "user-999"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "transaction-history-idor"
+      ]
+    }
+  ]
+}

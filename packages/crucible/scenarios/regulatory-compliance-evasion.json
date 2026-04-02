@@ -1,0 +1,238 @@
+{
+  "id": "regulatory-compliance-evasion",
+  "name": "Regulatory Compliance Evasion",
+  "description": "Advanced attack targeting financial regulatory systems to bypass AML monitoring, evade suspicious activity reporting, and manipulate KYC verification processes through systematic compliance system exploitation.",
+  "category": "Financial Services",
+  "difficulty": "Expert",
+  "tags": [
+    "aml-bypass",
+    "transaction-splitting",
+    "sar-evasion",
+    "kyc-manipulation",
+    "regulatory",
+    "financial-crime",
+    "compliance-bypass"
+  ],
+  "estimatedDuration": "25-35 minutes",
+  "steps": [
+    {
+      "id": "recon-compliance-infrastructure",
+      "name": "Compliance Infrastructure Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/compliance/infrastructure/status",
+        "headers": {
+          "User-Agent": "ComplianceBot/2.1 (Financial Audit Scanner)",
+          "Accept": "application/json",
+          "X-Audit-Source": "regulatory-scanner"
+        }
+      }
+    },
+    {
+      "id": "enumerate-aml-endpoints",
+      "name": "AML System Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/compliance/aml/.well-known/endpoints",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; AML-Scanner/1.0)",
+          "Accept": "application/json",
+          "X-Compliance-Check": "endpoint-discovery"
+        }
+      }
+    },
+    {
+      "id": "kyc-verification-probe",
+      "name": "KYC Verification System Probing",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/kyc/verify/test-mode",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "KYC-TestClient/3.2",
+          "X-Test-Mode": "verification-probe"
+        }
+      }
+    },
+    {
+      "id": "transaction-monitoring-bypass-prep",
+      "name": "Transaction Monitoring System Analysis",
+      "stage": "weaponization",
+      "request": {
+        "method": "GET",
+        "url": "/api/compliance/aml/monitor/thresholds",
+        "headers": {
+          "Authorization": "Bearer probe_token_001",
+          "User-Agent": "TransactionAnalyzer/2.5",
+          "X-Monitor-Query": "threshold-discovery"
+        }
+      }
+    },
+    {
+      "id": "structuring-pattern-development",
+      "name": "Transaction Structuring Pattern Development",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/transactions/split/simulate",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "FinTech-Simulator/1.8",
+          "X-Simulation-Mode": "pattern-analysis"
+        }
+      }
+    },
+    {
+      "id": "kyc-data-manipulation-craft",
+      "name": "KYC Data Manipulation Payload Crafting",
+      "stage": "weaponization",
+      "request": {
+        "method": "POST",
+        "url": "/api/kyc/data/validate",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "KYC-DataProcessor/4.1",
+          "X-Data-Source": "automated-verification"
+        }
+      }
+    },
+    {
+      "id": "aml-monitoring-bypass-attempt",
+      "name": "AML Monitoring System Bypass",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/compliance/aml/monitor/exclude",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer manipulated_token",
+          "User-Agent": "AML-ExceptionHandler/2.3",
+          "X-Exception-Type": "false-positive-suppression"
+        }
+      }
+    },
+    {
+      "id": "suspicious-activity-suppression",
+      "name": "Suspicious Activity Report Suppression",
+      "stage": "delivery",
+      "request": {
+        "method": "PUT",
+        "url": "/api/reporting/sar/suppress",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer elevated_access_token",
+          "User-Agent": "SAR-Manager/3.7",
+          "X-Report-Action": "suppression-request"
+        }
+      }
+    },
+    {
+      "id": "transaction-splitting-execution",
+      "name": "Automated Transaction Splitting Execution",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/transactions/split/execute",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "AutoTransfer/5.2",
+          "X-Batch-Processing": "enabled",
+          "X-Threshold-Aware": "true"
+        }
+      }
+    },
+    {
+      "id": "kyc-verification-bypass",
+      "name": "KYC Verification System Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/kyc/verify/bulk-override",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer system_admin_token",
+          "User-Agent": "KYC-BulkProcessor/2.9",
+          "X-Override-Reason": "expedited-verification"
+        }
+      }
+    },
+    {
+      "id": "regulatory-reporting-manipulation",
+      "name": "Regulatory Reporting Data Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/reporting/regulatory/modify",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer compliance_officer_token",
+          "User-Agent": "RegulatoryReporter/4.5",
+          "X-Report-Type": "quarterly-compliance"
+        }
+      }
+    },
+    {
+      "id": "compliance-audit-trail-corruption",
+      "name": "Compliance Audit Trail Corruption",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "DELETE",
+        "url": "/api/compliance/audit/logs/cleanup",
+        "headers": {
+          "Authorization": "Bearer system_maintenance_token",
+          "User-Agent": "AuditCleaner/1.6",
+          "X-Cleanup-Reason": "storage-optimization",
+          "X-Retention-Override": "true"
+        }
+      }
+    },
+    {
+      "id": "transaction-history-obfuscation",
+      "name": "Transaction History Obfuscation",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "POST",
+        "url": "/api/transactions/history/obfuscate",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "TransactionObfuscator/2.8",
+          "X-Obfuscation-Level": "advanced",
+          "X-Pattern-Hiding": "enabled"
+        }
+      }
+    },
+    {
+      "id": "compliance-data-exfiltration",
+      "name": "Compliance Database Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/compliance/data/export/bulk",
+        "headers": {
+          "Authorization": "Bearer data_export_token",
+          "User-Agent": "ComplianceExporter/3.4",
+          "X-Export-Type": "regulatory-archive",
+          "Accept-Encoding": "gzip, compress"
+        }
+      }
+    },
+    {
+      "id": "regulatory-system-persistence",
+      "name": "Regulatory System Backdoor Installation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/compliance/system/maintenance/install",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer system_admin_token",
+          "User-Agent": "MaintenanceInstaller/1.9",
+          "X-Maintenance-Type": "compliance-module-update"
+        }
+      }
+    }
+  ]
+}

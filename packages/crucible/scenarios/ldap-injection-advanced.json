@@ -1,0 +1,141 @@
+{
+  "id": "ldap-injection-advanced",
+  "name": "Advanced LDAP Injection Campaign",
+  "category": "Directory Services",
+  "difficulty": "Advanced",
+  "description": "Sophisticated LDAP injection attack targeting Active Directory and LDAP-based authentication systems with blind injection and filter bypasses",
+  "tags": [
+    "ldap",
+    "injection",
+    "authentication",
+    "directory",
+    "blind"
+  ],
+  "steps": [
+    {
+      "id": "ldap-recon-1",
+      "name": "LDAP Service Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"username\": \"testuser\", \"password\": \"testpass\"}"
+      },
+      "execution": {
+        "delayMs": 800
+      }
+    },
+    {
+      "id": "ldap-probe-1",
+      "name": "Basic LDAP Filter Injection",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"username\": \"*)(uid=*))(|(uid=*\", \"password\": \"any\"}"
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ldap-recon-1"
+      ]
+    },
+    {
+      "id": "ldap-exploit-1",
+      "name": "LDAP Blind Injection - Admin Search",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/directory/search",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "query=admin)(%26(objectClass=*)(uid=admin)(userPassword=*))"
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ldap-probe-1"
+      ]
+    },
+    {
+      "id": "ldap-exploit-2",
+      "name": "LDAP Filter Bypass - Boolean Logic",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users",
+        "params": {
+          "filter": "(&(objectClass=person)(|(cn=*admin*)(cn=*root*)))"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ldap-exploit-1"
+      ]
+    },
+    {
+      "id": "ldap-exploit-3",
+      "name": "LDAP Attribute Enumeration",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/validate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"username\": \"*)(mail=*@domain.com\", \"domain\": \"*)(objectClass=*))\"}"
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ldap-exploit-2"
+      ]
+    },
+    {
+      "id": "ldap-exfiltrate-1",
+      "name": "LDAP Time-Based Blind Extraction",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/directory/lookup",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"dn\": \"cn=admin,ou=users,dc=company,dc=com)(&(objectClass=*)(|(userPassword=a*)(userPassword=b*)))\"}"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ldap-exploit-3"
+      ]
+    }
+  ]
+}

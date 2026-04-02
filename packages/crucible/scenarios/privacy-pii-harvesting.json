@@ -1,0 +1,41 @@
+{
+  "id": "privacy-pii-harvesting",
+  "name": "PII Harvesting via User Enumeration",
+  "category": "Privacy",
+  "difficulty": "Advanced",
+  "description": "Slow user enumeration attack to harvest sensitive PII from profile endpoints.",
+  "steps": [
+    {
+      "id": "user-enumeration-slow",
+      "name": "Slow User ID Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/telecom/subscribers/SUB-{{iteration}}/profile"
+      },
+      "execution": {
+        "delayMs": 2000,
+        "iterations": 10,
+        "jitter": 0.5
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "harvest-pii-fields",
+      "name": "Harvest Sensitive PII Fields",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/telecom/subscribers/SUB-123/profile"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

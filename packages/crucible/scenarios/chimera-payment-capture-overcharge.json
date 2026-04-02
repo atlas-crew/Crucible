@@ -1,0 +1,136 @@
+{
+  "id": "chimera-payment-capture-overcharge",
+  "name": "Payment Capture Overcharge Attack",
+  "category": "Business Logic",
+  "difficulty": "Advanced",
+  "description": "Business logic flaw allowing capture of more money than authorized, exploiting mismatches between authorization and capture amounts",
+  "tags": ["chimera", "business-logic", "payments", "overcharge", "owasp-a04"],
+  "steps": [
+    {
+      "id": "authorize-payment",
+      "name": "Authorize Payment for $100",
+      "stage": "initialization",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments/authorize",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "card_number": "4111111111111111",
+          "amount": 100.00,
+          "merchant_id": "MERCHANT-001"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "status": 200
+      },
+      "extract": {
+        "auth_code": { "from": "body", "path": "authorization.authorization_code" }
+      }
+    },
+    {
+      "id": "capture-exact-amount",
+      "name": "Capture Exact Authorized Amount",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments/capture",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "authorization_code": "{{auth_code}}",
+          "amount": 100.00
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "status": 200
+      },
+      "dependsOn": [
+        "authorize-payment"
+      ]
+    },
+    {
+      "id": "authorize-small-amount",
+      "name": "Authorize Small Payment for $10",
+      "stage": "initialization",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments/authorize",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "card_number": "4111111111111111",
+          "amount": 10.00,
+          "merchant_id": "MERCHANT-001"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "status": 200
+      },
+      "extract": {
+        "auth_code_2": { "from": "body", "path": "authorization.authorization_code" }
+      }
+    },
+    {
+      "id": "capture-overcharge",
+      "name": "Capture Amount Exceeding Authorization",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments/capture",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "authorization_code": "{{auth_code_2}}",
+          "amount": 10000.00
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "overage"
+      },
+      "dependsOn": [
+        "authorize-small-amount"
+      ]
+    },
+    {
+      "id": "refund-more-than-paid",
+      "name": "Refund More Than Original Payment",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments/refund",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "transaction_id": "TXN-001",
+          "amount": 50000.00,
+          "reason": "customer_request"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

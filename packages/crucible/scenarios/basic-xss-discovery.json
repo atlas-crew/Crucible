@@ -1,0 +1,39 @@
+{
+  "id": "basic-xss-discovery",
+  "name": "Basic XSS Discovery Probes",
+  "category": "Injection",
+  "difficulty": "Beginner",
+  "description": "Simple probes for reflected XSS in search parameters.",
+  "steps": [
+    {
+      "id": "reflected-xss-healthcare",
+      "name": "Reflected XSS in Healthcare Search",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/search?q=<script>alert('XSS')</script>"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "reflected-xss-ecommerce",
+      "name": "Reflected XSS in Ecommerce Search",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/ecommerce/products/search?query=\"><img src=x onerror=alert(1)>"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

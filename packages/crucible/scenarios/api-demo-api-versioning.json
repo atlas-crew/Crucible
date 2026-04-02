@@ -1,0 +1,207 @@
+{
+  "id": "api-demo-api-versioning",
+  "name": "Chimera Version & Endpoint Discovery",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "API versioning exploits and deprecated endpoint discovery",
+  "steps": [
+    {
+      "id": "version-discovery-v1",
+      "name": "API v1 Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/version"
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "version-discovery-v2",
+      "name": "API v2 Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v2/version"
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "dependsOn": [
+        "version-discovery-v1"
+      ]
+    },
+    {
+      "id": "deprecated-v0-access",
+      "name": "Access Deprecated v0 API",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v0/admin/users"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "version-discovery-v2"
+      ]
+    },
+    {
+      "id": "beta-api-access",
+      "name": "Beta API Endpoint Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/beta/experimental/features",
+        "headers": {
+          "X-Beta-Access": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "deprecated-v0-access"
+      ]
+    },
+    {
+      "id": "internal-api-discovery",
+      "name": "Internal API Discovery",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/internal/debug",
+        "headers": {
+          "X-Internal-Request": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "beta-api-access"
+      ]
+    },
+    {
+      "id": "version-downgrade-attack",
+      "name": "Version Downgrade Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "API-Version": "0.1",
+          "Accept-Version": "legacy"
+        },
+        "body": {
+          "username": "admin",
+          "password": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "internal-api-discovery"
+      ]
+    },
+    {
+      "id": "graphql-to-rest-bypass",
+      "name": "GraphQL to REST Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/graphql-gateway",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "mutation { adminAction(action: \"DELETE_ALL\") }"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "version-downgrade-attack"
+      ]
+    },
+    {
+      "id": "legacy-auth-bypass",
+      "name": "Legacy Authentication Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/legacy/authenticate",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "user=admin&pass=&bypass=1"
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "graphql-to-rest-bypass"
+      ]
+    },
+    {
+      "id": "shadow-api-discovery",
+      "name": "Shadow API Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/shadow/endpoints"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "legacy-auth-bypass"
+      ]
+    },
+    {
+      "id": "version-header-manipulation",
+      "name": "Version Header Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/data/sensitive",
+        "headers": {
+          "X-API-Version": "999.999.999",
+          "X-Force-Version": "admin",
+          "X-Override-Version": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "shadow-api-discovery"
+      ]
+    }
+  ]
+}

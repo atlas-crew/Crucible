@@ -1,0 +1,52 @@
+{
+  "id": "compliance-pci-pan-logging",
+  "name": "PCI DSS Insecure PAN Logging Probe",
+  "category": "Compliance",
+  "difficulty": "Intermediate",
+  "description": "Performs a transaction and then probes debug logs to see if the full Primary Account Number (PAN) was accidentally logged in plain text.",
+  "steps": [
+    {
+      "id": "pci-transaction",
+      "name": "Execute Payment Transaction",
+      "stage": "initialization",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments/process",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 99.99,
+          "currency": "USD",
+          "card_number": "4111222233334444",
+          "expiry": "12/26",
+          "cvv": "123"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      }
+    },
+    {
+      "id": "probe-debug-logs",
+      "name": "Probe Debug Logs for PAN Exposure",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/logs?type=debug&q=4111222233334444",
+        "headers": {
+          "Authorization": "Bearer {{admin_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pci-transaction"
+      ]
+    }
+  ]
+}

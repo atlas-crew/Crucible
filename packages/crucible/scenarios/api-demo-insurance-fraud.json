@@ -1,0 +1,335 @@
+{
+  "id": "api-demo-insurance-fraud",
+  "name": "Insurance Fraud & Claims Manipulation",
+  "category": "Industry Attacks",
+  "difficulty": "Intermediate",
+  "description": "Automated insurance fraud campaign targeting policy manipulation, false claims submission, and coverage exploitation",
+  "steps": [
+    {
+      "id": "policy-discovery",
+      "name": "Insurance Policy Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/insurance/policies"
+      },
+      "execution": {
+        "delayMs": 1500
+      }
+    },
+    {
+      "id": "coverage-enumeration",
+      "name": "Coverage Details Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/insurance/coverage",
+        "headers": {
+          "X-Include-Limits": "true",
+          "X-Include-Exclusions": "false"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "policy-discovery"
+      ]
+    },
+    {
+      "id": "patient-record-creation",
+      "name": "Create Fake Patient Records",
+      "stage": "resource-development",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/upload",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient": {
+            "name": "John FakeClaim",
+            "ssn": "123-45-6789",
+            "dob": "1980-01-01"
+          },
+          "conditions": [
+            "chronic_pain",
+            "anxiety",
+            "hypertension"
+          ],
+          "medications": [
+            "oxycodone",
+            "xanax",
+            "lisinopril"
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "dependsOn": [
+        "coverage-enumeration"
+      ]
+    },
+    {
+      "id": "appointment-manipulation",
+      "name": "Schedule Fake Medical Appointments",
+      "stage": "resource-development",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/appointments/schedule",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "patient_id": "FAKE-001",
+          "provider": "Dr. Complicit",
+          "type": "specialist_consultation",
+          "cost": 5000
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "patient-record-creation"
+      ]
+    },
+    {
+      "id": "prescription-fraud",
+      "name": "Generate Fraudulent Prescriptions",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/prescriptions/refill",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Override-Limits": "true"
+        },
+        "body": {
+          "prescription_id": "RX-FAKE-001",
+          "medication": "oxycodone",
+          "quantity": 500,
+          "refills": 12
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "appointment-manipulation"
+      ]
+    },
+    {
+      "id": "claim-submission-1",
+      "name": "Submit First Fraudulent Claim",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/insurance/claims",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "policy_number": "POL-123456",
+          "claim_type": "medical",
+          "amount": 25000,
+          "diagnosis_code": "M79.3",
+          "treatment": "experimental_therapy"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "prescription-fraud"
+      ]
+    },
+    {
+      "id": "claim-status-manipulation",
+      "name": "Manipulate Claim Status",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/insurance/claims/CLAIM-001?status=approved&bypass_review=true",
+        "headers": {
+          "X-Admin-Override": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "claim-submission-1"
+      ]
+    },
+    {
+      "id": "duplicate-claims",
+      "name": "Submit Duplicate Claims",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/insurance/claims",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Request-ID": "{{random}}"
+        },
+        "body": {
+          "policy_number": "POL-123456",
+          "claim_type": "medical",
+          "amount": 25000,
+          "diagnosis_code": "M79.3",
+          "treatment": "experimental_therapy",
+          "duplicate_id": "CLAIM-001"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "claim-status-manipulation"
+      ]
+    },
+    {
+      "id": "bulk-claim-automation",
+      "name": "Automated Bulk Claim Submission",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/insurance/claims/bulk",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "claims": [
+            {
+              "amount": 9999,
+              "type": "dental"
+            },
+            {
+              "amount": 9999,
+              "type": "vision"
+            },
+            {
+              "amount": 9999,
+              "type": "mental_health"
+            },
+            {
+              "amount": 9999,
+              "type": "physical_therapy"
+            },
+            {
+              "amount": 9999,
+              "type": "chiropractic"
+            }
+          ],
+          "auto_approve": true
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "duplicate-claims"
+      ]
+    },
+    {
+      "id": "policy-limit-bypass",
+      "name": "Policy Limit Bypass Attempt",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/insurance/claims",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Bypass-Limits": "true"
+        },
+        "body": {
+          "policy_number": "POL-123456",
+          "claim_type": "catastrophic",
+          "amount": 10000000,
+          "override_maximum": true
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "bulk-claim-automation"
+      ]
+    },
+    {
+      "id": "provider-collusion",
+      "name": "Provider Network Collusion",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/insurance/providers/billing",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Provider-ID": "PROV-FAKE-001"
+        },
+        "body": {
+          "billing_scheme": "upcoding",
+          "procedures": [
+            {
+              "claimed": "99215",
+              "actual": "99213"
+            },
+            {
+              "claimed": "99291",
+              "actual": "99282"
+            }
+          ],
+          "kickback_percentage": 30
+        }
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "policy-limit-bypass"
+      ]
+    },
+    {
+      "id": "claims-history-tampering",
+      "name": "Claims History Data Tampering",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "DELETE",
+        "url": "/api/v1/insurance/claims/history?patient_id=FAKE-001",
+        "headers": {
+          "Authorization": "Bearer {{admin_token}}",
+          "X-Audit-Bypass": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "provider-collusion"
+      ]
+    }
+  ]
+}

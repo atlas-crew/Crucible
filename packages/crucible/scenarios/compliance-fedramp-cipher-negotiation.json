@@ -1,0 +1,27 @@
+{
+  "id": "compliance-fedramp-cipher-negotiation",
+  "name": "FedRAMP Non-FIPS Cipher Negotiation Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Attempts to negotiate weak or non-FIPS compliant TLS ciphers.",
+  "steps": [
+    {
+      "id": "weak-cipher-probe",
+      "name": "Weak Cipher Negotiation Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/api/v1/health",
+        "headers": {
+          "X-SSL-Cipher-Suites": "TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

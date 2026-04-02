@@ -1,0 +1,248 @@
+{
+  "id": "api-demo-mixed-behavior",
+  "name": "Chimera Mixed Behavior Pattern",
+  "category": "Mixed Traffic",
+  "difficulty": "Intermediate",
+  "description": "Combines legitimate user behavior with occasional suspicious activities like rapid requests and parameter fuzzing",
+  "steps": [
+    {
+      "id": "normal-auth-check",
+      "name": "Normal Auth Methods Check",
+      "stage": "initialization",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/methods"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "normal-login",
+      "name": "Normal User Login",
+      "stage": "authentication",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "normaluser@example.com",
+          "password": "ValidPassword123"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "normal-auth-check"
+      ]
+    },
+    {
+      "id": "rapid-status-check-1",
+      "name": "Rapid Status Check 1",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status"
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "dependsOn": [
+        "normal-login"
+      ]
+    },
+    {
+      "id": "rapid-status-check-2",
+      "name": "Rapid Status Check 2",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status"
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "dependsOn": [
+        "rapid-status-check-1"
+      ]
+    },
+    {
+      "id": "rapid-status-check-3",
+      "name": "Rapid Status Check 3",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status"
+      },
+      "execution": {
+        "delayMs": 50
+      },
+      "dependsOn": [
+        "rapid-status-check-2"
+      ]
+    },
+    {
+      "id": "normal-product-search",
+      "name": "Normal Product Search",
+      "stage": "browsing",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "rapid-status-check-3"
+      ]
+    },
+    {
+      "id": "fuzzy-search-attempt",
+      "name": "Fuzzy Search with Special Characters",
+      "stage": "probing",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop'%20OR%201=1--"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "normal-product-search"
+      ]
+    },
+    {
+      "id": "normal-cart-add",
+      "name": "Normal Add to Cart",
+      "stage": "shopping",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "LAPTOP-001",
+          "quantity": 1
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "fuzzy-search-attempt"
+      ]
+    },
+    {
+      "id": "negative-quantity-attempt",
+      "name": "Attempt Negative Quantity Update",
+      "stage": "probing",
+      "request": {
+        "method": "PUT",
+        "url": "/api/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "LAPTOP-001",
+          "quantity": -5
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "normal-cart-add"
+      ]
+    },
+    {
+      "id": "normal-review-submit",
+      "name": "Normal Review Submission",
+      "stage": "interaction",
+      "request": {
+        "method": "POST",
+        "url": "/api/reviews/submit",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "LAPTOP-001",
+          "rating": 4,
+          "review": "Good product, meets expectations"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "negative-quantity-attempt"
+      ]
+    },
+    {
+      "id": "bulk-rating-attempt",
+      "name": "Bulk Rating Submission Attempt",
+      "stage": "probing",
+      "request": {
+        "method": "POST",
+        "url": "/api/ratings/bulk",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ratings": [
+            {
+              "product_id": "PROD-001",
+              "rating": 5
+            },
+            {
+              "product_id": "PROD-002",
+              "rating": 5
+            },
+            {
+              "product_id": "PROD-003",
+              "rating": 5
+            },
+            {
+              "product_id": "PROD-004",
+              "rating": 5
+            },
+            {
+              "product_id": "PROD-005",
+              "rating": 5
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 100
+      },
+      "dependsOn": [
+        "normal-review-submit"
+      ]
+    },
+    {
+      "id": "normal-logout",
+      "name": "Normal User Logout",
+      "stage": "cleanup",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/logout"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "bulk-rating-attempt"
+      ]
+    }
+  ]
+}

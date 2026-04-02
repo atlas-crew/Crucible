@@ -1,0 +1,50 @@
+{
+  "id": "identity-oidc-claim-injection",
+  "name": "OIDC Claim Injection & Privilege Escalation",
+  "category": "Identity",
+  "difficulty": "Advanced",
+  "description": "Attempts to manipulate OpenID Connect (OIDC) claims during the callback phase to escalate user privileges.",
+  "steps": [
+    {
+      "id": "oidc-callback-manipulation",
+      "name": "Manipulate OIDC Callback Claims",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/callback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "state": "random-state-123",
+          "id_token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSIsIm5hbWUiOiJKb2huIERvZSIsImdyb3VwcyI6WyJhZG1pbiJdfQ.fake-signature"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "userinfo-claim-override",
+      "name": "Attempt to Override Claims via UserInfo",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/userinfo",
+        "headers": {
+          "Authorization": "Bearer {{access_token}}",
+          "X-Claim-Override": "roles=super-admin"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "id": "chimera-jwt-token-forgery",
+  "name": "Chimera JWT Token Forgery",
+  "category": "Broken Authentication",
+  "difficulty": "Advanced",
+  "description": "Attempts to forge JWT tokens and exploit algorithm confusion vulnerabilities to gain unauthorized administrative access to Chimera.",
+  "tags": [
+    "chimera",
+    "jwt",
+    "token-forgery",
+    "owasp-a07"
+  ],
+  "steps": [
+    {
+      "id": "forge-admin-token",
+      "name": "Forge Admin Token via Token Endpoint",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/oauth/token/forge",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "client_id": "demo-client",
+          "username": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "access_token"
+      }
+    },
+    {
+      "id": "forge-user-token",
+      "name": "Forge Regular User Token",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/oauth/token/forge",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "client_id": "demo-client",
+          "username": "regular_user"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "forge-admin-token"
+      ]
+    },
+    {
+      "id": "none-algorithm-attack",
+      "name": "JWT None Algorithm Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-JWT-Algorithm": "none"
+        },
+        "body": {
+          "username": "admin",
+          "password": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "forge-admin-token"
+      ]
+    },
+    {
+      "id": "access-admin-with-forged",
+      "name": "Access Admin Config with Forged Token",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/config",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VyIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4ifQ."
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "database"
+      },
+      "dependsOn": [
+        "forge-user-token"
+      ]
+    }
+  ]
+}

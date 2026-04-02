@@ -1,0 +1,742 @@
+{
+  "id": "api-demo-botnet-showcase",
+  "name": "Botnet Console Showcase - Distributed Attack Simulation",
+  "category": "Advanced Persistent Threats",
+  "difficulty": "Advanced",
+  "description": "Demonstrates distributed botnet behavior with credential stuffing, account takeover attempts, and bot detection evasion techniques. Showcases ThreatX Botnet Console capabilities through coordinated multi-IP attacks with realistic timing patterns.",
+  "tags": [
+    "botnet",
+    "distributed-attack",
+    "credential-stuffing",
+    "account-takeover",
+    "bot-detection-evasion",
+    "api-abuse",
+    "threatx-showcase"
+  ],
+  "steps": [
+    {
+      "id": "botnet-recon-1",
+      "name": "Bot Detection Test - Initial Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/bot/detection-test",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept-Encoding": "gzip, deflate, br"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      }
+    },
+    {
+      "id": "botnet-recon-2",
+      "name": "Login Endpoint Response Analysis",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api/auth/login",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "*/*",
+          "Access-Control-Request-Method": "POST"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "dependsOn": [
+        "botnet-recon-1"
+      ]
+    },
+    {
+      "id": "botnet-recon-3",
+      "name": "Authentication Methods Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/auth/login",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "dependsOn": [
+        "botnet-recon-2"
+      ]
+    },
+    {
+      "id": "botnet-cred-1",
+      "name": "Credential Stuffing - Bot Node 1 (US East)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "198.51.100.23",
+          "X-Real-IP": "198.51.100.23"
+        },
+        "body": {
+          "username": "admin@demo.com",
+          "password": "Password123!",
+          "remember": true
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-recon-3"
+      ]
+    },
+    {
+      "id": "botnet-cred-2",
+      "name": "Credential Stuffing - Bot Node 2 (EU West)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (Version/17.1 Safari/605.1.15)",
+          "Accept": "application/json, text/plain",
+          "X-Forwarded-For": "185.220.101.45",
+          "CF-Connecting-IP": "185.220.101.45"
+        },
+        "body": {
+          "username": "user@example.com",
+          "password": "Welcome2024",
+          "remember": false
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-1"
+      ]
+    },
+    {
+      "id": "botnet-cred-3",
+      "name": "Credential Stuffing - Bot Node 3 (Asia Pacific)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+          "Accept": "application/json",
+          "X-Forwarded-For": "203.0.113.78",
+          "X-Client-IP": "203.0.113.78"
+        },
+        "body": {
+          "username": "john.doe@corp.com",
+          "password": "Spring2024!",
+          "deviceId": "android-mobile-001"
+        }
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-2"
+      ]
+    },
+    {
+      "id": "botnet-cred-4",
+      "name": "Credential Stuffing - Bot Node 4 (South America)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+          "Accept": "application/json",
+          "Accept-Language": "pt-BR,pt;q=0.9",
+          "X-Forwarded-For": "177.89.234.12",
+          "True-Client-IP": "177.89.234.12"
+        },
+        "body": {
+          "username": "test@company.com",
+          "password": "Test@12345",
+          "remember": true
+        }
+      },
+      "execution": {
+        "delayMs": 2200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-3"
+      ]
+    },
+    {
+      "id": "botnet-cred-5",
+      "name": "Credential Stuffing - Bot Node 5 (Canada)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
+          "Accept": "application/json",
+          "X-Forwarded-For": "142.93.145.67",
+          "X-Real-IP": "142.93.145.67"
+        },
+        "body": {
+          "username": "support@service.com",
+          "password": "Support123!",
+          "deviceId": "iphone-14-pro"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-4"
+      ]
+    },
+    {
+      "id": "botnet-cred-6",
+      "name": "Credential Stuffing - Bot Node 6 (Australia)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Accept-Language": "en-AU,en;q=0.9",
+          "X-Forwarded-For": "1.1.1.89",
+          "CF-Connecting-IP": "1.1.1.89"
+        },
+        "body": {
+          "username": "manager@business.com",
+          "password": "Manager2024",
+          "remember": false
+        }
+      },
+      "execution": {
+        "delayMs": 1900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-5"
+      ]
+    },
+    {
+      "id": "botnet-cred-7",
+      "name": "Credential Stuffing - Bot Node 7 (UK)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/javascript",
+          "Accept-Language": "en-GB,en;q=0.8",
+          "X-Forwarded-For": "81.2.69.142",
+          "X-Client-IP": "81.2.69.142"
+        },
+        "body": {
+          "username": "director@org.co.uk",
+          "password": "Director123!",
+          "deviceId": "macbook-pro-m2"
+        }
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-6"
+      ]
+    },
+    {
+      "id": "botnet-cred-8",
+      "name": "Credential Stuffing - Bot Node 8 (Germany)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+          "Accept": "application/json",
+          "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+          "X-Forwarded-For": "87.123.45.231",
+          "True-Client-IP": "87.123.45.231"
+        },
+        "body": {
+          "username": "entwickler@firma.de",
+          "password": "Entwickler2024!",
+          "remember": true
+        }
+      },
+      "execution": {
+        "delayMs": 1600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-7"
+      ]
+    },
+    {
+      "id": "botnet-cred-9",
+      "name": "Credential Stuffing - Bot Node 9 (Japan)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8",
+          "X-Forwarded-For": "210.152.12.78",
+          "X-Real-IP": "210.152.12.78"
+        },
+        "body": {
+          "username": "tanaka@company.jp",
+          "password": "Tanaka@2024",
+          "deviceId": "windows-desktop-001"
+        }
+      },
+      "execution": {
+        "delayMs": 2100
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-8"
+      ]
+    },
+    {
+      "id": "botnet-cred-10",
+      "name": "Credential Stuffing - Bot Node 10 (Singapore)",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (iPad; CPU OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
+          "Accept": "application/json",
+          "X-Forwarded-For": "103.28.248.123",
+          "CF-Connecting-IP": "103.28.248.123"
+        },
+        "body": {
+          "username": "admin.sg@asia.com",
+          "password": "Asia123!",
+          "deviceId": "ipad-air"
+        }
+      },
+      "execution": {
+        "delayMs": 1700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-9"
+      ]
+    },
+    {
+      "id": "botnet-ato-1",
+      "name": "Account Takeover - Session Hijacking Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/account-takeover",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "45.33.32.156",
+          "Cookie": "session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fake.token"
+        },
+        "body": {
+          "attack_type": "session_hijacking",
+          "target_user": "admin@demo.com",
+          "stolen_session": "sess_1a2b3c4d5e6f7g8h9i0j"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-cred-10"
+      ]
+    },
+    {
+      "id": "botnet-ato-2",
+      "name": "Account Takeover - Password Reset Abuse",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/account-takeover",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "192.0.2.45"
+        },
+        "body": {
+          "attack_type": "password_reset_abuse",
+          "target_user": "user@example.com",
+          "reset_token": "5d41402abc4b2a76b9719d911017c592",
+          "new_password": "Hijacked2024!"
+        }
+      },
+      "execution": {
+        "delayMs": 2800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-ato-1"
+      ]
+    },
+    {
+      "id": "botnet-ato-3",
+      "name": "Account Takeover - 2FA Bypass Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/account-takeover",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "104.28.15.234",
+          "Authorization": "Bearer partial_auth_token_abc123"
+        },
+        "body": {
+          "attack_type": "2fa_bypass",
+          "target_user": "john.doe@corp.com",
+          "bypass_method": "backup_codes",
+          "mfa_code": "000000"
+        }
+      },
+      "execution": {
+        "delayMs": 3200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-ato-2"
+      ]
+    },
+    {
+      "id": "botnet-ato-4",
+      "name": "Account Takeover - OAuth Token Theft",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/account-takeover",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+          "Accept": "application/json",
+          "X-Forwarded-For": "151.101.65.121"
+        },
+        "body": {
+          "attack_type": "oauth_token_theft",
+          "target_user": "test@company.com",
+          "stolen_token": "ya29.a0AfH6SMBx...",
+          "refresh_token": "1//0gJeOfwT9..."
+        }
+      },
+      "execution": {
+        "delayMs": 2600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-ato-3"
+      ]
+    },
+    {
+      "id": "botnet-evasion-1",
+      "name": "Bot Detection Evasion - Low and Slow Login",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+          "X-Forwarded-For": "72.14.207.99",
+          "Referer": "https://demo.com/login"
+        },
+        "body": {
+          "username": "slow.attack@example.com",
+          "password": "SlowAndSteady123!"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-ato-4"
+      ]
+    },
+    {
+      "id": "botnet-evasion-2",
+      "name": "Bot Detection Evasion - Human-Like Timing",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (Version/17.1 Safari/605.1.15)",
+          "Accept": "application/json",
+          "X-Forwarded-For": "208.67.222.222"
+        },
+        "body": {
+          "username": "human.mimic@test.com",
+          "password": "HumanLike456!",
+          "typing_pattern": [
+            120,
+            95,
+            110,
+            88,
+            103,
+            97,
+            115
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 4200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-evasion-1"
+      ]
+    },
+    {
+      "id": "botnet-evasion-3",
+      "name": "Bot Detection Evasion - Browser Fingerprint Rotation",
+      "stage": "persistence",
+      "request": {
+        "method": "GET",
+        "url": "/api/bot/detection-test",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+          "X-Forwarded-For": "8.8.8.8",
+          "Sec-Ch-Ua": "\"Chromium\";v=\"120\", \"Not A(Brand\";v=\"99\"",
+          "Sec-Ch-Ua-Mobile": "?0",
+          "Sec-Ch-Ua-Platform": "\"Chrome OS\""
+        }
+      },
+      "execution": {
+        "delayMs": 3800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-evasion-2"
+      ]
+    },
+    {
+      "id": "botnet-evasion-4",
+      "name": "Bot Detection Evasion - Canvas Fingerprinting",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "1.0.0.1",
+          "X-Canvas-Hash": "a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5"
+        },
+        "body": {
+          "username": "canvas.evade@test.com",
+          "password": "Canvas789!",
+          "canvas_fingerprint": "unique_hash_per_request"
+        }
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-evasion-3"
+      ]
+    },
+    {
+      "id": "botnet-evasion-5",
+      "name": "Bot Detection Evasion - WebGL Fingerprinting",
+      "stage": "persistence",
+      "request": {
+        "method": "GET",
+        "url": "/api/bot/detection-test",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
+          "Accept": "application/json",
+          "X-Forwarded-For": "9.9.9.9",
+          "X-WebGL-Vendor": "Apple Inc.",
+          "X-WebGL-Renderer": "Apple GPU"
+        }
+      },
+      "execution": {
+        "delayMs": 3500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-evasion-4"
+      ]
+    },
+    {
+      "id": "botnet-persistence-1",
+      "name": "Persistent Access - API Key Generation",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "13.107.42.14",
+          "Authorization": "Bearer compromised_token_xyz"
+        },
+        "body": {
+          "username": "persistent.bot@example.com",
+          "password": "Persistent2024!",
+          "create_api_key": true,
+          "key_expiry": "2099-12-31"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-evasion-5"
+      ]
+    },
+    {
+      "id": "botnet-persistence-2",
+      "name": "Persistent Access - Session Token Renewal",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/account-takeover",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "172.217.14.206"
+        },
+        "body": {
+          "attack_type": "session_persistence",
+          "refresh_token": "long_lived_refresh_token_abc",
+          "auto_renew": true
+        }
+      },
+      "execution": {
+        "delayMs": 3600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-persistence-1"
+      ]
+    },
+    {
+      "id": "botnet-coordinated-finale",
+      "name": "Coordinated Botnet Finale - Multi-Vector Attack",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/attack/credential-stuffing",
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "X-Forwarded-For": "23.227.38.65",
+          "X-Botnet-Coordination": "final_phase"
+        },
+        "body": {
+          "username": "final.target@example.com",
+          "password": "FinalStrike2024!",
+          "coordinated_attack": true,
+          "botnet_size": 10,
+          "attack_surface": "distributed"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "botnet-persistence-2"
+      ]
+    }
+  ]
+}

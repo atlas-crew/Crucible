@@ -1,0 +1,42 @@
+{
+  "id": "compliance-fedramp-cross-tenant",
+  "name": "FedRAMP Cross-Tenant Data Leakage Probe",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Sophisticated IDOR scenario testing for cross-tenant data isolation.",
+  "steps": [
+    {
+      "id": "tenant-a-resource-access",
+      "name": "Access Own Tenant Resource",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/saas/tenants/TENANT-A/projects",
+        "headers": {
+          "Authorization": "Bearer {{tenant_a_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "tenant-b-resource-access-attempt",
+      "name": "Attempt to Access Tenant B Resource",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/saas/tenants/TENANT-B/projects",
+        "headers": {
+          "Authorization": "Bearer {{tenant_a_token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

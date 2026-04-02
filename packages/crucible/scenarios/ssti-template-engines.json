@@ -1,0 +1,208 @@
+{
+  "id": "ssti-template-engines",
+  "name": "Server-Side Template Injection Multi-Engine",
+  "category": "Template Injection",
+  "difficulty": "Expert",
+  "description": "Advanced SSTI campaign targeting multiple template engines (Jinja2, Twig, Freemarker, Velocity) with RCE payloads and sandbox escapes",
+  "tags": [
+    "ssti",
+    "template",
+    "jinja2",
+    "twig",
+    "freemarker",
+    "rce",
+    "sandbox"
+  ],
+  "steps": [
+    {
+      "id": "ssti-detect-1",
+      "name": "Template Engine Detection - Basic",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/search",
+        "params": {
+          "q": "{{7*7}}"
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      }
+    },
+    {
+      "id": "ssti-detect-2",
+      "name": "Template Engine Fingerprinting",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/render",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"template\": \"${7*7}[[7*7]]{{7*7}}\"}"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-detect-1"
+      ]
+    },
+    {
+      "id": "ssti-jinja2-1",
+      "name": "Jinja2 Object Introspection",
+      "stage": "delivery",
+      "request": {
+        "method": "POST",
+        "url": "/api/template/compile",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"content\": \"{{''.__class__.__mro__[1].__subclasses__()}}\"}"
+      },
+      "execution": {
+        "delayMs": 1400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-detect-2"
+      ]
+    },
+    {
+      "id": "ssti-jinja2-rce",
+      "name": "Jinja2 RCE via Subprocess",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/email/template",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "subject={{''.__class__.__mro__[1].__subclasses__()[104].__init__.__globals__['sys'].modules['subprocess'].check_output(['id'])}}&body=test"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-jinja2-1"
+      ]
+    },
+    {
+      "id": "ssti-twig-1",
+      "name": "Twig Function Access",
+      "stage": "delivery",
+      "request": {
+        "method": "GET",
+        "url": "/preview",
+        "params": {
+          "template": "{{_self.env.getFunction('exec')}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-detect-2"
+      ]
+    },
+    {
+      "id": "ssti-twig-rce",
+      "name": "Twig Command Execution",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/report/generate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"format\": \"{{_self.env.getFunction('system').getCallable()('cat /etc/passwd')}}\"}"
+      },
+      "execution": {
+        "delayMs": 2400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-twig-1"
+      ]
+    },
+    {
+      "id": "ssti-freemarker-1",
+      "name": "FreeMarker Object Instantiation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/document/render",
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "<#assign ex=\"freemarker.template.utility.Execute\"?new()> ${ex(\"whoami\")}"
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-detect-2"
+      ]
+    },
+    {
+      "id": "ssti-velocity-1",
+      "name": "Velocity Runtime Execution",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/dynamic/page",
+        "params": {
+          "content": "#set($str=$class.forName('java.lang.String'))#set($chr=$class.forName('java.lang.Character'))#set($ex=$class.forName('java.lang.Runtime').getRuntime().exec('id'))"
+        }
+      },
+      "execution": {
+        "delayMs": 2200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-detect-2"
+      ]
+    },
+    {
+      "id": "ssti-persist-1",
+      "name": "Template Backdoor Installation",
+      "stage": "persistence",
+      "request": {
+        "method": "PUT",
+        "url": "/api/templates/global.tmpl",
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "{{''.__class__.__mro__[1].__subclasses__()[104].__init__.__globals__['sys'].modules['os'].system(request.args.get('cmd'))}}"
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssti-jinja2-rce",
+        "ssti-twig-rce"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "id": "chimera-ssrf-cloud-metadata",
+  "name": "SSRF Cloud Metadata and Internal Service Access",
+  "category": "SSRF",
+  "difficulty": "Advanced",
+  "description": "SSRF to access cloud metadata endpoints and internal services, targeting AWS, GCP, and localhost resources",
+  "tags": ["chimera", "ssrf", "cloud-metadata", "aws", "owasp-a10"],
+  "steps": [
+    {
+      "id": "ssrf-aws-metadata",
+      "name": "SSRF AWS Metadata Service",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/attack/ssrf",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://169.254.169.254/latest/meta-data/",
+          "method": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "credentials"
+      }
+    },
+    {
+      "id": "ssrf-gcp-metadata",
+      "name": "SSRF GCP Metadata Service",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/attack/ssrf",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://metadata.google.internal/computeMetadata/v1/",
+          "method": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-aws-metadata"
+      ]
+    },
+    {
+      "id": "ssrf-internal-service",
+      "name": "SSRF Internal Service Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/attack/ssrf",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://localhost:8080/admin",
+          "method": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-gcp-metadata"
+      ]
+    },
+    {
+      "id": "ssrf-webhook-registration",
+      "name": "SSRF via Webhook Registration",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/integrations/webhook/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "callback_url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-internal-service"
+      ]
+    },
+    {
+      "id": "ssrf-dns-rebind",
+      "name": "SSRF DNS Rebinding Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/attack/ssrf",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "url": "http://rebind.attacker.com/admin",
+          "method": "GET"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ssrf-webhook-registration"
+      ]
+    }
+  ]
+}

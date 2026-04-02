@@ -1,0 +1,241 @@
+{
+  "id": "api-demo-ics-ot-sabotage",
+  "name": "Industrial Control System Sabotage Campaign",
+  "category": "Industry Attacks",
+  "difficulty": "Expert",
+  "description": "Nation-state level ICS/OT attack targeting SCADA systems, PLCs, and critical infrastructure similar to Stuxnet/Triton",
+  "steps": [
+    {
+      "id": "scada-discovery",
+      "name": "SCADA System Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/ics/scada/systems"
+      },
+      "execution": {
+        "delayMs": 3000
+      }
+    },
+    {
+      "id": "device-inventory",
+      "name": "OT Device Inventory Scan",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/ot/devices/inventory",
+        "headers": {
+          "User-Agent": "Industrial/Scanner v1.0"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "dependsOn": [
+        "scada-discovery"
+      ]
+    },
+    {
+      "id": "hmi-interfaces-enum",
+      "name": "HMI Interface Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/ics/hmi/interfaces"
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "dependsOn": [
+        "device-inventory"
+      ]
+    },
+    {
+      "id": "controller-status",
+      "name": "Controller Status Polling",
+      "stage": "collection",
+      "request": {
+        "method": "GET",
+        "url": "/api/ics/controllers/status",
+        "headers": {
+          "X-Engineering-Mode": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "hmi-interfaces-enum"
+      ]
+    },
+    {
+      "id": "modbus-injection",
+      "name": "Modbus Protocol Command Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/ot/protocols/modbus",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "function_code": "0x05",
+          "address": "0x0000",
+          "value": "0xFF00"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "controller-status"
+      ]
+    },
+    {
+      "id": "plc-command-send",
+      "name": "Malicious PLC Command Execution",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/plc/commands/send",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Override-Safety": "true"
+        },
+        "body": {
+          "plc_id": "PLC-001",
+          "command": "SET_OUTPUT",
+          "parameters": {
+            "output": 1,
+            "value": "HIGH"
+          }
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "modbus-injection"
+      ]
+    },
+    {
+      "id": "setpoint-manipulation",
+      "name": "Critical Setpoint Manipulation",
+      "stage": "impact",
+      "request": {
+        "method": "PUT",
+        "url": "/api/ics/setpoints/modify",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "device": "TURBINE-001",
+          "setpoint": "RPM_LIMIT",
+          "value": 99999
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "plc-command-send"
+      ]
+    },
+    {
+      "id": "safety-bypass",
+      "name": "Safety Interlock Bypass",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/ot/safety/bypass",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer engineer_token_stolen"
+        },
+        "body": {
+          "safety_system": "SIS-001",
+          "bypass": true,
+          "reason": "maintenance"
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "setpoint-manipulation"
+      ]
+    },
+    {
+      "id": "schedule-manipulation",
+      "name": "Production Schedule Tampering",
+      "stage": "impact",
+      "request": {
+        "method": "PUT",
+        "url": "/api/ics/schedules/manipulate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "schedule_id": "PROD-2024",
+          "operations": [
+            {
+              "time": "02:00",
+              "action": "EMERGENCY_SHUTDOWN"
+            },
+            {
+              "time": "02:01",
+              "action": "RESTART_UNSAFE_MODE"
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "safety-bypass"
+      ]
+    },
+    {
+      "id": "network-segmentation",
+      "name": "OT Network Segmentation Breach",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "POST",
+        "url": "/api/ot/network/segment",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "action": "bridge",
+          "from_network": "OT_LEVEL_0",
+          "to_network": "CORPORATE_IT"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "schedule-manipulation"
+      ]
+    }
+  ]
+}

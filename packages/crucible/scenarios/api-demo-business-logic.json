@@ -1,0 +1,172 @@
+{
+  "id": "api-demo-business-logic",
+  "name": "Chimera Business Logic Exploitation",
+  "category": "Business Logic",
+  "difficulty": "Intermediate",
+  "description": "Exploits business logic flaws in e-commerce and vendor management APIs",
+  "steps": [
+    {
+      "id": "vendor-list",
+      "name": "List Marketplace Vendors",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/ecommerce/vendors/marketplace"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "vendor-register",
+      "name": "Register New Vendor",
+      "stage": "initialization",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/ecommerce/vendors/register",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "name": "TestVendor_{{timestamp}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "dependsOn": [
+        "vendor-list"
+      ]
+    },
+    {
+      "id": "negative-cart-qty",
+      "name": "Negative Quantity Cart Manipulation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/v1/ecommerce/cart/update",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "EXPENSIVE-ITEM-001",
+          "quantity": -10
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-register"
+      ]
+    },
+    {
+      "id": "inventory-reserve-overflow",
+      "name": "Inventory Reserve Overflow",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/ecommerce/inventory/reserve",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_id": "LIMITED-ITEM-001",
+          "quantity": 999999,
+          "duration_minutes": 1440
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "negative-cart-qty"
+      ]
+    },
+    {
+      "id": "bulk-fake-reviews",
+      "name": "Bulk Fake Review Submission",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/ecommerce/ratings/bulk",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ratings": [
+            {
+              "product_id": "COMPETITOR-001",
+              "rating": 1
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "inventory-reserve-overflow"
+      ]
+    },
+    {
+      "id": "vendor-privilege-escalation",
+      "name": "Vendor Privilege Escalation",
+      "stage": "exploitation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/v1/ecommerce/vendors/privileges/escalate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "vendor_id": "VENDOR-001",
+          "privilege": "super_admin"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "bulk-fake-reviews"
+      ]
+    },
+    {
+      "id": "vendor-inventory-sabotage",
+      "name": "Competitor Inventory Sabotage",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/ecommerce/vendors/inventory/sabotage",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "vendor_id": "COMPETITOR-VENDOR-001",
+          "action": "zero_out_stock"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-privilege-escalation"
+      ]
+    }
+  ]
+}

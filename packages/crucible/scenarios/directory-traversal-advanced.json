@@ -1,0 +1,46 @@
+{
+  "id": "directory-traversal-advanced",
+  "name": "Advanced Directory Traversal",
+  "category": "Injection",
+  "difficulty": "Advanced",
+  "description": "Exploits path traversal vulnerabilities in log and file access endpoints.",
+  "steps": [
+    {
+      "id": "log-traversal-probe",
+      "name": "Admin Log Path Traversal",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/logs?file=../../../../etc/passwd"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "healthcare-upload-traversal",
+      "name": "Healthcare Document Path Traversal",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/upload",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "filename": "../../../config/secrets.json",
+          "content": "fake content"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

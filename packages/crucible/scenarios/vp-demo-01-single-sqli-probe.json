@@ -1,0 +1,33 @@
+{
+  "id": "vp-demo-01-single-sqli-probe",
+  "name": "01 - Single SQLi Probe",
+  "category": "VP Demo",
+  "difficulty": "Beginner",
+  "description": "Single SQL injection probe to demonstrate WAF detection and risk scoring.",
+  "kind": "campaign",
+  "tags": [
+    "campaign",
+    "vp-demo",
+    "sqli",
+    "synapse",
+    "sequence-01"
+  ],
+  "sourceIp": "203.0.113.45",
+  "steps": [
+    {
+      "id": "sqli-probe-1",
+      "name": "SQLi Probe",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "https://localhost:6190/",
+        "params": {
+          "id": "1' OR '1'='1"
+        }
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

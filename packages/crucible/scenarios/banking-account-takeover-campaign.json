@@ -1,0 +1,66 @@
+{
+  "id": "banking-account-takeover-campaign",
+  "name": "Banking Account Takeover Campaign",
+  "category": "Banking",
+  "difficulty": "Advanced",
+  "description": "Multi-stage attack targeting banking accounts and fund transfers.",
+  "steps": [
+    {
+      "id": "list-accounts-idor",
+      "name": "List Accounts (IDOR Probe)",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "get-account-details",
+      "name": "Get Victim Account Details",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts/ACC-VICTIM-999"
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "list-accounts-idor"
+      ]
+    },
+    {
+      "id": "initiate-transfer-fraud",
+      "name": "Initiate Fraudulent Transfer",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/banking/transfer",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "from_account": "ACC-VICTIM-999",
+          "to_account": "ACC-ATTACKER-001",
+          "amount": 5000,
+          "bypass_mfa": true
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "get-account-details"
+      ]
+    }
+  ]
+}

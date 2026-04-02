@@ -1,0 +1,53 @@
+{
+  "id": "command-injection-sophisticated",
+  "name": "Sophisticated OS Command Injection",
+  "category": "Injection",
+  "difficulty": "Advanced",
+  "description": "Multi-stage command injection attack targeting system administration endpoints.",
+  "steps": [
+    {
+      "id": "execute-probe",
+      "name": "Admin Execute Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/execute",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "command": "ls",
+          "args": ["-la"]
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "command-injection-chained",
+      "name": "Chained Command Injection",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/execute",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "command": "ls; cat /etc/passwd",
+          "args": []
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "execute-probe"
+      ]
+    }
+  ]
+}

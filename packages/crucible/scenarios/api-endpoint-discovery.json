@@ -1,0 +1,383 @@
+{
+  "id": "api-endpoint-discovery",
+  "name": "API Endpoint Discovery",
+  "description": "API surface mapping through common endpoint and documentation discovery over 10-15 minutes",
+  "category": "API Reconnaissance",
+  "difficulty": "Intermediate",
+  "tags": [
+    "api",
+    "recon",
+    "discovery",
+    "low-risk",
+    "endpoints"
+  ],
+  "metadata": {
+    "expectedBlocked": false,
+    "stage": "reconnaissance",
+    "estimatedDuration": "14 minutes",
+    "riskLevel": "minimal",
+    "detectionLikelihood": "low",
+    "targetTypes": [
+      "rest-api",
+      "graphql",
+      "microservices",
+      "web-application"
+    ],
+    "techniques": [
+      "api-enumeration",
+      "endpoint-discovery",
+      "documentation-mapping",
+      "version-detection",
+      "method-discovery"
+    ],
+    "indicators": {
+      "requestRate": "0.033 req/sec",
+      "averageDelay": "51 seconds",
+      "totalRequests": 28,
+      "cumulativeWeight": 6.81,
+      "methodDistribution": {
+        "GET": 24,
+        "OPTIONS": 3,
+        "HEAD": 1
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "api-root-probe",
+      "name": "Probe base API root endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Discover allowed methods on API root",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Check API v1 versioned endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Check API v2 versioned endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v2",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Probe alternate v1 API path",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/v1",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Check REST API endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/rest",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Look for API documentation page",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/docs",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Check alternative API docs path",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api-docs",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Enumerate Swagger UI endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Retrieve Swagger API specification",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/swagger.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Check nested Swagger spec location",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/swagger.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Look for OpenAPI specification file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/openapi.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Check for ReDoc documentation interface",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/redoc",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Probe GraphQL endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/graphql",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Discover GraphQL endpoint capabilities",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/graphql",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Check versioned GraphQL path",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/v1/graphql",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Look for nested GraphQL endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/graphql",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Check API health check endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/health",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-19",
+      "name": "Probe API status endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/status",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-20",
+      "name": "Query API version information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/version",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-21",
+      "name": "Lightweight version endpoint check",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/api/version",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-22",
+      "name": "Retrieve API schema definition",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/schema",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-23",
+      "name": "Look for API specification document",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/spec",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-24",
+      "name": "Probe users resource endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/users",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-25",
+      "name": "Discover allowed methods on users endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api/users",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-26",
+      "name": "Check authentication endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/auth",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-27",
+      "name": "Probe login API endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/login",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-28",
+      "name": "Discover login endpoint methods",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api/login",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; APIScanner/1.0)"
+        }
+      }
+    }
+  ]
+}

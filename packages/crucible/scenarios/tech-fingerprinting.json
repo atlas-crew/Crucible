@@ -1,0 +1,256 @@
+{
+  "name": "Technology Fingerprinting",
+  "description": "Passive technology and version identification through common files and headers over 10-15 minutes",
+  "category": "Reconnaissance",
+  "difficulty": "Beginner",
+  "tags": [
+    "fingerprinting",
+    "recon",
+    "low-risk",
+    "passive",
+    "osint"
+  ],
+  "metadata": {
+    "expectedBlocked": false,
+    "stage": "reconnaissance",
+    "estimatedDuration": "15 minutes",
+    "riskLevel": "minimal",
+    "detectionLikelihood": "low",
+    "targetTypes": [
+      "web-application",
+      "api",
+      "cms"
+    ],
+    "techniques": [
+      "passive-reconnaissance",
+      "version-enumeration",
+      "technology-identification",
+      "metadata-gathering"
+    ],
+    "indicators": {
+      "requestRate": "0.02 req/sec",
+      "averageDelay": "53 seconds",
+      "totalRequests": 18,
+      "cumulativeWeight": 1.61
+    }
+  },
+  "id": "tech-fingerprinting",
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Check robots.txt for technology hints and directory structure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/robots.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-2",
+      "name": "Probe for version information file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/version.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-3",
+      "name": "Check standard security contact information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/.well-known/security.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-4",
+      "name": "Look for human-readable site information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/humans.txt",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-5",
+      "name": "Attempt to retrieve Node.js package information",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/package.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Check for web app manifest file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/manifest.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Look for PHP Composer dependencies",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/composer.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-8",
+      "name": "Check for changelog with version history",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/CHANGELOG.md",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-9",
+      "name": "Query API version endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/version",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-10",
+      "name": "Probe API information endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/info",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-11",
+      "name": "Check health monitoring endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/health",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-12",
+      "name": "Look for build information metadata",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/build-info.json",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-13",
+      "name": "Check for WordPress version file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/wp-includes/version.php",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-14",
+      "name": "Attempt to access Apache server status",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/server-status",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-15",
+      "name": "Probe for PHP info disclosure",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/info.php",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-16",
+      "name": "Check alternative PHP info endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/phpinfo.php",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-17",
+      "name": "Look for uppercase VERSION file",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/VERSION",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    },
+    {
+      "id": "step-18",
+      "name": "Analyze sitemap for site structure insights",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/sitemap.xml",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
+        }
+      }
+    }
+  ]
+}

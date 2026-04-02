@@ -1,0 +1,54 @@
+{
+  "id": "supply-chain-dependency-confusion",
+  "name": "Dependency Confusion Reconnaissance",
+  "category": "Supply Chain",
+  "difficulty": "Intermediate",
+  "description": "Probes for internal package names leaked in API responses that could be targeted for dependency confusion attacks.",
+  "steps": [
+    {
+      "id": "probe-public-bundle",
+      "name": "Probe Public JS Bundle for Internal Packages",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/static/js/main.chunk.js"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "bodyNotContains": "@internal-corp/"
+      }
+    },
+    {
+      "id": "probe-version-info",
+      "name": "Probe API Version Endpoint",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/system/version"
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "extract": {
+        "internal_pkg": { "from": "body", "path": "dependencies.@internal-corp/auth-lib" }
+      }
+    },
+    {
+      "id": "dependency-leak-check",
+      "name": "Check for Leaked Internal Dependencies",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/debug/dependencies"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

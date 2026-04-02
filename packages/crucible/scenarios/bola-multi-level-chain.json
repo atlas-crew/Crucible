@@ -1,0 +1,54 @@
+{
+  "id": "bola-multi-level-chain",
+  "name": "Complex Multi-Level BOLA Chain",
+  "category": "BOLA",
+  "difficulty": "Advanced",
+  "description": "Sophisticated BOLA attack targeting nested resources and sub-resource metadata.",
+  "steps": [
+    {
+      "id": "enumerate-tenants",
+      "name": "Enumerate SaaS Tenants",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/saas/tenants/TENANT-1/projects"
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "bola-cross-tenant-projects",
+      "name": "BOLA: Cross-Tenant Project Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/saas/tenants/VICTIM-TENANT/projects"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "enumerate-tenants"
+      ]
+    },
+    {
+      "id": "bola-subscriber-profile",
+      "name": "BOLA: Unauthorized Telecom Profile Access",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/telecom/subscribers/SUB-999/profile"
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      }
+    }
+  ]
+}

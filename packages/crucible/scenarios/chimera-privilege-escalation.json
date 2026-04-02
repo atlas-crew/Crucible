@@ -1,0 +1,118 @@
+{
+  "id": "chimera-privilege-escalation",
+  "name": "Privilege Escalation via Role Elevation",
+  "category": "Broken Access Control",
+  "difficulty": "Advanced",
+  "description": "Privilege escalation via role elevation and unauthorized access to admin endpoints, testing for broken access control on administrative functions",
+  "tags": ["chimera", "privilege-escalation", "rbac", "owasp-a01"],
+  "steps": [
+    {
+      "id": "discover-admin-panel",
+      "name": "Discover Admin Configuration Panel",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/config"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "database"
+      }
+    },
+    {
+      "id": "list-users-unauthenticated",
+      "name": "List Users Without Authentication",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/users"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "password_hash"
+      },
+      "dependsOn": [
+        "discover-admin-panel"
+      ]
+    },
+    {
+      "id": "elevate-to-admin",
+      "name": "Elevate User to Admin Role",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/users/user-001/elevate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "role": "admin"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "elevated"
+      },
+      "dependsOn": [
+        "list-users-unauthenticated"
+      ]
+    },
+    {
+      "id": "suspend-audit-logging",
+      "name": "Suspend Audit Logging",
+      "stage": "defense-evasion",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/admin/audit/suspend",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "duration_minutes": 60,
+          "reason": "maintenance"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "elevate-to-admin"
+      ]
+    },
+    {
+      "id": "export-users-with-passwords",
+      "name": "Export Users with Plaintext Passwords",
+      "stage": "exfiltration",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/admin/users/export",
+        "params": {
+          "format": "json",
+          "include_passwords": "true"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "password_plaintext"
+      },
+      "dependsOn": [
+        "suspend-audit-logging"
+      ]
+    }
+  ]
+}

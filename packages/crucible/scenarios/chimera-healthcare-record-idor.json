@@ -1,0 +1,90 @@
+{
+  "id": "chimera-healthcare-record-idor",
+  "name": "Healthcare Record IDOR Access",
+  "category": "IDOR",
+  "difficulty": "Beginner",
+  "description": "IDOR to access healthcare records without authorization, testing for improper direct object reference controls on sensitive patient data",
+  "tags": ["chimera", "idor", "healthcare", "hipaa", "owasp-a01"],
+  "steps": [
+    {
+      "id": "list-all-records",
+      "name": "List All Healthcare Records",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "ssn"
+      }
+    },
+    {
+      "id": "access-specific-record",
+      "name": "Access Specific Patient Record",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/REC-001"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "patient_info"
+      },
+      "dependsOn": [
+        "list-all-records"
+      ]
+    },
+    {
+      "id": "access-another-record",
+      "name": "Access Another Patient Record",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/REC-002"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true,
+        "bodyNotContains": "diagnosis"
+      },
+      "dependsOn": [
+        "access-specific-record"
+      ]
+    },
+    {
+      "id": "bulk-export-records",
+      "name": "Bulk Export Patient Records",
+      "stage": "exfiltration",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/healthcare/records/export",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Skip-Audit": "true"
+        },
+        "body": {
+          "patient_ids": ["REC-001", "REC-002", "REC-003"],
+          "format": "json"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "access-another-record"
+      ]
+    }
+  ]
+}

