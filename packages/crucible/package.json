@@ -1,12 +1,17 @@
 {
   "name": "@atlascrew/crucible",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Unified Crucible application package with the web UI, execution backend, and scenario catalog.",
   "type": "module",
   "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
   "homepage": "https://crucible.atlascrew.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inferno-lab/Crucible",
+    "directory": "packages/crucible"
+  },
   "bugs": {
-    "url": "https://github.com/NickCrew/Crucible/issues"
+    "url": "https://github.com/inferno-lab/Crucible/issues"
   },
   "license": "MIT",
   "engines": {
