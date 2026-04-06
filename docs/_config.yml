@@ -3,6 +3,15 @@ description: Next-generation security testing platform with 80+ attack scenarios
 url: "https://crucible.atlascrew.dev"
 baseurl: ""
 
+image:
+  path: /assets/crucible-banner.png
+  width: 1280
+  height: 320
+  alt: "Crucible — Next-generation security testing platform"
+
+twitter:
+  card: summary_large_image
+
 plugins:
   - jekyll-optional-front-matter
   - jekyll-titles-from-headings
