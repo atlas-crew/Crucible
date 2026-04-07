@@ -1,0 +1,11 @@
+{
+  "name": "@atlascrew/crucible",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/crucible/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "dependsOn": ["^build", "web-client:build"]
+    }
+  }
+}

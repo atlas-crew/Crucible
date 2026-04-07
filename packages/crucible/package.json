@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist scenarios web-client",
-    "build:web": "NEXT_PUBLIC_API_URL=/api NEXT_PUBLIC_WS_URL=auto NEXT_TELEMETRY_DISABLED=1 pnpm --dir ../.. --filter web-client build && node ./scripts/copy-web-client.mjs",
+    "build:web": "node ./scripts/copy-web-client.mjs",
     "build:server": "tsup",
     "build": "pnpm run clean && pnpm run build:web && pnpm run build:server",
     "type-check": "tsc --noEmit -p tsconfig.json",
