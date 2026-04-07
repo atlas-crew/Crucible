@@ -201,7 +201,7 @@ export class ExecutionRepository {
   getStorageStats(): { totalResultBytes: number; totalAssertionBytes: number } {
     const stats = this.db
       .select({
-        totalResultBytes: sql<number>`SUM(LENGTH(${executionSteps.result}))`,
+        totalResultBytes: sql<number>`SUM(LENGTH(${executionSteps.details}))`,
         totalAssertionBytes: sql<number>`SUM(LENGTH(${executionSteps.assertions}))`,
       })
       .from(executionSteps)

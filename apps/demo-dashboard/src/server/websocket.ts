@@ -91,6 +91,9 @@ export function setupWebSocket(wss: WebSocketServer, engine: ScenarioEngine, ter
     console.log('Client connected');
 
     for (const execution of engine.listExecutions()) {
+      if (!executionSnapshots.has(execution.id)) {
+        executionSnapshots.set(execution.id, cloneExecution(execution));
+      }
       ws.send(JSON.stringify(createSnapshotEvent('STATUS_UPDATE', execution)));
     }
 

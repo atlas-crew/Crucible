@@ -57,15 +57,31 @@ function createMockEngine() {
   } as unknown as ScenarioEngine & { emit: Function };
 }
 
+function createMockTerminal() {
+  const handlers = new Map<string, Function[]>();
+  return {
+    on(event: string, handler: Function) {
+      if (!handlers.has(event)) handlers.set(event, []);
+      handlers.get(event)!.push(handler);
+    },
+    startSession: vi.fn(),
+    sendInput: vi.fn(),
+    stopSession: vi.fn(),
+    resize: vi.fn(),
+  };
+}
+
 describe('setupWebSocket', () => {
   let wss: ReturnType<typeof createMockWss>;
   let engine: ReturnType<typeof createMockEngine>;
+  let terminal: ReturnType<typeof createMockTerminal>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     wss = createMockWss();
     engine = createMockEngine();
-    setupWebSocket(wss as any, engine as any);
+    terminal = createMockTerminal();
+    setupWebSocket(wss as any, engine as any, terminal as any);
   });
 
   describe('incoming messages', () => {
