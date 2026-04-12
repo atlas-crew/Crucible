@@ -1,4 +1,5 @@
 import type { Scenario } from '../models/types.js';
+import { resolveRule } from '../models/regulations.js';
 
 export interface ValidationResult {
   valid: boolean;
@@ -17,6 +18,16 @@ export function validateScenario(scenario: Scenario): ValidationResult {
   const warnings: string[] = [];
 
   const stepIds = new Set(scenario.steps.map((s) => s.id));
+
+  // ── Regulatory reference detection ────────────────────────────────
+
+  if (scenario.rule_ids) {
+    for (const ruleId of scenario.rule_ids) {
+      if (!resolveRule(ruleId)) {
+        errors.push(`Scenario "${scenario.id}" references unknown regulation rule ID "${ruleId}"`);
+      }
+    }
+  }
 
   // ── Missing reference detection ───────────────────────────────────
 

@@ -174,4 +174,26 @@ describe('validateScenario', () => {
       expect(result.warnings.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('regulatory validation', () => {
+    it('returns valid for a scenario with valid rule_ids', () => {
+      const result = validateScenario(
+        scenario({
+          rule_ids: ['164.312-a-1', '3.5.1'],
+        }),
+      );
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('errors when a rule_id does not exist in the registry', () => {
+      const result = validateScenario(
+        scenario({
+          rule_ids: ['invalid-rule-id'],
+        }),
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e: string) => e.includes('invalid-rule-id'))).toBe(true);
+    });
+  });
 });
