@@ -52,6 +52,15 @@ export {
 // Validation
 export { validateScenario, type ValidationResult } from './validation/scenario-validator.js';
 
+// Regulations
+export {
+  RegulationRegistry,
+  resolveRule,
+  type RegulationControl,
+  type RegulationFramework,
+  type ResolvedRule,
+} from './models/regulations.js';
+
 // Service
 export { CatalogService } from './service/catalog-service.js';
 
