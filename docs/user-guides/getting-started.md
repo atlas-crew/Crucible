@@ -1,8 +1,8 @@
 # Getting Started
 
-This guide walks you through installing and running Crucible. Choose the method that fits your needs — npm and Docker are the fastest paths; source installs give you the full development environment.
+This guide walks you through installing and running Crucible. Choose the method that fits your needs — npm and Docker are the fastest paths; source installs give you the full development environment. If you already have a Crucible server running and just want to talk to it from code or the terminal, skip to [Option D](#option-d-api-client-library) or [Option E](#option-e-remote-cli).
 
-## Option A: Install from npm (recommended)
+## Option A: Install the server from npm (recommended)
 
 Requires **Node.js 22+**.
 
@@ -34,7 +34,7 @@ crucible start
 
 ---
 
-## Option B: Run with Docker
+## Option B: Run the server with Docker
 
 ```bash
 docker run -p 3000:3000 nickcrew/crucible:latest
@@ -56,7 +56,7 @@ Available tags: `latest`, `0.2`, `0.2.4`, `sha-<commit>`.
 
 ---
 
-## Option C: Run from Source
+## Option C: Run the server from source
 
 Use this option when you want to develop Crucible itself or need fine-grained control over individual components.
 
@@ -76,7 +76,7 @@ corepack enable
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/NickCrew/Crucible.git
+git clone https://github.com/atlas-crew/Crucible.git
 cd Crucible
 pnpm install
 ```
@@ -122,14 +122,55 @@ Look at the top-right corner of the web UI. You should see a green **CONNECTED**
 
 ---
 
+## Option D: API Client Library
+
+If you already have a Crucible server running and want to call it from a TypeScript or JavaScript application:
+
+```bash
+npm install @atlascrew/crucible-client
+```
+
+```typescript
+import { CrucibleClient } from '@atlascrew/crucible-client';
+
+const client = new CrucibleClient({ baseUrl: 'http://localhost:3000' });
+const scenarios = await client.scenarios.list();
+const { executionId } = await client.assessments.start('my-scenario');
+```
+
+Zero runtime dependencies — works in Node 22+ and modern browsers. See the [API Client Library](api-client.md) guide for the full reference.
+
+---
+
+## Option E: Remote CLI
+
+For scripting and CI pipelines that target a running Crucible server:
+
+```bash
+npm install -g @atlascrew/crucible-cli
+```
+
+```bash
+export CRUCIBLE_URL=http://localhost:3000
+crucible-cli health
+crucible-cli scenarios
+crucible-cli assess my-scenario --fail-below 90
+```
+
+The CLI exits non-zero if any scenario falls below the threshold, making it easy to wire into CI. See the [CLI Reference](cli.md) guide for all commands and flags.
+
+---
+
 ## Project Structure
 
 ```
 crucible/
-├── packages/crucible/         # @atlascrew/crucible — unified publishable package
+├── packages/crucible/         # @atlascrew/crucible — unified server package
 ├── packages/catalog/          # Scenario schemas, validation, JSON loader
 │   ├── src/                   # TypeScript source
 │   └── scenarios/             # 80+ pre-built scenario JSON files
+├── apps/client/               # @atlascrew/crucible-client — typed API client library
+├── apps/cli/                  # @atlascrew/crucible-cli — lightweight remote CLI
 ├── apps/web-client/           # Next.js UI (scenarios, simulations, assessments)
 │   └── src/
 │       ├── app/               # Pages (dashboard, scenarios, simulations, assessments)
@@ -149,3 +190,5 @@ crucible/
 
 - [Running Scenarios](running-scenarios.md) — browse the catalog, launch simulations, review assessments
 - [Editing Scenarios](editing-scenarios.md) — create custom scenarios in the visual editor
+- [API Client Library](api-client.md) — integrate Crucible into TypeScript or JavaScript applications
+- [CLI Reference](cli.md) — script assessments from the terminal or CI

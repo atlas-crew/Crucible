@@ -10,7 +10,7 @@ layout: default
     <p class="intro-text">Next-generation security testing platform with 80+ attack scenarios, a visual editor, real-time simulations, and pass/fail assessment scoring.</p>
     <div class="intro-actions">
       <a href="{{ '/user-guides/getting-started' | relative_url }}" class="btn btn-primary">Get Started</a>
-      <a href="https://github.com/NickCrew/Crucible" class="btn btn-outline">View on GitHub</a>
+      <a href="https://github.com/atlas-crew/Crucible" class="btn btn-outline">View on GitHub</a>
     </div>
   </section>
 
@@ -55,9 +55,18 @@ crucible start</code></pre>
       </div>
       <div class="quickstart-option">
         <h4>From Source</h4>
-        <pre><code>git clone https://github.com/NickCrew/Crucible.git
+        <pre><code>git clone https://github.com/atlas-crew/Crucible.git
 cd Crucible &amp;&amp; pnpm install &amp;&amp; pnpm build
 pnpm dev</code></pre>
+      </div>
+      <div class="quickstart-option">
+        <h4>API Client</h4>
+        <pre><code>npm install @atlascrew/crucible-client</code></pre>
+      </div>
+      <div class="quickstart-option">
+        <h4>Remote CLI</h4>
+        <pre><code>npm install -g @atlascrew/crucible-cli
+crucible-cli assess my-scenario</code></pre>
       </div>
     </div>
   </section>
@@ -72,6 +81,14 @@ pnpm dev</code></pre>
       <a href="{{ '/user-guides/editing-scenarios' | relative_url }}" class="explore-card">
         <h4>Editing Scenarios</h4>
         <p>Create and modify scenario definitions with the visual editor</p>
+      </a>
+      <a href="{{ '/user-guides/api-client' | relative_url }}" class="explore-card">
+        <h4>API Client Library</h4>
+        <p>Typed TypeScript client for the REST and WebSocket APIs</p>
+      </a>
+      <a href="{{ '/user-guides/cli' | relative_url }}" class="explore-card">
+        <h4>Remote CLI</h4>
+        <p>Script assessments from the terminal or CI pipelines</p>
       </a>
       <a href="{{ '/architecture/system-overview' | relative_url }}" class="explore-card">
         <h4>System Overview</h4>
