@@ -22,6 +22,9 @@
       },
       "execution": {
         "delayMs": 500
+      },
+      "expect": {
+        "status": 200
       }
     },
     {
@@ -67,7 +70,10 @@
       },
       "expect": {
         "blocked": true
-      }
+      },
+      "dependsOn": [
+        "standard-chat"
+      ]
     }
   ]
 }

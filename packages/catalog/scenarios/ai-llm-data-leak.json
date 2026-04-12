@@ -24,7 +24,9 @@
         "delayMs": 1500
       },
       "expect": {
-        "blocked": true
+        "blocked": true,
+        "bodyNotContains": "SSN",
+        "bodyNotContains": "social security"
       }
     },
     {
@@ -45,7 +47,9 @@
         "delayMs": 1000
       },
       "expect": {
-        "blocked": true
+        "blocked": true,
+        "bodyNotContains": "api_key",
+        "bodyNotContains": "secret"
       }
     },
     {
@@ -60,6 +64,7 @@
         "delayMs": 500
       },
       "expect": {
+        "status": 403,
         "blocked": true
       }
     }
