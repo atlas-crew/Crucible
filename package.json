@@ -12,7 +12,7 @@
     "test": "nx run-many --target=test --all",
     "lint": "nx run-many --target=lint --all",
     "type-check": "nx run-many --target=type-check --all",
-    "build:release": "pnpm --filter @atlascrew/crucible build"
+    "build:release": "pnpm --filter @atlascrew/crucible-client --filter @atlascrew/crucible-cli --filter @atlascrew/crucible build"
   },
   "devDependencies": {
     "nx": "21.6.4",
