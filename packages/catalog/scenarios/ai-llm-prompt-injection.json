@@ -4,6 +4,7 @@
   "category": "AI Security",
   "difficulty": "Intermediate",
   "description": "Attempts to bypass LLM safety filters and exfiltrate system instructions using direct prompt injection payloads.",
+  "rule_ids": ["LLM01"],
   "steps": [
     {
       "id": "standard-chat",

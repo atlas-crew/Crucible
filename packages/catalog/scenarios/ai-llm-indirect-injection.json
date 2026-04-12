@@ -4,6 +4,7 @@
   "category": "AI Security",
   "difficulty": "Advanced",
   "description": "Simulates an attack where malicious instructions are embedded in a document (e.g., a resume) processed by an LLM.",
+  "rule_ids": ["LLM01"],
   "steps": [
     {
       "id": "upload-malicious-doc",

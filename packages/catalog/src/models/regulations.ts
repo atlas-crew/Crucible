@@ -114,6 +114,32 @@ export const RegulationRegistry = {
       },
     },
   },
+  'OWASP-LLM': {
+    name: 'OWASP Top 10 for LLM',
+    version: '1.1',
+    controls: {
+      'LLM01': {
+        id: 'LLM01',
+        title: 'Prompt Injection',
+        description: 'Direct or indirect manipulation of LLM input to execute unauthorized actions or bypass safety filters.',
+      },
+      'LLM02': {
+        id: 'LLM02',
+        title: 'Insecure Output Handling',
+        description: 'Failure to validate or sanitize LLM outputs before passing them to downstream systems.',
+      },
+      'LLM06': {
+        id: 'LLM06',
+        title: 'Sensitive Information Disclosure',
+        description: 'Revealing sensitive data, PII, or proprietary information through LLM responses.',
+      },
+      'LLM07': {
+        id: 'LLM07',
+        title: 'Insecure Plugin Design',
+        description: 'LLM plugins having insecure inputs or insufficient access controls.',
+      },
+    },
+  },
 } as const satisfies Record<string, RegulationFramework>;
 
 /**

@@ -4,6 +4,7 @@
   "category": "AI Security",
   "difficulty": "Advanced",
   "description": "Attacks an AI agent to trick it into revealing PII or sensitive internal context from its retrieval-augmented generation (RAG) sources.",
+  "rule_ids": ["LLM06"],
   "steps": [
     {
       "id": "rag-context-probe",
