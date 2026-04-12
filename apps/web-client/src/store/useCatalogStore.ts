@@ -684,6 +684,9 @@ export const useCatalogStore = create<CatalogState>()(
         targetUrl: state.targetUrl,
         pinnedScenarioIds: state.pinnedScenarioIds,
       }),
+      // Defer rehydration until after React mounts so SSR output and the
+      // first client render match. AppInitializer triggers rehydrate().
+      skipHydration: true,
     },
   ),
 );
