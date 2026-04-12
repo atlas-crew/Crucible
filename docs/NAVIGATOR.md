@@ -17,6 +17,12 @@
 | [System Overview](architecture/system-overview.md) | High-level architecture, component map, and data flow |
 | [Scenario Engine](architecture/scenario-engine.md) | Execution model, DAG scheduling, assertions, and WebSocket protocol |
 
+## Reference
+
+| Document | Description |
+|----------|-------------|
+| [Database Schema](reference/database-schema.md) | `executions` and `execution_steps` tables, invariants, and migration history |
+
 ## Development
 
 | Document | Description |

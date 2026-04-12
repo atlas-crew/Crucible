@@ -67,7 +67,7 @@ export interface ScenarioExecution {
   context?: Record<string, unknown>;
   pausedState?: PausedState;
   parentExecutionId?: string;
-  targetUrl?: string;
+  targetUrl: string;
   report?: {
     summary: string;
     passed: boolean;

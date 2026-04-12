@@ -94,6 +94,7 @@ describe('Zod schemas from drizzle-zod', () => {
       mode: 'simulation',
       status: 'pending',
       startedAt: Date.now(),
+      targetUrl: 'http://127.0.0.1:8880',
     });
     expect(result.success).toBe(true);
   });
@@ -134,6 +135,7 @@ describe('Zod schemas from drizzle-zod', () => {
       scenarioId: 'chimera-jwt-token-forgery',
       mode: 'assessment',
       status: 'completed',
+      targetUrl: 'http://127.0.0.1:8880',
       triggerData,
       report,
     });

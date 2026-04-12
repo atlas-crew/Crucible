@@ -73,7 +73,7 @@ export interface ScenarioExecution {
   context?: Record<string, unknown>;
   pausedState?: PausedState;
   parentExecutionId?: string;
-  targetUrl?: string;
+  targetUrl: string;
   report?: {
     summary: string;
     passed: boolean;
@@ -120,7 +120,7 @@ export class ExecutionRepository {
         context TEXT,
         paused_state TEXT,
         parent_execution_id TEXT,
-        target_url TEXT,
+        target_url TEXT NOT NULL,
         report TEXT
       )
     `);
@@ -171,6 +171,14 @@ export class ExecutionRepository {
         throw error;
       }
     }
+    // Pre-existing DBs may still have NULL target_url values from before this
+    // column was required. Backfill with a clear sentinel so the subsequent
+    // NOT NULL rebuild cannot fail and so historical rows are distinguishable.
+    this.db.run(sql`UPDATE executions SET target_url = 'unknown' WHERE target_url IS NULL`);
+    // SQLite cannot tighten a column from nullable to NOT NULL in place, so we
+    // rebuild the executions table only if PRAGMA reports target_url is still
+    // nullable. Gated so this runs at most once per DB.
+    this.tightenTargetUrlNotNull();
     try {
       this.db.run(sql`ALTER TABLE execution_steps ADD COLUMN details TEXT`);
     } catch (error) {
@@ -231,7 +239,7 @@ export class ExecutionRepository {
         context: exec.context ?? null,
         pausedState: exec.pausedState ?? null,
         parentExecutionId: exec.parentExecutionId ?? null,
-        targetUrl: exec.targetUrl ?? null,
+        targetUrl: exec.targetUrl,
         report: exec.report ?? null,
       }).run();
 
@@ -400,6 +408,59 @@ export class ExecutionRepository {
 
   // ── Private helpers ─────────────────────────────────────────────
 
+  /**
+   * Rebuild `executions` with `target_url` NOT NULL if the current schema still
+   * reports it as nullable. SQLite has no ALTER COLUMN, so we copy rows to a
+   * fresh table with the tightened constraint, swap names, and recreate indexes.
+   * Callers MUST have backfilled NULLs before invoking this, or the rebuild
+   * will fail with a NOT NULL constraint violation.
+   */
+  private tightenTargetUrlNotNull(): void {
+    const columns = this.db.all(sql`PRAGMA table_info(executions)`) as Array<{
+      name: string;
+      notnull: number;
+    }>;
+    const targetUrlColumn = columns.find((c) => c.name === 'target_url');
+    if (!targetUrlColumn || targetUrlColumn.notnull === 1) {
+      return;
+    }
+    this.db.transaction(() => {
+      this.db.run(sql`
+        CREATE TABLE executions_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          scenario_id TEXT NOT NULL,
+          mode TEXT NOT NULL,
+          status TEXT NOT NULL,
+          started_at INTEGER,
+          completed_at INTEGER,
+          duration INTEGER,
+          error TEXT,
+          trigger_data TEXT,
+          metadata TEXT,
+          context TEXT,
+          paused_state TEXT,
+          parent_execution_id TEXT,
+          target_url TEXT NOT NULL,
+          report TEXT
+        )
+      `);
+      this.db.run(sql`
+        INSERT INTO executions_new (
+          id, scenario_id, mode, status, started_at, completed_at, duration,
+          error, trigger_data, metadata, context, paused_state,
+          parent_execution_id, target_url, report
+        )
+        SELECT
+          id, scenario_id, mode, status, started_at, completed_at, duration,
+          error, trigger_data, metadata, context, paused_state,
+          parent_execution_id, target_url, report
+        FROM executions
+      `);
+      this.db.run(sql`DROP TABLE executions`);
+      this.db.run(sql`ALTER TABLE executions_new RENAME TO executions`);
+    });
+  }
+
   private insertStep(executionId: string, step: ExecutionStepResult): void {
     this.db.insert(executionSteps).values({
       executionId,
@@ -425,6 +486,9 @@ export class ExecutionRepository {
       scenarioId: row.scenarioId,
       mode: row.mode as ExecutionMode,
       status: row.status as ExecutionStatus,
+      // Defensive fallback for any row that somehow survived migration with a
+      // NULL target_url. Post-migration this should never trigger.
+      targetUrl: row.targetUrl ?? 'unknown',
       steps: stepRows.map((s) => ({
         stepId: s.stepId,
         status: s.status as ExecutionStatus,
@@ -449,7 +513,6 @@ export class ExecutionRepository {
     if (row.context != null) exec.context = row.context as Record<string, unknown>;
     if (row.pausedState != null) exec.pausedState = row.pausedState as PausedState;
     if (row.parentExecutionId != null) exec.parentExecutionId = row.parentExecutionId;
-    if (row.targetUrl != null) exec.targetUrl = row.targetUrl;
     if (row.report != null) exec.report = row.report as ScenarioExecution['report'];
 
     return exec;

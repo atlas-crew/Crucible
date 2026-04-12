@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { sql } from 'drizzle-orm';
 import { createDb } from '../client.js';
 import { ExecutionRepository } from '../execution-repository.js';
 import type { ScenarioExecution, ExecutionStepResult } from '../execution-repository.js';
@@ -10,6 +11,7 @@ function makeExecution(overrides?: Partial<ScenarioExecution>): ScenarioExecutio
     mode: 'simulation',
     status: 'pending',
     startedAt: Date.now(),
+    targetUrl: 'http://127.0.0.1:8880',
     steps: [],
     ...overrides,
   };
@@ -228,6 +230,94 @@ describe('ExecutionRepository', () => {
 
     const retrieved = repo.getExecution(exec.id);
     expect(retrieved!.report).toEqual(report);
+  });
+
+  it('fresh DB has NOT NULL target_url from CREATE TABLE', () => {
+    const db = createDb();
+    new ExecutionRepository(db).ensureTables();
+    const columns = db.all(sql`PRAGMA table_info(executions)`) as Array<{ name: string; notnull: number }>;
+    const targetUrlColumn = columns.find((c) => c.name === 'target_url');
+    expect(targetUrlColumn).toBeDefined();
+    expect(targetUrlColumn!.notnull).toBe(1);
+  });
+
+  it('rejects inserting a NULL target_url after migration', () => {
+    const db = createDb();
+    new ExecutionRepository(db).ensureTables();
+    expect(() =>
+      db.run(sql`
+        INSERT INTO executions (id, scenario_id, mode, status, target_url)
+        VALUES ('bad', 'scenario-x', 'simulation', 'pending', NULL)
+      `),
+    ).toThrow();
+  });
+
+  it('backfills NULL target_url and tightens constraint on a pre-existing DB', () => {
+    // Simulate a pre-existing DB: executions table that predates the NOT NULL
+    // tightening, with a row whose target_url is NULL.
+    const db = createDb();
+    db.run(sql`
+      CREATE TABLE executions (
+        id TEXT PRIMARY KEY NOT NULL,
+        scenario_id TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at INTEGER,
+        completed_at INTEGER,
+        duration INTEGER,
+        error TEXT,
+        trigger_data TEXT,
+        metadata TEXT,
+        context TEXT,
+        paused_state TEXT,
+        parent_execution_id TEXT,
+        target_url TEXT,
+        report TEXT
+      )
+    `);
+    db.run(sql`
+      CREATE TABLE execution_steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        execution_id TEXT NOT NULL REFERENCES executions(id) ON DELETE CASCADE,
+        step_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at INTEGER,
+        completed_at INTEGER,
+        duration INTEGER,
+        error TEXT,
+        logs TEXT,
+        result TEXT,
+        details TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        assertions TEXT
+      )
+    `);
+    db.run(sql`
+      INSERT INTO executions (id, scenario_id, mode, status, target_url)
+      VALUES ('historical-null', 'scenario-y', 'assessment', 'completed', NULL)
+    `);
+
+    const repo = new ExecutionRepository(db);
+    repo.ensureTables();
+
+    const historical = repo.getExecution('historical-null');
+    expect(historical).toBeDefined();
+    expect(historical!.targetUrl).toBe('unknown');
+
+    const columns = db.all(sql`PRAGMA table_info(executions)`) as Array<{ name: string; notnull: number }>;
+    const targetUrlColumn = columns.find((c) => c.name === 'target_url');
+    expect(targetUrlColumn!.notnull).toBe(1);
+  });
+
+  it('is idempotent when ensureTables runs twice on a migrated DB', () => {
+    const db = createDb();
+    const repo = new ExecutionRepository(db);
+    repo.ensureTables();
+    // Running the migration path again must not rebuild the table or throw.
+    expect(() => repo.ensureTables()).not.toThrow();
+    const columns = db.all(sql`PRAGMA table_info(executions)`) as Array<{ name: string; notnull: number }>;
+    const targetUrlColumn = columns.find((c) => c.name === 'target_url');
+    expect(targetUrlColumn!.notnull).toBe(1);
   });
 
   it('round-trips targetUrl and stored step details', () => {

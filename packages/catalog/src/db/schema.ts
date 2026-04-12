@@ -24,7 +24,7 @@ export const executions = sqliteTable('executions', {
     stepResults: Record<string, unknown>;
   }>(),
   parentExecutionId: text('parent_execution_id'),
-  targetUrl: text('target_url'),
+  targetUrl: text('target_url').notNull(),
   report: text('report', { mode: 'json' }).$type<{
     summary: string;
     passed: boolean;
