@@ -2,7 +2,7 @@
 
 Attack simulation and compliance assessment engine with 80+ built-in scenarios, a visual editor, real-time execution, and pass/fail assessment scoring.
 
-Part of the [Inferno Lab](https://github.com/inferno-lab) security testing suite.
+Part of the [Inferno Lab](https://github.com/atlas-crew) security testing suite.
 
 ## Quick Start
 
@@ -116,5 +116,5 @@ crucible start
 ## Links
 
 - [Documentation](https://crucible.atlascrew.dev)
-- [GitHub](https://github.com/inferno-lab/Crucible)
+- [GitHub](https://github.com/atlas-crew/Crucible)
 - [npm](https://www.npmjs.com/package/@atlascrew/crucible)

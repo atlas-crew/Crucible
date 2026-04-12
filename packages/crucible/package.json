@@ -7,11 +7,11 @@
   "homepage": "https://crucible.atlascrew.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/inferno-lab/Crucible",
+    "url": "https://github.com/atlas-crew/Crucible",
     "directory": "packages/crucible"
   },
   "bugs": {
-    "url": "https://github.com/inferno-lab/Crucible/issues"
+    "url": "https://github.com/atlas-crew/Crucible/issues"
   },
   "license": "MIT",
   "engines": {

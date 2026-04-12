@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://crucible.atlascrew.dev/sitemap.xml
