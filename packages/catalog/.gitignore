@@ -1,0 +1,5 @@
+# Build artifacts (outDir is ./dist but guard against stale src/ output)
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
