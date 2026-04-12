@@ -55,6 +55,9 @@
 :root {
   --radius: 0.5rem;
 
+  /* Recursive variable font loaded via @fontsource-variable/recursive/full.css */
+  --font-recursive: 'Recursive Variable', ui-sans-serif, system-ui, sans-serif;
+
   /* Deep slate base with cool blue undertone */
   --background: oklch(0.13 0.015 265);
   --foreground: oklch(0.93 0.008 260);

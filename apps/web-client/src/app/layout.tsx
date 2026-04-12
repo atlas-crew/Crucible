@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
-import { Recursive } from "next/font/google";
+// Use the upstream Arrowtype Recursive variable font via fontsource.
+// The `full` build preserves all five axes (wght, slnt, MONO, CASL, CRSV)
+// and ships an unmodified woff2, avoiding Next.js's font subsetter which
+// produced a malformed glyf table that Firefox's OTS rejected.
+import "@fontsource-variable/recursive/full.css";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { AppInitializer } from "@/components/app-initializer";
-
-const recursive = Recursive({
-  variable: "--font-recursive",
-  subsets: ["latin"],
-  axes: ["MONO", "CASL", "CRSV"],
-});
 
 export const metadata: Metadata = {
   title: "Crucible | Security Scenario Engine",
@@ -22,9 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body
-        className={`${recursive.variable} antialiased min-h-screen flex flex-col`}
-      >
+      <body className="antialiased min-h-screen flex flex-col">
         <AppInitializer>
           <SiteHeader />
           <main className="flex-1 container mx-auto py-6 px-4">
