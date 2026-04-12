@@ -1,0 +1,47 @@
+{
+  "name": "@atlascrew/crucible-cli",
+  "version": "0.1.0",
+  "description": "Lightweight CLI for interacting with a running Crucible server.",
+  "type": "module",
+  "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
+  "homepage": "https://crucible.atlascrew.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlas-crew/Crucible",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/atlas-crew/Crucible/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "crucible-cli": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "@atlascrew/crucible-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsup": "^8.3.6",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
