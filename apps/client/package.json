@@ -30,7 +30,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -40,11 +40,9 @@
     "access": "public",
     "provenance": true
   },
-  "dependencies": {
-    "@crucible/catalog": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "tsup": "^8.3.6",
     "typescript": "5.8.3",
     "vitest": "^3.2.4"
   }

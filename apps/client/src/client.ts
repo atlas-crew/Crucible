@@ -1,4 +1,4 @@
-import type { Scenario, ScenarioExecution } from '@crucible/catalog';
+import type { Scenario, ScenarioExecution } from './types.js';
 import { CrucibleApiError } from './errors.js';
 import { CrucibleSocket } from './socket.js';
 import type {

@@ -3,7 +3,7 @@ export { CrucibleClient } from './client.js';
 export { CrucibleSocket } from './socket.js';
 export { CrucibleApiError } from './errors.js';
 
-// Client-specific types
+// Types (client-specific + domain types — all self-contained)
 export type {
   CrucibleClientOptions,
   CrucibleSocketOptions,
@@ -22,10 +22,6 @@ export type {
   WebSocketEventName,
   ScenarioExecutionDelta,
   ExecutionStepDelta,
-} from './types.js';
-
-// Re-export domain types from catalog so consumers only need @crucible/client
-export type {
   Scenario,
   ScenarioStep,
   Request,
@@ -42,4 +38,4 @@ export type {
   ExecutionFilters,
   AssertionResult,
   PausedState,
-} from '@crucible/catalog';
+} from './types.js';

@@ -1,10 +1,162 @@
-import type {
-  ExecutionMode,
-  ExecutionStatus,
-  ExecutionStepResult,
-  Scenario,
-  ScenarioExecution,
-} from '@crucible/catalog';
+// ── Domain types (standalone — no external dependency) ──────────────
+
+export type ExecutionStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'paused'
+  | 'skipped';
+
+export type ExecutionMode = 'simulation' | 'assessment';
+
+export type StepExecutionMode = 'sequential' | 'parallel';
+
+export interface Request {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+  url: string;
+  headers?: Record<string, string>;
+  body?: string | Record<string, unknown> | unknown[];
+  params?: Record<string, string>;
+}
+
+export interface ExecutionConfig {
+  delayMs?: number;
+  retries?: number;
+  jitter?: number;
+  iterations?: number;
+}
+
+export interface Expect {
+  status?: number;
+  blocked?: boolean;
+  bodyContains?: string;
+  bodyNotContains?: string;
+  headerPresent?: string;
+  headerEquals?: Record<string, string>;
+}
+
+export interface ExtractRule {
+  from: 'body' | 'header' | 'status';
+  path?: string;
+}
+
+export type Extract = Record<string, ExtractRule>;
+
+export interface WhenCondition {
+  step: string;
+  succeeded?: boolean;
+  status?: number;
+}
+
+export interface ScenarioStep {
+  id: string;
+  name: string;
+  stage: string;
+  request: Request;
+  execution?: ExecutionConfig;
+  expect?: Expect;
+  extract?: Extract;
+  executionMode?: StepExecutionMode;
+  parallelGroup?: number;
+  dependsOn?: string[];
+  when?: WhenCondition;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+  steps: ScenarioStep[];
+  version?: number;
+  tags?: string[];
+  rule_ids?: string[];
+  target?: string;
+  sourceIp?: string;
+  kind?: string;
+  [key: string]: unknown;
+}
+
+export interface AssertionResult {
+  field: string;
+  expected: unknown;
+  actual: unknown;
+  passed: boolean;
+}
+
+export interface ExecutionStepResult {
+  stepId: string;
+  status: ExecutionStatus;
+  startedAt?: number;
+  completedAt?: number;
+  duration?: number;
+  result?: Record<string, unknown>;
+  details?: {
+    response?: {
+      status: number;
+      headers: Record<string, string>;
+      body: unknown;
+    };
+    retention?: {
+      policy: string;
+      truncated: boolean;
+      contentType: string;
+      originalBytes: number;
+      storedBytes: number;
+      bodyFormat: 'json' | 'text';
+    };
+  };
+  error?: string;
+  logs?: string[];
+  attempts: number;
+  assertions?: AssertionResult[];
+}
+
+export interface PausedState {
+  pendingStepIds: string[];
+  completedStepIds: string[];
+  context: Record<string, unknown>;
+  passedSteps: number;
+  stepResults: Record<string, ExecutionStepResult>;
+}
+
+export interface ScenarioExecution {
+  id: string;
+  scenarioId: string;
+  mode: ExecutionMode;
+  status: ExecutionStatus;
+  startedAt?: number;
+  completedAt?: number;
+  duration?: number;
+  steps: ExecutionStepResult[];
+  error?: string;
+  triggerData?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  context?: Record<string, unknown>;
+  pausedState?: PausedState;
+  parentExecutionId?: string;
+  targetUrl?: string;
+  report?: {
+    summary: string;
+    passed: boolean;
+    score: number;
+    artifacts: string[];
+  };
+}
+
+export interface ExecutionFilters {
+  scenarioId?: string;
+  status?: ExecutionStatus | ExecutionStatus[];
+  mode?: ExecutionMode;
+  since?: number;
+  until?: number;
+  limit?: number;
+  offset?: number;
+  targetUrl?: string;
+}
 
 // ── Client options ──────────────────────────────────────────────────
 

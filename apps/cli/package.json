@@ -35,10 +35,8 @@
     "access": "public",
     "provenance": true
   },
-  "dependencies": {
-    "@atlascrew/crucible-client": "workspace:*"
-  },
   "devDependencies": {
+    "@atlascrew/crucible-client": "workspace:*",
     "@types/node": "^20.14.0",
     "tsup": "^8.3.6",
     "typescript": "5.8.3",
