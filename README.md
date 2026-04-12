@@ -18,22 +18,26 @@ Next-generation security testing platform. Crucible provides a catalog of 80+ at
 
 ```
 crucible/
-├── packages/crucible       # @atlascrew/crucible — unified publishable package (npm + Docker)
+├── packages/crucible       # @atlascrew/crucible — unified server package (npm + Docker)
 ├── packages/catalog        # @crucible/catalog — scenario schemas, validation, and loader
 ├── apps/web-client         # Next.js 16 web UI (scenarios, assessments, simulations)
-└── apps/demo-dashboard     # Express + WebSocket simulation orchestrator
+├── apps/demo-dashboard     # Express + WebSocket simulation orchestrator
+├── apps/client             # @atlascrew/crucible-client — typed API client library
+└── apps/cli                # @atlascrew/crucible-cli — lightweight remote CLI
 ```
 
 | Package | Stack | Description |
 |---------|-------|-------------|
-| `@atlascrew/crucible` | Express, Next.js, SQLite | Unified package — bundles the UI, API, engine, and scenario catalog into a single installable |
+| `@atlascrew/crucible` | Express, Next.js, SQLite | Unified server — bundles the UI, API, engine, and scenario catalog into a single installable |
+| `@atlascrew/crucible-client` | TypeScript, native fetch | Typed API client for the Crucible REST and WebSocket APIs — zero runtime dependencies |
+| `@atlascrew/crucible-cli` | TypeScript, tsup | Lightweight CLI for interacting with a running Crucible server |
 | `@crucible/catalog` | TypeScript, Zod | Scenario type definitions, JSON schema validation, runbook parser |
 | `web-client` | Next.js 16, React 19, Tailwind 4, Radix UI | Primary web interface for browsing and editing scenarios |
-| `@crucible/demo-dashboard` | Express, WebSocket | Real-time scenario execution engine with live dashboard |
+| `demo-dashboard` | Express, WebSocket | Real-time scenario execution engine with live dashboard |
 
 ## Installation
 
-### npm (recommended)
+### Server (npm)
 
 ```bash
 npm install -g @atlascrew/crucible
@@ -42,11 +46,44 @@ crucible start
 
 Open **http://localhost:3000**. The UI, REST API, and WebSocket endpoint are all served from a single process.
 
-### Docker
+### Server (Docker)
 
 ```bash
 docker run -p 3000:3000 nickcrew/crucible:latest
 ```
+
+### API Client Library
+
+```bash
+npm install @atlascrew/crucible-client
+```
+
+```typescript
+import { CrucibleClient } from '@atlascrew/crucible-client';
+
+const client = new CrucibleClient({ baseUrl: 'http://localhost:3000' });
+const scenarios = await client.scenarios.list();
+const { executionId } = await client.assessments.start('my-scenario');
+const execution = await client.executions.get(executionId);
+```
+
+Zero runtime dependencies — uses native `fetch` and `WebSocket` (Node 22+).
+
+### Remote CLI
+
+```bash
+npm install -g @atlascrew/crucible-cli
+```
+
+```bash
+crucible-cli health
+crucible-cli scenarios
+crucible-cli assess my-scenario --fail-below 90
+crucible-cli executions --status running,completed
+crucible-cli reports abc123 --download pdf -o report.pdf
+```
+
+Talks to a running Crucible server over HTTP. Set `CRUCIBLE_URL` or use `--server <url>`.
 
 ### Environment Variables
 
@@ -69,7 +106,7 @@ docker run -p 3000:3000 nickcrew/crucible:latest
 ### Run from source
 
 ```bash
-git clone https://github.com/NickCrew/Crucible.git
+git clone https://github.com/atlas-crew/Crucible.git
 cd Crucible
 pnpm install
 pnpm build
@@ -122,21 +159,29 @@ Every PR to `main` runs build, type-check, and test via [GitHub Actions](.github
 
 ### Package And Docker Release
 
-Pushing a semver tag that matches `packages/crucible/package.json` triggers npm and Docker publishing:
+Pushing a semver tag triggers npm and Docker publishing:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
-This publishes `@atlascrew/crucible` to npmjs and `nickcrew/crucible` to Docker Hub with tags derived from the version (for example `0.2.0`, `0.2`, and `latest`). The release workflow expects `NPM_TOKEN`, `DOCKERHUB_USERNAME`, and `DOCKERHUB_TOKEN` repository secrets.
+The release workflow checks each `@atlascrew/*` package against npm and publishes only those with a new version:
+
+| Package | npm | Versioned |
+|---------|-----|-----------|
+| `@atlascrew/crucible` | [npmjs.com](https://www.npmjs.com/package/@atlascrew/crucible) | Independently |
+| `@atlascrew/crucible-client` | [npmjs.com](https://www.npmjs.com/package/@atlascrew/crucible-client) | Independently |
+| `@atlascrew/crucible-cli` | [npmjs.com](https://www.npmjs.com/package/@atlascrew/crucible-cli) | Independently |
+
+The Docker image (`nickcrew/crucible`) is tagged with the version from the git tag (e.g. `0.3.0`, `0.3`, `latest`). The release workflow expects `NPM_TOKEN`, `DOCKERHUB_USERNAME`, and `DOCKERHUB_TOKEN` repository secrets.
 
 ## Project Commands
 
 | Command | Description |
 |---------|-------------|
 | `pnpm build` | Build all packages (Nx orchestrated) |
-| `pnpm build:release` | Build the publishable `@atlascrew/crucible` package |
+| `pnpm build:release` | Build all publishable `@atlascrew/*` packages |
 | `pnpm test` | Run all test suites |
 | `pnpm type-check` | TypeScript type checking across all packages |
 | `pnpm lint` | Lint all packages |
