@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { Scenario } from '@crucible/catalog';
+import { type Scenario, resolveRule, type ResolvedRule } from '@crucible/catalog';
 import type { ExecutionStepResult, ScenarioExecution } from '../shared/types.js';
 
 const SENSITIVE_HEADER_NAMES = new Set([
@@ -31,6 +31,13 @@ export interface ReportServiceConfig {
   baseUrl: string;
 }
 
+export interface FrameworkCompliance {
+  name: string;
+  passed: boolean;
+  score: number;
+  rules: ResolvedRule[];
+}
+
 export interface AssessmentReportPayload {
   generatedAt: string;
   execution: {
@@ -52,6 +59,10 @@ export interface AssessmentReportPayload {
     description?: string;
     category?: string;
     difficulty?: string;
+    rule_ids?: string[];
+  };
+  compliance?: {
+    frameworks: Record<string, FrameworkCompliance>;
   };
   exports: {
     json: string;
@@ -131,6 +142,26 @@ export class ReportService {
     const htmlExport = `${this.baseUrl}/api/reports/${execution.id}?format=${ReportService.HTML_SUFFIX}`;
     const stepResults = new Map(execution.steps.map((step) => [step.stepId, step]));
 
+    const frameworks: Record<string, FrameworkCompliance> = {};
+    if (scenario.rule_ids && scenario.rule_ids.length > 0) {
+      for (const ruleId of scenario.rule_ids) {
+        const resolved = resolveRule(ruleId);
+        if (resolved) {
+          if (!frameworks[resolved.framework]) {
+            frameworks[resolved.framework] = {
+              name: resolved.framework,
+              // TODO: Compute per-framework pass/score based on rule-level results.
+              // Currently reflecting overall scenario status.
+              passed: execution.report?.passed ?? false,
+              score: execution.report?.score ?? 0,
+              rules: [],
+            };
+          }
+          frameworks[resolved.framework].rules.push(resolved);
+        }
+      }
+    }
+
     return {
       generatedAt: new Date().toISOString(),
       execution: {
@@ -152,7 +183,9 @@ export class ReportService {
         description: scenario.description,
         category: scenario.category,
         difficulty: scenario.difficulty,
+        rule_ids: scenario.rule_ids,
       },
+      compliance: Object.keys(frameworks).length > 0 ? { frameworks } : undefined,
       exports: {
         json: jsonExport,
         html: htmlExport,
@@ -209,6 +242,36 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
     0,
   );
   const generatedAt = new Date(payload.generatedAt).toLocaleString();
+
+  const complianceSection = payload.compliance
+    ? `<section class="panel">
+        <h2>Regulatory Compliance</h2>
+        <div class="compliance-grid">
+          ${Object.values(payload.compliance.frameworks)
+            .map(
+              (fw) => `
+            <div class="framework-card">
+              <div class="framework-header">
+                <h3>${escapeHtml(fw.name)}</h3>
+                <span class="badge ${fw.passed ? 'pass' : 'fail'}">${fw.score}% RESULT</span>
+              </div>
+              <ul class="control-list">
+                ${fw.rules
+                  .map(
+                    (rule) => `
+                  <li class="control-item">
+                    <span class="control-id">${escapeHtml(rule.id)}</span>
+                    <span>${escapeHtml(rule.title)}</span>
+                  </li>`,
+                  )
+                  .join('')}
+              </ul>
+            </div>`,
+            )
+            .join('')}
+        </div>
+      </section>`
+    : '';
 
   const stepCards = payload.steps
     .map((step, index) => {
@@ -471,6 +534,44 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
         font-weight: 700;
         text-decoration: none;
       }
+      .compliance-grid {
+        display: grid;
+        gap: 24px;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        margin-top: 16px;
+      }
+      .framework-card {
+        padding: 20px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.6);
+      }
+      .framework-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .control-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 0;
+        display: grid;
+        gap: 8px;
+      }
+      .control-item {
+        font-size: 13px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.4);
+        border: 1px solid var(--border);
+      }
+      .control-id {
+        font-family: "IBM Plex Mono", monospace;
+        font-weight: 700;
+        color: var(--accent);
+        margin-right: 8px;
+      }
       @media (max-width: 640px) {
         main {
           width: min(100% - 20px, 100%);
@@ -478,7 +579,8 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
         }
         .hero,
         .panel,
-        .step-card {
+        .step-card,
+        .framework-card {
           padding: 20px;
           border-radius: 20px;
         }
@@ -559,6 +661,8 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
             : ''
         }
       </section>
+
+      ${complianceSection}
 
       ${stepCards}
     </main>
