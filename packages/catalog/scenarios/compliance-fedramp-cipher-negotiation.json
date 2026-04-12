@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Attempts to negotiate weak or non-FIPS compliant TLS ciphers.",
+  "rule_ids": ["164.312-e-1"],
   "steps": [
     {
       "id": "weak-cipher-probe",

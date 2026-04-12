@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Sophisticated IDOR scenario testing for cross-tenant data isolation.",
+  "rule_ids": ["CC6.1"],
   "steps": [
     {
       "id": "tenant-a-resource-access",

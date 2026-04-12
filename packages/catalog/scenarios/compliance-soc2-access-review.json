@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Tests enforcement of credential rotation policies by attempting to use an expired service account key.",
+  "rule_ids": ["CC6.1"],
   "steps": [
     {
       "id": "expired-key-attempt",

@@ -98,6 +98,22 @@ export const RegulationRegistry = {
       },
     },
   },
+  'PRIVACY': {
+    name: 'Privacy',
+    version: 'GDPR / CCPA',
+    controls: {
+      'GDPR-ART-17': {
+        id: 'GDPR-Art-17',
+        title: 'Right to Erasure (Forget Me)',
+        description: 'The data subject shall have the right to obtain from the controller the erasure of personal data concerning him or her without undue delay.',
+      },
+      'GDPR-ART-21': {
+        id: 'GDPR-Art-21',
+        title: 'Right to Object (Consent)',
+        description: 'The data subject shall have the right to object, on grounds relating to his or her particular situation, at any time to processing of personal data concerning him or her.',
+      },
+    },
+  },
 } as const satisfies Record<string, RegulationFramework>;
 
 /**

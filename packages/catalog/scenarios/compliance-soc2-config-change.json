@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Attempts to change security configurations without a valid change management ticket ID.",
+  "rule_ids": ["CC8.1"],
   "steps": [
     {
       "id": "disable-mfa-no-ticket",
