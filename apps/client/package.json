@@ -1,0 +1,51 @@
+{
+  "name": "@atlascrew/crucible-client",
+  "version": "0.1.0",
+  "description": "Typed API client for the Crucible REST and WebSocket APIs.",
+  "type": "module",
+  "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
+  "homepage": "https://crucible.atlascrew.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlas-crew/Crucible",
+    "directory": "apps/client"
+  },
+  "bugs": {
+    "url": "https://github.com/atlas-crew/Crucible/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "@crucible/catalog": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -15,7 +15,8 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@crucible/catalog": ["packages/catalog/src/index.ts"]
+      "@crucible/catalog": ["packages/catalog/src/index.ts"],
+      "@atlascrew/crucible-client": ["apps/client/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist"]
