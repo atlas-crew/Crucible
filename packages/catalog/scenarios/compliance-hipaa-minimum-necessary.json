@@ -1,0 +1,53 @@
+{
+  "id": "compliance-hipaa-minimum-necessary",
+  "name": "HIPAA Minimum Necessary Access Control Check",
+  "category": "Compliance",
+  "difficulty": "Advanced",
+  "description": "Verifies enforcement of the 'Minimum Necessary' rule by ensuring that users with different roles (e.g., Billing vs Clinical) receive appropriately filtered data when accessing the same patient resource.",
+  "rule_ids": ["164.312-a-1"],
+  "tags": ["hipaa", "rbac", "healthcare", "privacy"],
+  "steps": [
+    {
+      "id": "clinical-access-full",
+      "name": "Clinical User: Access Full PHI",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/P-88210",
+        "headers": {
+          "Authorization": "Bearer {{clinical_token}}",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": "psychotherapy_notes"
+      }
+    },
+    {
+      "id": "billing-access-filtered",
+      "name": "Billing User: Access Filtered PHI",
+      "stage": "exploitation",
+      "request": {
+        "method": "GET",
+        "url": "/api/v1/healthcare/records/P-88210",
+        "headers": {
+          "Authorization": "Bearer {{billing_token}}",
+          "Accept": "application/json"
+        }
+      },
+      "execution": {
+        "delayMs": 1000
+      },
+      "expect": {
+        "status": 200,
+        "bodyNotContains": "psychotherapy_notes",
+        "bodyContains": "invoice_id"
+      },
+      "dependsOn": ["clinical-access-full"]
+    }
+  ]
+}
