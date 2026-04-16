@@ -18,6 +18,35 @@ export interface AssertionResult {
   passed: boolean;
 }
 
+export type RunnerFindingSeverity =
+  | 'info'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'critical'
+  | 'unknown';
+
+export interface RunnerSummary {
+  type: 'k6' | 'nuclei';
+  summary?: string;
+  exitCode?: number;
+  targetUrl?: string;
+  artifacts?: string[];
+  metrics?: {
+    checksPassed?: number;
+    checksFailed?: number;
+    thresholdsPassed?: number;
+    thresholdsFailed?: number;
+    httpReqDurationP95Ms?: number;
+    iterations?: number;
+    requests?: number;
+  };
+  findings?: {
+    total: number;
+    bySeverity?: Partial<Record<RunnerFindingSeverity, number>>;
+  };
+}
+
 export interface ExecutionStepResult {
   stepId: string;
   status: ExecutionStatus;
@@ -39,6 +68,7 @@ export interface ExecutionStepResult {
       storedBytes: number;
       bodyFormat: 'json' | 'text';
     };
+    runner?: RunnerSummary;
   };
   error?: string;
   logs?: string[];

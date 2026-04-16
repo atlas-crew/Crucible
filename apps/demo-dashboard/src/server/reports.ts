@@ -1,6 +1,15 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { type Scenario, resolveRule, type ResolvedRule } from '@crucible/catalog';
+import {
+  type Request as ScenarioRequest,
+  type Scenario,
+  type ScenarioRunnerStep,
+  getScenarioStepType,
+  isScenarioHttpStep,
+  isScenarioRunnerStep,
+  resolveRule,
+  type ResolvedRule,
+} from '@crucible/catalog';
 import type { ExecutionStepResult, ScenarioExecution } from '../shared/types.js';
 
 const SENSITIVE_HEADER_NAMES = new Set([
@@ -71,12 +80,17 @@ export interface AssessmentReportPayload {
   steps: Array<{
     id: string;
     name: string;
-    request: {
-      method: Scenario['steps'][number]['request']['method'];
+    type: 'http' | 'k6' | 'nuclei';
+    request?: {
+      method: ScenarioRequest['method'];
       url: string;
       params?: Record<string, string>;
       headers?: Record<string, string>;
       body?: unknown;
+    };
+    runner?: {
+      type: ScenarioRunnerStep['type'];
+      config: Record<string, unknown>;
     };
     executionMode?: Scenario['steps'][number]['executionMode'];
     parallelGroup?: Scenario['steps'][number]['parallelGroup'];
@@ -196,7 +210,14 @@ export class ReportService {
         return {
           id: definition.id,
           name: definition.name,
-          request: sanitizeRequest(definition.request),
+          type: getScenarioStepType(definition),
+          request: isScenarioHttpStep(definition) ? sanitizeRequest(definition.request) : undefined,
+          runner: isScenarioRunnerStep(definition)
+            ? {
+                type: definition.type,
+                config: sanitizeRunnerConfig(definition),
+              }
+            : undefined,
           executionMode: definition.executionMode,
           parallelGroup: definition.parallelGroup,
           status: result?.status ?? 'pending',
@@ -301,7 +322,7 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
             <div>
               <p class="step-kicker">Step ${index + 1}</p>
               <h3>${escapeHtml(step.name)}</h3>
-              <p class="muted">${escapeHtml(step.request.method)} ${escapeHtml(step.request.url)}</p>
+              <p class="muted">${escapeHtml(formatStepDefinition(step))}</p>
             </div>
             <div class="step-meta">
               <span class="badge ${badgeClass(step.status)}">${escapeHtml(step.status.toUpperCase())}</span>
@@ -712,11 +733,28 @@ function badgeClass(status: ExecutionStepResult['status']): string {
   return status;
 }
 
-function sanitizeRequest(request: Scenario['steps'][number]['request']) {
+function sanitizeRequest(request: ScenarioRequest) {
   return {
     ...request,
     headers: sanitizeHeaders(request.headers),
     body: sanitizeBodyValue(request.body, 'request body'),
+  };
+}
+
+function sanitizeRunnerConfig(step: ScenarioRunnerStep): Record<string, unknown> {
+  if (step.type === 'k6') {
+    return {
+      scriptRef: step.runner.scriptRef,
+      args: sanitizeValue(step.runner.args),
+      thresholds: sanitizeValue(step.runner.thresholds),
+    };
+  }
+
+  return {
+    templateRef: step.runner.templateRef,
+    workflowRef: step.runner.workflowRef,
+    tags: sanitizeValue(step.runner.tags),
+    severity: sanitizeValue(step.runner.severity),
   };
 }
 
@@ -755,6 +793,24 @@ function sanitizeBodyValue(value: unknown, label: string): unknown {
     return `[redacted ${label}]`;
   }
   return sanitizeValue(value);
+}
+
+function formatStepDefinition(step: AssessmentReportPayload['steps'][number]): string {
+  if (step.request) {
+    return `${step.request.method} ${step.request.url}`;
+  }
+  if (step.runner) {
+    const reference =
+      typeof step.runner.config.scriptRef === 'string'
+        ? step.runner.config.scriptRef
+        : typeof step.runner.config.templateRef === 'string'
+          ? step.runner.config.templateRef
+          : typeof step.runner.config.workflowRef === 'string'
+            ? step.runner.config.workflowRef
+            : 'configured runner';
+    return `${step.runner.type.toUpperCase()} runner • ${reference}`;
+  }
+  return `${step.type.toUpperCase()} step`;
 }
 
 function sanitizeValue(value: unknown): unknown {

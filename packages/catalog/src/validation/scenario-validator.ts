@@ -1,4 +1,10 @@
-import type { Scenario } from '../models/types.js';
+import {
+  type Scenario,
+  type ScenarioStep,
+  isScenarioHttpStep,
+  isScenarioK6Step,
+  isScenarioNucleiStep,
+} from '../models/types.js';
 import { resolveRule } from '../models/regulations.js';
 
 export interface ValidationResult {
@@ -96,7 +102,7 @@ export function validateScenario(scenario: Scenario): ValidationResult {
 
   for (const step of scenario.steps) {
     // Collect variables extracted by prior steps (order-dependent)
-    if (step.extract) {
+    if (isScenarioHttpStep(step) && step.extract) {
       for (const varName of Object.keys(step.extract)) {
         extractedVars.add(varName);
       }
@@ -121,32 +127,51 @@ export function validateScenario(scenario: Scenario): ValidationResult {
 }
 
 /** Collect all {{varName}} references from a step's request fields. */
-function collectTemplateVars(step: { request: { url: string; headers?: Record<string, string>; body?: unknown } }): Set<string> {
+function collectTemplateVars(step: ScenarioStep): Set<string> {
   const vars = new Set<string>();
   const templateRe = /\{\{(\w+)\}\}/g;
 
-  // URL
-  for (const m of step.request.url.matchAll(templateRe)) {
-    vars.add(m[1]);
-  }
+  const addTemplateVars = (value: unknown): void => {
+    if (value == null) {
+      return;
+    }
 
-  // Headers
-  if (step.request.headers) {
-    for (const value of Object.values(step.request.headers)) {
+    if (typeof value === 'string') {
       for (const m of value.matchAll(templateRe)) {
         vars.add(m[1]);
       }
+      return;
     }
-  }
 
-  // Body
-  if (step.request.body) {
-    const bodyStr = typeof step.request.body === 'string'
-      ? step.request.body
-      : JSON.stringify(step.request.body);
-    for (const m of bodyStr.matchAll(templateRe)) {
-      vars.add(m[1]);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        addTemplateVars(item);
+      }
+      return;
     }
+
+    if (typeof value === 'object') {
+      for (const nested of Object.values(value as Record<string, unknown>)) {
+        addTemplateVars(nested);
+      }
+    }
+  };
+
+  if (isScenarioHttpStep(step)) {
+    addTemplateVars(step.request.url);
+    addTemplateVars(step.request.headers);
+    addTemplateVars(step.request.body);
+  } else if (isScenarioK6Step(step)) {
+    addTemplateVars(step.runner.scriptRef);
+    addTemplateVars(step.runner.args);
+    addTemplateVars(step.runner.env);
+    addTemplateVars(step.runner.thresholds);
+  } else if (isScenarioNucleiStep(step)) {
+    addTemplateVars(step.runner.templateRef);
+    addTemplateVars(step.runner.workflowRef);
+    addTemplateVars(step.runner.tags);
+    addTemplateVars(step.runner.vars);
+    addTemplateVars(step.runner.args);
   }
 
   return vars;

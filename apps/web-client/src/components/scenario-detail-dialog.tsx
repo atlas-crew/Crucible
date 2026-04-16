@@ -1,7 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import type { Scenario, ScenarioStep } from "@crucible/catalog"
+import {
+  getScenarioStepType,
+  isScenarioHttpStep,
+  isScenarioRunnerStep,
+  type Scenario,
+  type ScenarioStep,
+} from "@crucible/catalog"
 import {
   Dialog,
   DialogContent,
@@ -144,17 +150,16 @@ function StepsTab({ steps }: { steps: ScenarioStep[] }) {
                   {step.stage}
                 </Badge>
                 <span className="type-timestamp text-muted-foreground shrink-0">
-                  {step.request.method} {step.request.url.length > 40
-                    ? step.request.url.slice(0, 40) + "..."
-                    : step.request.url}
+                  {formatStepSummary(step)}
                 </span>
               </button>
 
               {isOpen && (
                 <div className="px-3 pb-3 pt-1 space-y-3 border-t">
                   <StepDetail label="ID" value={step.id} />
+                  <StepDetail label="Type" value={getScenarioStepType(step)} />
 
-                  {step.request.headers && Object.keys(step.request.headers).length > 0 && (
+                  {isScenarioHttpStep(step) && step.request.headers && Object.keys(step.request.headers).length > 0 && (
                     <DetailBlock label="Headers">
                       <pre className="type-code whitespace-pre-wrap">
                         {JSON.stringify(step.request.headers, null, 2)}
@@ -162,12 +167,20 @@ function StepsTab({ steps }: { steps: ScenarioStep[] }) {
                     </DetailBlock>
                   )}
 
-                  {step.request.body && (
+                  {isScenarioHttpStep(step) && step.request.body && (
                     <DetailBlock label="Body">
                       <pre className="type-code whitespace-pre-wrap">
                         {typeof step.request.body === "string"
                           ? step.request.body
                           : JSON.stringify(step.request.body, null, 2)}
+                      </pre>
+                    </DetailBlock>
+                  )}
+
+                  {isScenarioRunnerStep(step) && (
+                    <DetailBlock label="Runner">
+                      <pre className="type-code whitespace-pre-wrap">
+                        {JSON.stringify(step.runner, null, 2)}
                       </pre>
                     </DetailBlock>
                   )}
@@ -180,7 +193,7 @@ function StepsTab({ steps }: { steps: ScenarioStep[] }) {
                     </DetailBlock>
                   )}
 
-                  {step.expect && (
+                  {isScenarioHttpStep(step) && step.expect && (
                     <DetailBlock label="Assertions">
                       <pre className="type-code whitespace-pre-wrap">
                         {JSON.stringify(step.expect, null, 2)}
@@ -188,7 +201,7 @@ function StepsTab({ steps }: { steps: ScenarioStep[] }) {
                     </DetailBlock>
                   )}
 
-                  {step.extract && (
+                  {isScenarioHttpStep(step) && step.extract && (
                     <DetailBlock label="Extract">
                       <pre className="type-code whitespace-pre-wrap">
                         {JSON.stringify(step.extract, null, 2)}
@@ -215,6 +228,21 @@ function StepsTab({ steps }: { steps: ScenarioStep[] }) {
       </div>
     </ScrollArea>
   )
+}
+
+function formatStepSummary(step: ScenarioStep): string {
+  if (isScenarioHttpStep(step)) {
+    return `${step.request.method} ${step.request.url.length > 40
+      ? step.request.url.slice(0, 40) + "..."
+      : step.request.url}`
+  }
+
+  if (step.type === "k6") {
+    return `K6 ${step.runner.scriptRef}`
+  }
+
+  const reference = step.runner.templateRef ?? step.runner.workflowRef ?? "configured runner"
+  return `NUCLEI ${reference}`
 }
 
 /* ── Shared helpers ───────────────────────────────────────────────── */

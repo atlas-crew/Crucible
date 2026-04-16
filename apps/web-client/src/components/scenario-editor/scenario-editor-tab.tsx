@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { Scenario, ScenarioStep } from "@crucible/catalog"
+import { isScenarioHttpStep, type Scenario, type ScenarioHttpStep, type ScenarioStep } from "@crucible/catalog"
 import { useCatalogStore } from "@/store/useCatalogStore"
 import { MetadataForm, type ScenarioDraft } from "./metadata-form"
 import { StepsList, emptyRequestDraft, emptyExecutionDraft, emptyExpectDraft, emptyExtractDraft } from "./steps-list"
@@ -42,16 +42,17 @@ export function ScenarioEditorTab({
   onSaveSuccess,
 }: ScenarioEditorTabProps) {
   const updateScenario = useCatalogStore((s) => s.updateScenario)
+  const supportsVisualEditor = scenario.steps.every(isScenarioHttpStep)
 
   // View mode: visual form or raw JSON
-  const [viewMode, setViewMode] = useState<"visual" | "json">("visual")
+  const [viewMode, setViewMode] = useState<"visual" | "json">(supportsVisualEditor ? "visual" : "json")
 
   // Draft state
   const [metadata, setMetadata] = useState<ScenarioDraft>(() =>
     scenarioToMetadataDraft(scenario)
   )
   const [steps, setSteps] = useState<StepDraft[]>(() =>
-    scenario.steps.map(stepToStepDraft)
+    supportsVisualEditor ? scenario.steps.map(stepToStepDraft) : []
   )
 
   // Unknown keys preservation
@@ -92,7 +93,9 @@ export function ScenarioEditorTab({
   const scenarioId = scenario.id
   useEffect(() => {
     setMetadata(scenarioToMetadataDraft(scenario))
-    setSteps((prev) => reconcileStepKeys(prev, scenario.steps.map(stepToStepDraft)))
+    setSteps((prev) =>
+      supportsVisualEditor ? reconcileStepKeys(prev, scenario.steps.map(stepToStepDraft)) : [],
+    )
     setUnknownScenarioKeys(extractUnknownKeys(scenario, KNOWN_SCENARIO_KEYS))
     const map = new Map<string, Record<string, unknown>>()
     for (const step of scenario.steps) {
@@ -100,14 +103,19 @@ export function ScenarioEditorTab({
       if (Object.keys(extra).length > 0) map.set(step.id, extra)
     }
     setUnknownStepKeys(map)
+    setViewMode((current) => (supportsVisualEditor ? current : "json"))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId])
+  }, [scenarioId, supportsVisualEditor])
 
   // Switch from JSON back to visual
   const switchToVisual = () => {
     if (viewMode === "json") {
       try {
         const parsed = JSON.parse(jsonText) as Scenario
+        if (!(parsed.steps ?? []).every(isScenarioHttpStep)) {
+          setJsonError("Visual mode currently supports HTTP-only steps. Keep this scenario in JSON mode to preserve runner fields.")
+          return
+        }
         setMetadata(scenarioToMetadataDraft(parsed))
         setSteps((prev) => reconcileStepKeys(prev, (parsed.steps ?? []).map(stepToStepDraft)))
         setUnknownScenarioKeys(extractUnknownKeys(parsed, KNOWN_SCENARIO_KEYS))
@@ -167,6 +175,7 @@ export function ScenarioEditorTab({
             type="button"
             variant={viewMode === "visual" ? "default" : "outline"}
             size="sm"
+            disabled={!supportsVisualEditor}
             onClick={() =>
               viewMode === "json" ? switchToVisual() : setViewMode("visual")
             }
@@ -193,6 +202,12 @@ export function ScenarioEditorTab({
       {(saveError || jsonError) && (
         <p className="text-sm text-destructive font-medium">
           {saveError || jsonError}
+        </p>
+      )}
+
+      {!supportsVisualEditor && (
+        <p className="text-sm text-muted-foreground">
+          Visual editing currently supports HTTP-only steps. Scenarios with k6 or nuclei runner steps stay in JSON mode so their runner fields are preserved.
         </p>
       )}
 
@@ -238,6 +253,10 @@ function scenarioToMetadataDraft(s: Scenario): ScenarioDraft {
 }
 
 function stepToStepDraft(step: ScenarioStep): StepDraft {
+  if (!isScenarioHttpStep(step)) {
+    throw new Error("Visual editor only supports HTTP steps")
+  }
+
   return {
     _key: crypto.randomUUID(),
     id: step.id,
@@ -251,7 +270,7 @@ function stepToStepDraft(step: ScenarioStep): StepDraft {
   }
 }
 
-function requestToRequestDraft(req: ScenarioStep["request"]): RequestDraft {
+function requestToRequestDraft(req: ScenarioHttpStep["request"]): RequestDraft {
   const body = req.body
   let bodyMode: BodyMode = "none"
   let bodyJson = ""
@@ -278,7 +297,7 @@ function requestToRequestDraft(req: ScenarioStep["request"]): RequestDraft {
   }
 }
 
-function executionToExecutionDraft(exec?: ScenarioStep["execution"]): ExecutionDraft {
+function executionToExecutionDraft(exec?: ScenarioHttpStep["execution"]): ExecutionDraft {
   if (!exec) return emptyExecutionDraft()
   return {
     enabled: true,
@@ -289,7 +308,7 @@ function executionToExecutionDraft(exec?: ScenarioStep["execution"]): ExecutionD
   }
 }
 
-function expectToExpectDraft(exp?: ScenarioStep["expect"]): ExpectDraft {
+function expectToExpectDraft(exp?: ScenarioHttpStep["expect"]): ExpectDraft {
   if (!exp) return emptyExpectDraft()
   return {
     enabled: true,
@@ -302,7 +321,7 @@ function expectToExpectDraft(exp?: ScenarioStep["expect"]): ExpectDraft {
   }
 }
 
-function extractToExtractDraft(ext?: ScenarioStep["extract"]): ExtractDraft {
+function extractToExtractDraft(ext?: ScenarioHttpStep["extract"]): ExtractDraft {
   if (!ext) return emptyExtractDraft()
   const rows: ExtractRow[] = Object.entries(ext).map(([varName, rule]) => ({
     varName,

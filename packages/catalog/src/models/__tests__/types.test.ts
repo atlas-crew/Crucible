@@ -175,6 +175,56 @@ describe('ScenarioStepSchema', () => {
       ).success,
     ).toBe(false);
   });
+
+  it('accepts legacy HTTP steps without an explicit type', () => {
+    const r = ScenarioStepSchema.safeParse(minimalStep());
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.type).toBeUndefined();
+    }
+  });
+
+  it('accepts k6 runner steps', () => {
+    const r = ScenarioStepSchema.safeParse({
+      id: 'k6-step',
+      type: 'k6',
+      name: 'Load test',
+      stage: 'exercise',
+      runner: {
+        scriptRef: 'scripts/smoke.js',
+        mode: 'docker',
+        env: { TOKEN: '{{token}}' },
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts nuclei runner steps with a template reference', () => {
+    const r = ScenarioStepSchema.safeParse({
+      id: 'nuclei-step',
+      type: 'nuclei',
+      name: 'Scan target',
+      stage: 'validate',
+      runner: {
+        templateRef: 'templates/http/cves/example.yaml',
+        severity: ['high', 'critical'],
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects nuclei runner steps without template or workflow references', () => {
+    const r = ScenarioStepSchema.safeParse({
+      id: 'nuclei-step',
+      type: 'nuclei',
+      name: 'Broken scan',
+      stage: 'validate',
+      runner: {
+        severity: ['medium'],
+      },
+    });
+    expect(r.success).toBe(false);
+  });
 });
 
 describe('WhenConditionSchema', () => {

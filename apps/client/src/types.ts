@@ -50,7 +50,8 @@ export interface WhenCondition {
   status?: number;
 }
 
-export interface ScenarioStep {
+export interface ScenarioHttpStep {
+  type?: 'http';
   id: string;
   name: string;
   stage: string;
@@ -62,6 +63,80 @@ export interface ScenarioStep {
   parallelGroup?: number;
   dependsOn?: string[];
   when?: WhenCondition;
+}
+
+export interface K6StepRunner {
+  scriptRef: string;
+  args?: string[];
+  env?: Record<string, string>;
+  mode?: 'native' | 'docker';
+  thresholds?: Record<string, string>;
+}
+
+export interface ScenarioK6Step {
+  type: 'k6';
+  id: string;
+  name: string;
+  stage: string;
+  execution?: ExecutionConfig;
+  executionMode?: StepExecutionMode;
+  parallelGroup?: number;
+  dependsOn?: string[];
+  when?: WhenCondition;
+  runner: K6StepRunner;
+}
+
+export type RunnerFindingSeverity =
+  | 'info'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'critical'
+  | 'unknown';
+
+export interface NucleiStepRunner {
+  templateRef?: string;
+  workflowRef?: string;
+  tags?: string[];
+  severity?: RunnerFindingSeverity[];
+  vars?: Record<string, string>;
+  args?: string[];
+}
+
+export interface ScenarioNucleiStep {
+  type: 'nuclei';
+  id: string;
+  name: string;
+  stage: string;
+  execution?: ExecutionConfig;
+  executionMode?: StepExecutionMode;
+  parallelGroup?: number;
+  dependsOn?: string[];
+  when?: WhenCondition;
+  runner: NucleiStepRunner;
+}
+
+export type ScenarioRunnerStep = ScenarioK6Step | ScenarioNucleiStep;
+export type ScenarioStep = ScenarioHttpStep | ScenarioRunnerStep;
+
+export function getScenarioStepType(step: ScenarioStep): 'http' | 'k6' | 'nuclei' {
+  return step.type ?? 'http';
+}
+
+export function isScenarioHttpStep(step: ScenarioStep): step is ScenarioHttpStep {
+  return getScenarioStepType(step) === 'http';
+}
+
+export function isScenarioK6Step(step: ScenarioStep): step is ScenarioK6Step {
+  return step.type === 'k6';
+}
+
+export function isScenarioNucleiStep(step: ScenarioStep): step is ScenarioNucleiStep {
+  return step.type === 'nuclei';
+}
+
+export function isScenarioRunnerStep(step: ScenarioStep): step is ScenarioRunnerStep {
+  return step.type === 'k6' || step.type === 'nuclei';
 }
 
 export interface Scenario {
@@ -87,6 +162,27 @@ export interface AssertionResult {
   passed: boolean;
 }
 
+export interface RunnerSummary {
+  type: 'k6' | 'nuclei';
+  summary?: string;
+  exitCode?: number;
+  targetUrl?: string;
+  artifacts?: string[];
+  metrics?: {
+    checksPassed?: number;
+    checksFailed?: number;
+    thresholdsPassed?: number;
+    thresholdsFailed?: number;
+    httpReqDurationP95Ms?: number;
+    iterations?: number;
+    requests?: number;
+  };
+  findings?: {
+    total: number;
+    bySeverity?: Partial<Record<RunnerFindingSeverity, number>>;
+  };
+}
+
 export interface ExecutionStepResult {
   stepId: string;
   status: ExecutionStatus;
@@ -108,6 +204,7 @@ export interface ExecutionStepResult {
       storedBytes: number;
       bodyFormat: 'json' | 'text';
     };
+    runner?: RunnerSummary;
   };
   error?: string;
   logs?: string[];

@@ -2824,6 +2824,32 @@ describe('ScenarioEngine', () => {
       ).rejects.toThrow('Scenario non-existent not found');
     });
 
+    it('rejects runner steps before creating execution state', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'runner-step',
+        name: 'Runner Step',
+        steps: [
+          {
+            id: 'load-check',
+            name: 'Load Check',
+            type: 'k6',
+            stage: 'main',
+            runner: {
+              type: 'k6',
+              scriptRef: 'baseline-smoke.js',
+            },
+          },
+        ],
+      });
+
+      await expect(engine.startScenario('runner-step')).rejects.toThrow(
+        'Scenario runner-step contains runner steps that are not executable yet: load-check (k6)',
+      );
+
+      expect(engine.listExecutions()).toHaveLength(0);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it('destroy() can be called without error', () => {
       expect(() => engine.destroy()).not.toThrow();
     });
@@ -2956,6 +2982,183 @@ describe('ScenarioEngine', () => {
 
       expect(engine.getExecution(id1)?.status).toBe('cancelled');
       expect(engine.getExecution(id2)?.status).toBe('cancelled');
+    });
+  });
+
+  describe('per-run target override', () => {
+    const singleStepScenario = {
+      id: 'target-override',
+      name: 'Target Override',
+      steps: [
+        {
+          id: 'probe',
+          name: 'Probe',
+          stage: 'main',
+          request: { method: 'GET', url: '/health' },
+        },
+      ],
+    };
+
+    it('uses the per-run override when one is supplied', async () => {
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+      mockFetch.mockResolvedValueOnce(mockResponse(200, { ok: true }, { 'content-type': 'application/json' }));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario(
+        'target-override',
+        'simulation',
+        undefined,
+        undefined,
+        'http://127.0.0.1:5555',
+      );
+      const execution = await done;
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toBe('http://127.0.0.1:5555/health');
+      expect(execution.status).toBe('completed');
+      expect(execution.targetUrl).toBe('http://127.0.0.1:5555');
+    });
+
+    it('falls back to the engine default when no override is supplied', async () => {
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+      mockFetch.mockResolvedValueOnce(mockResponse(200, { ok: true }, { 'content-type': 'application/json' }));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('target-override');
+      const execution = await done;
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toBe('http://localhost/health');
+      expect(execution.targetUrl).toBe('http://localhost');
+    });
+
+    it('scopes the outbound allowlist to the per-run target', async () => {
+      // Scenario tries to hit the engine default host (localhost) via an
+      // explicit absolute URL, but the operator launched with an override
+      // targeting 127.0.0.1:5555. The per-execution allowlist must reject
+      // localhost even though localhost is what the engine was configured
+      // with — the whole point of rescoping the allowlist per run.
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'target-override-ssrf',
+        name: 'Target Override SSRF',
+        steps: [
+          {
+            id: 'pivot',
+            name: 'Pivot to engine default',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/secret' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario(
+        'target-override-ssrf',
+        'simulation',
+        undefined,
+        undefined,
+        'http://127.0.0.1:5555',
+      );
+      const execution = await done;
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('Outbound request blocked');
+    });
+
+    it('rejects an invalid override before creating any execution state', async () => {
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+
+      await expect(
+        engine.startScenario(
+          'target-override',
+          'simulation',
+          undefined,
+          undefined,
+          'ftp://evil.example',
+        ),
+      ).rejects.toThrow('Scenario target URL must use http or https');
+
+      // Engine state is untouched
+      expect(engine.listExecutions()).toHaveLength(0);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unparseable override', async () => {
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+      await expect(
+        engine.startScenario('target-override', 'simulation', undefined, undefined, 'not-a-url'),
+      ).rejects.toThrow('Scenario target URL must be a valid absolute URL');
+      expect(engine.listExecutions()).toHaveLength(0);
+    });
+
+    it('rejects an override containing credentials', async () => {
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+      await expect(
+        engine.startScenario(
+          'target-override',
+          'simulation',
+          undefined,
+          undefined,
+          'http://user:pass@example.test',
+        ),
+      ).rejects.toThrow('Scenario target URL must not include credentials');
+    });
+
+    it('rejects an override containing a fragment', async () => {
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+      await expect(
+        engine.startScenario(
+          'target-override',
+          'simulation',
+          undefined,
+          undefined,
+          'http://example.test#frag',
+        ),
+      ).rejects.toThrow('Scenario target URL must not include a fragment');
+    });
+
+    it('preserves per-run allowlist isolation between concurrent executions', async () => {
+      // Two concurrent runs, each pointing at a different target. Neither run
+      // should see the other run's host in its own allowlist.
+      const resolvers: Array<(v: unknown) => void> = [];
+      mockFetch.mockImplementation(() => new Promise((resolve) => {
+        resolvers.push((v) => resolve(v));
+      }));
+      mockCatalog.getScenario.mockReturnValue(singleStepScenario);
+
+      const id1 = await engine.startScenario(
+        'target-override',
+        'simulation',
+        undefined,
+        undefined,
+        'http://10.0.0.1:9000',
+      );
+      const id2 = await engine.startScenario(
+        'target-override',
+        'simulation',
+        undefined,
+        undefined,
+        'http://10.0.0.2:9000',
+      );
+
+      // Let both scheduler loops advance and hit the fetch call
+      await vi.advanceTimersByTimeAsync(5);
+
+      // Resolve in order they were scheduled
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const urls = mockFetch.mock.calls.map((c) => c[0]);
+      expect(urls).toContain('http://10.0.0.1:9000/health');
+      expect(urls).toContain('http://10.0.0.2:9000/health');
+
+      resolvers.forEach((r) =>
+        r(mockResponse(200, { ok: true }, { 'content-type': 'application/json' })),
+      );
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(engine.getExecution(id1)?.targetUrl).toBe('http://10.0.0.1:9000');
+      expect(engine.getExecution(id2)?.targetUrl).toBe('http://10.0.0.2:9000');
     });
   });
 });

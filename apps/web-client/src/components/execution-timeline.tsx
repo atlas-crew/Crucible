@@ -30,7 +30,13 @@ import {
 import { useState } from "react";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import type { ExecutionStepResult, ExecutionStatus, ScenarioExecution } from "@/store/useCatalogStore";
-import type { Scenario, ScenarioStep } from "@crucible/catalog";
+import {
+  getScenarioStepType,
+  isScenarioHttpStep,
+  isScenarioRunnerStep,
+  type Scenario,
+  type ScenarioStep,
+} from "@crucible/catalog";
 
 const RemoteTerminal = dynamic(
   () => import("@/components/remote-terminal").then((mod) => mod.RemoteTerminal),
@@ -61,6 +67,9 @@ function formatDuration(ms?: number): string {
 }
 
 function generateCurl(step: ScenarioStep, targetUrl?: string): string {
+  if (!isScenarioHttpStep(step)) {
+    return `# ${getScenarioStepType(step)} runner steps do not have an equivalent cURL request`;
+  }
   const { method, url, headers, body } = step.request;
   const resolvedUrl = url.startsWith("/") ? `${targetUrl || "<target-url>"}${url}` : url;
   
@@ -103,6 +112,19 @@ function getArtifactPresentation(url: string): { label: string; icon: typeof Fil
   return { label: "Download report artifact", icon: FileText };
 }
 
+function formatDefinitionSummary(step: ScenarioStep): string {
+  if (isScenarioHttpStep(step)) {
+    return `${step.request.method} ${step.request.url}`;
+  }
+
+  if (step.type === "k6") {
+    return `K6 ${step.runner.scriptRef}`;
+  }
+
+  const reference = step.runner.templateRef ?? step.runner.workflowRef ?? "configured runner";
+  return `NUCLEI ${reference}`;
+}
+
 // ── Step card ───────────────────────────────────────────────────────
 
 function StepCard({ 
@@ -128,9 +150,10 @@ function StepCard({
   const totalAssertions = step.assertions?.length ?? 0;
   
   const hasResult = step.details?.response;
+  const hasRunnerSummary = step.details?.runner;
   const hasLogs = step.logs && step.logs.length > 0;
   const hasError = !!step.error;
-  const hasDetail = hasResult || hasLogs || hasError || step.assertions?.length;
+  const hasDetail = hasResult || hasRunnerSummary || hasLogs || hasError || step.assertions?.length;
 
   const copyCurl = () => {
     if (!definition) return;
@@ -175,7 +198,7 @@ function StepCard({
               )}
             </span>
             <span className="type-timestamp text-muted-foreground truncate">
-              {definition?.request.method} {definition?.request.url}
+              {definition ? formatDefinitionSummary(definition) : "Definition unavailable"}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -246,41 +269,58 @@ function StepCard({
               <TabsContent value="request" className="mt-0 space-y-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Definition</span>
-                  <Button variant="ghost" size="xs" onClick={copyCurl} className={cn("h-6 text-[10px] gap-1.5 transition-colors", copied && "text-success")}>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={copyCurl}
+                    disabled={!definition || !isScenarioHttpStep(definition)}
+                    className={cn("h-6 text-[10px] gap-1.5 transition-colors", copied && "text-success")}
+                  >
                     {copied ? <CheckCircle2 className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     {copied ? "Copied!" : "Copy as cURL"}
                   </Button>
                 </div>
                 {definition && (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="bg-muted/30 p-2 rounded border border-border/50">
-                        <div className="flex gap-2 text-[11px] mb-1">
-                          <span className="font-bold text-primary">{definition.request.method}</span>
-                          <span className="text-muted-foreground break-all">{definition.request.url}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {definition.request.headers && Object.keys(definition.request.headers).length > 0 && (
-                      <div>
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Headers</p>
-                        <div className="bg-muted/30 p-2 rounded border border-border/50 space-y-1">
-                          {Object.entries(definition.request.headers).map(([k, v]) => (
-                            <div key={k} className="flex gap-2 text-[11px]">
-                              <span className="text-muted-foreground shrink-0">{k}:</span>
-                              <span className="text-foreground break-all">{v}</span>
+                    {isScenarioHttpStep(definition) ? (
+                      <>
+                        <div className="grid grid-cols-1 gap-2">
+                          <div className="bg-muted/30 p-2 rounded border border-border/50">
+                            <div className="flex gap-2 text-[11px] mb-1">
+                              <span className="font-bold text-primary">{definition.request.method}</span>
+                              <span className="text-muted-foreground break-all">{definition.request.url}</span>
                             </div>
-                          ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {definition.request.body && (
+                        {definition.request.headers && Object.keys(definition.request.headers).length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Headers</p>
+                            <div className="bg-muted/30 p-2 rounded border border-border/50 space-y-1">
+                              {Object.entries(definition.request.headers).map(([k, v]) => (
+                                <div key={k} className="flex gap-2 text-[11px]">
+                                  <span className="text-muted-foreground shrink-0">{k}:</span>
+                                  <span className="text-foreground break-all">{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {definition.request.body && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Body</p>
+                            <pre className="type-code bg-muted/30 p-2 rounded border border-border/50 overflow-x-auto text-[11px]">
+                              {typeof definition.request.body === "string" 
+                                ? definition.request.body 
+                                : JSON.stringify(definition.request.body, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </>
+                    ) : (
                       <div>
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Body</p>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Runner</p>
                         <pre className="type-code bg-muted/30 p-2 rounded border border-border/50 overflow-x-auto text-[11px]">
-                          {typeof definition.request.body === "string" 
-                            ? definition.request.body 
-                            : JSON.stringify(definition.request.body, null, 2)}
+                          {JSON.stringify(definition.runner, null, 2)}
                         </pre>
                       </div>
                     )}
@@ -288,7 +328,15 @@ function StepCard({
                 )}
               </TabsContent>
 
-              <TabsContent value="response" className="mt-0 space-y-4">
+                <TabsContent value="response" className="mt-0 space-y-4">
+                {step.details?.runner && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Runner Summary</p>
+                    <pre className="type-code bg-muted/30 p-2 rounded border border-border/50 overflow-x-auto text-[11px]">
+                      {JSON.stringify(step.details.runner, null, 2)}
+                    </pre>
+                  </div>
+                )}
                 {step.details?.response && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">

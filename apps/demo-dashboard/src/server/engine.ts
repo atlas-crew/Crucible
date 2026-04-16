@@ -2,7 +2,13 @@ import { EventEmitter } from 'events';
 import { BlockList, isIP } from 'node:net';
 import { nanoid } from 'nanoid';
 import { CatalogService, ExecutionRepository } from '@crucible/catalog';
-import type { Scenario, ScenarioStep } from '@crucible/catalog';
+import {
+  isScenarioHttpStep,
+  type Extract,
+  type Scenario,
+  type ScenarioHttpStep,
+  type ScenarioStep,
+} from '@crucible/catalog';
 import { ReportService } from './reports.js';
 import type {
   ScenarioExecution,
@@ -18,6 +24,17 @@ interface ExecutionControl {
   paused: boolean;
   pausePromise: Promise<void> | null;
   pauseResolve: (() => void) | null;
+}
+
+// ── Per-execution runtime state ──────────────────────────────────────
+// Non-persisted, lifetime-scoped to a single execution. Holds the effective
+// target URL and SSRF allowlist so they cannot diverge from what the operator
+// explicitly chose when the run was launched, and so that concurrent executions
+// pointing at different targets do not share a single mutable allowlist.
+
+interface ExecutionRuntimeState {
+  targetUrl: string;
+  outboundAllowlist: OutboundAllowlist;
 }
 
 // ── Concurrency semaphore types ──────────────────────────────────────
@@ -75,6 +92,7 @@ export class ScenarioEngine extends EventEmitter {
   private reportService: ReportService | null = null;
   private executions: Map<string, ScenarioExecution>;
   private controls: Map<string, ExecutionControl> = new Map();
+  private runtimeStates: Map<string, ExecutionRuntimeState> = new Map();
 
   // Target URL for scenario execution
   readonly targetUrl: string;
@@ -151,6 +169,7 @@ export class ScenarioEngine extends EventEmitter {
     setTimeout(() => {
       this.executions.delete(id);
       this.controls.delete(id);
+      this.runtimeStates.delete(id);
     }, CACHE_EVICT_DELAY_MS);
   }
 
@@ -161,11 +180,32 @@ export class ScenarioEngine extends EventEmitter {
     mode: 'simulation' | 'assessment' = 'simulation',
     triggerData?: Record<string, unknown>,
     parentExecutionId?: string,
+    targetUrl?: string,
   ): Promise<string> {
     const scenario = this.catalog.getScenario(scenarioId);
     if (!scenario) {
       throw new Error(`Scenario ${scenarioId} not found`);
     }
+    const unsupportedStepTypes = scenario.steps
+      .filter((step) => !isScenarioHttpStep(step))
+      .map((step) => `${step.id} (${step.type})`);
+    if (unsupportedStepTypes.length > 0) {
+      throw new Error(
+        `Scenario ${scenarioId} contains runner steps that are not executable yet: ${unsupportedStepTypes.join(', ')}`,
+      );
+    }
+
+    // Resolve the effective target for this run. Validation runs before any
+    // execution state is created so invalid overrides throw without leaving
+    // orphan rows, controls, or runtime state behind.
+    const effectiveTarget =
+      targetUrl !== undefined
+        ? normalizeConfiguredTargetUrl(targetUrl, 'Scenario target URL')
+        : this.targetUrl;
+    const outboundAllowlist = parseOutboundAllowlist(
+      process.env.CRUCIBLE_OUTBOUND_ALLOWLIST,
+      effectiveTarget,
+    );
 
     const executionId = nanoid();
     const execution: ScenarioExecution = {
@@ -177,7 +217,7 @@ export class ScenarioEngine extends EventEmitter {
       steps: [],
       triggerData: triggerData || {},
       context: {},
-      targetUrl: this.targetUrl,
+      targetUrl: effectiveTarget,
       ...(parentExecutionId ? { parentExecutionId } : {}),
     };
 
@@ -190,6 +230,10 @@ export class ScenarioEngine extends EventEmitter {
       paused: false,
       pausePromise: null,
       pauseResolve: null,
+    });
+    this.runtimeStates.set(executionId, {
+      targetUrl: effectiveTarget,
+      outboundAllowlist,
     });
 
     this.executeScenario(execution, scenario).catch((err) => {
@@ -222,6 +266,10 @@ export class ScenarioEngine extends EventEmitter {
       this.emit('execution:started', execution);
 
       const ctrl = this.controls.get(execution.id);
+      const runtime = this.runtimeStates.get(execution.id);
+      if (!runtime) {
+        throw new Error(`Runtime state missing for execution ${execution.id}`);
+      }
 
       const context = new Map<string, unknown>();
       const stepOrder = new Map(scenario.steps.map((step, index) => [step.id, index]));
@@ -346,14 +394,15 @@ export class ScenarioEngine extends EventEmitter {
               result.attempts = attempt;
 
               try {
-                const response = await this.executeStep(step, context, signal);
+                const response = await this.executeStep(step, context, runtime, signal);
                 latestResponse = response;
+                const httpStep = isScenarioHttpStep(step) ? step : null;
 
-                if (step.extract) {
-                  this.runExtract(step.extract, response, context);
+                if (httpStep?.extract) {
+                  this.runExtract(httpStep.extract, response, context);
                 }
 
-                const assertions = this.evaluateAssertions(step, response);
+                const assertions = httpStep ? this.evaluateAssertions(httpStep, response) : [];
                 if (assertions.length > 0) {
                   result.assertions = assertions;
                 }
@@ -580,47 +629,53 @@ export class ScenarioEngine extends EventEmitter {
   private async executeStep(
     step: ScenarioStep,
     context: Map<string, unknown>,
+    runtime: ExecutionRuntimeState,
     signal?: AbortSignal,
   ): Promise<StepHttpResponse> {
+    if (!isScenarioHttpStep(step)) {
+      throw new Error(`Step ${step.id} uses unsupported runner type "${step.type}" in the HTTP executor`);
+    }
+
+    const httpStep = step;
     console.log(`Executing step ${step.id}: ${step.name}`);
 
     // ── Delay + jitter ──────────────────────────────────────────────
-    const delayMs = step.execution?.delayMs ?? 0;
-    const jitter = step.execution?.jitter ?? 0;
+    const delayMs = httpStep.execution?.delayMs ?? 0;
+    const jitter = httpStep.execution?.jitter ?? 0;
     const totalDelay = delayMs + (jitter > 0 ? Math.random() * jitter : 0);
     if (totalDelay > 0) {
       await new Promise((resolve) => setTimeout(resolve, totalDelay));
     }
 
     // ── Resolve templates ───────────────────────────────────────────
-    const resolvedUrl = resolveTemplates(step.request.url, context, this.targetUrl);
+    const resolvedUrl = resolveTemplates(httpStep.request.url, context, runtime.targetUrl);
     // Prepend target URL to relative paths
     const url = validateOutboundRequestUrl(
-      resolvedUrl.startsWith('/') ? `${this.targetUrl}${resolvedUrl}` : resolvedUrl,
-      this.outboundAllowlist,
+      resolvedUrl.startsWith('/') ? `${runtime.targetUrl}${resolvedUrl}` : resolvedUrl,
+      runtime.outboundAllowlist,
     );
     const headers: Record<string, string> = {};
-    if (step.request.headers) {
-      for (const [k, v] of Object.entries(step.request.headers)) {
-        headers[k] = resolveTemplates(v, context, this.targetUrl);
+    if (httpStep.request.headers) {
+      for (const [k, v] of Object.entries(httpStep.request.headers)) {
+        headers[k] = resolveTemplates(v, context, runtime.targetUrl);
       }
     }
 
     let rawBody: string | undefined;
-    if (step.request.body !== undefined) {
-      rawBody = typeof step.request.body === 'string'
-        ? resolveTemplates(step.request.body, context, this.targetUrl)
-        : resolveTemplates(JSON.stringify(step.request.body), context, this.targetUrl);
+    if (httpStep.request.body !== undefined) {
+      rawBody = typeof httpStep.request.body === 'string'
+        ? resolveTemplates(httpStep.request.body, context, runtime.targetUrl)
+        : resolveTemplates(JSON.stringify(httpStep.request.body), context, runtime.targetUrl);
     }
 
     // ── Iterations ──────────────────────────────────────────────────
-    const iterations = step.execution?.iterations ?? 1;
+    const iterations = httpStep.execution?.iterations ?? 1;
     let lastResponse: StepHttpResponse | undefined;
 
     for (let i = 0; i < iterations; i++) {
       try {
         const response = await fetch(url, {
-          method: step.request.method,
+          method: httpStep.request.method,
           headers: Object.keys(headers).length > 0 ? headers : undefined,
           body: rawBody,
           signal,
@@ -729,7 +784,7 @@ export class ScenarioEngine extends EventEmitter {
 
   /** Run extract rules against a response and populate context. */
   private runExtract(
-    extract: NonNullable<ScenarioStep['extract']>,
+    extract: Extract,
     response: { status: number; headers: Record<string, string>; body: unknown },
     context: Map<string, unknown>,
   ): void {
@@ -750,7 +805,7 @@ export class ScenarioEngine extends EventEmitter {
 
   /** Evaluate assertions from the step's `expect` block. */
   private evaluateAssertions(
-    step: ScenarioStep,
+    step: ScenarioHttpStep,
     response: { status: number; headers: Record<string, string>; body: unknown },
   ): AssertionResult[] {
     const results: AssertionResult[] = [];
@@ -1115,13 +1170,13 @@ function truncateUtf8(value: string, maxBytes: number): string {
   return Buffer.from(value, 'utf8').subarray(0, maxBytes).toString('utf8');
 }
 
-function normalizeConfiguredTargetUrl(rawTargetUrl: string): string {
+function normalizeConfiguredTargetUrl(rawTargetUrl: string, label: string = 'CRUCIBLE_TARGET_URL'): string {
   const trimmedTargetUrl = rawTargetUrl.trim();
   if (!trimmedTargetUrl) {
-    throw new Error('CRUCIBLE_TARGET_URL must not be empty');
+    throw new Error(`${label} must not be empty`);
   }
 
-  parseValidatedAbsoluteUrl(trimmedTargetUrl, 'CRUCIBLE_TARGET_URL');
+  parseValidatedAbsoluteUrl(trimmedTargetUrl, label);
   return trimmedTargetUrl.replace(/\/+$/, '');
 }
 
