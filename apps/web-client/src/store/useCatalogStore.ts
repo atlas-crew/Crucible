@@ -146,6 +146,16 @@ type ExecutionMetricsSnapshot = Omit<ExecutionMetricsPoint, 'timestamp'>;
 const DEFAULT_METRICS_HISTORY_LIMIT = 60;
 const DEFAULT_METRICS_THROTTLE_MS = 500;
 const DEFAULT_HISTORY_PAGE_SIZE = 10;
+const noopStorage: Storage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+  clear: () => undefined,
+  key: () => null,
+  get length() {
+    return 0;
+  },
+};
 
 export const defaultExecutionHistoryFilters: ExecutionHistoryFilters = {
   scenarioId: '',
@@ -190,8 +200,8 @@ interface CatalogState {
   resetExecutionHistory: () => void;
   fetchHealth: () => Promise<void>;
   updateScenario: (id: string, data: Scenario) => Promise<void>;
-  startSimulation: (scenarioId: string) => Promise<string>;
-  startAssessment: (scenarioId: string) => Promise<string>;
+  startSimulation: (scenarioId: string, targetUrl?: string | null) => Promise<string>;
+  startAssessment: (scenarioId: string, targetUrl?: string | null) => Promise<string>;
   updateExecution: (execution: ScenarioExecution) => void;
   applyExecutionDelta: (delta: ScenarioExecutionDelta) => void;
   setActiveExecution: (executionId: string | null) => void;
@@ -335,6 +345,46 @@ export const useCatalogStore = create<CatalogState>()(
             captureMetricsSample(Date.now());
           }, nextDelayMs);
         }
+      };
+
+      const seedPendingExecution = (
+        executionId: string,
+        scenarioId: string,
+        mode: ScenarioExecution['mode'],
+        targetUrl?: string,
+      ): void => {
+        const execution: ScenarioExecution = {
+          id: executionId,
+          scenarioId,
+          mode,
+          status: 'pending',
+          startedAt: Date.now(),
+          steps: [],
+          ...(targetUrl ? { targetUrl } : {}),
+        };
+
+        set((state: CatalogState) => {
+          const existingExecution = state.executions.find((existing) => existing.id === executionId);
+          const seededExecution = existingExecution ?? execution;
+          const executions = existingExecution ? state.executions : [execution, ...state.executions];
+          const existingHistoryExecution =
+            mode === 'assessment'
+              ? state.historyExecutions.find((existing) => existing.id === executionId)
+              : undefined;
+          const historyExecutions =
+            mode === 'assessment'
+              ? existingHistoryExecution
+                ? state.historyExecutions
+                : [seededExecution, ...state.historyExecutions]
+              : state.historyExecutions;
+
+          return {
+            executions,
+            historyExecutions,
+            activeExecution: seededExecution,
+            error: null,
+          };
+        });
       };
 
       return {
@@ -499,35 +549,51 @@ export const useCatalogStore = create<CatalogState>()(
           }));
         },
 
-        startSimulation: async (scenarioId: string) => {
+        startSimulation: async (scenarioId: string, targetUrl?: string | null) => {
           try {
+            const launchTargetUrl = normalizeLaunchTargetUrl(
+              targetUrl !== undefined ? targetUrl : get().targetUrl,
+            );
             const response = await fetch(`${API_BASE}/simulations`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scenarioId }),
+              body: JSON.stringify({ scenarioId, ...(launchTargetUrl ? { targetUrl: launchTargetUrl } : {}) }),
             });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+              throw new Error(err.error || `HTTP ${response.status}`);
+            }
             const { executionId } = await response.json();
+            seedPendingExecution(executionId, scenarioId, 'simulation', launchTargetUrl);
             return executionId;
-          } catch {
-            set({ error: 'Failed to start simulation' });
-            throw new Error('Failed to start simulation');
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to start simulation';
+            set({ error: message });
+            throw new Error(message);
           }
         },
 
-        startAssessment: async (scenarioId: string) => {
+        startAssessment: async (scenarioId: string, targetUrl?: string | null) => {
           try {
+            const launchTargetUrl = normalizeLaunchTargetUrl(
+              targetUrl !== undefined ? targetUrl : get().targetUrl,
+            );
             const response = await fetch(`${API_BASE}/assessments`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scenarioId }),
+              body: JSON.stringify({ scenarioId, ...(launchTargetUrl ? { targetUrl: launchTargetUrl } : {}) }),
             });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+              throw new Error(err.error || `HTTP ${response.status}`);
+            }
             const { executionId } = await response.json();
+            seedPendingExecution(executionId, scenarioId, 'assessment', launchTargetUrl);
             return executionId;
-          } catch {
-            set({ error: 'Failed to start assessment' });
-            throw new Error('Failed to start assessment');
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to start assessment';
+            set({ error: message });
+            throw new Error(message);
           }
         },
 
@@ -685,7 +751,7 @@ export const useCatalogStore = create<CatalogState>()(
           }));
         },
 
-        setTargetUrl: (url: string | null) => set({ targetUrl: url }),
+        setTargetUrl: (url: string | null) => set({ targetUrl: url, targetStatus: 'unknown' }),
 
         sanitizeTransientState: () => {
           set((state) => {
@@ -709,7 +775,7 @@ export const useCatalogStore = create<CatalogState>()(
     },
     {
       name: 'crucible-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(resolvePersistentStorage),
       partialize: (state) => ({
         targetUrl: state.targetUrl,
         pinnedScenarioIds: state.pinnedScenarioIds,
@@ -724,6 +790,19 @@ export const useCatalogStore = create<CatalogState>()(
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resolvePersistentStorage(): Storage {
+  if (
+    typeof localStorage !== 'undefined' &&
+    typeof localStorage.getItem === 'function' &&
+    typeof localStorage.setItem === 'function' &&
+    typeof localStorage.removeItem === 'function'
+  ) {
+    return localStorage;
+  }
+
+  return noopStorage;
 }
 
 function buildExecutionHistoryUrl(
@@ -746,6 +825,11 @@ function buildExecutionHistoryUrl(
   if (until !== undefined) params.set('until', String(until));
 
   return `${API_BASE}/executions?${params.toString()}`;
+}
+
+function normalizeLaunchTargetUrl(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function toStartOfDayTimestamp(value: string): number | undefined {

@@ -538,10 +538,10 @@ describe('useCatalogStore', () => {
       mockFetch.mockResolvedValueOnce(mockJsonResponse(500, {}));
 
       await expect(useCatalogStore.getState().startSimulation('scenario-1')).rejects.toThrow(
-        'Failed to start simulation',
+        'HTTP 500',
       );
 
-      expect(useCatalogStore.getState().error).toBe('Failed to start simulation');
+      expect(useCatalogStore.getState().error).toBe('HTTP 500');
     });
   });
 
@@ -564,5 +564,40 @@ describe('useCatalogStore', () => {
 
       expect(useCatalogStore.getState().error).toBe('Not running');
     });
+  });
+});
+
+describe('launch seeding', () => {
+  it('does not overwrite a newer execution that already arrived over WebSocket', async () => {
+    const existingExecution = {
+      id: 'exec-1',
+      scenarioId: 'sc-1',
+      mode: 'simulation' as const,
+      status: 'running' as const,
+      startedAt: 123,
+      steps: [
+        {
+          stepId: 'step-1',
+          status: 'running' as const,
+          attempts: 1,
+        },
+      ],
+      targetUrl: 'http://target.local',
+    };
+
+    useCatalogStore.setState({
+      executions: [existingExecution as any],
+      activeExecution: null,
+      targetUrl: 'http://target.local',
+    });
+
+    mockFetch.mockResolvedValueOnce(mockJsonResponse(200, { executionId: 'exec-1' }));
+
+    await useCatalogStore.getState().startSimulation('scenario-1');
+
+    const state = useCatalogStore.getState();
+    expect(state.executions).toHaveLength(1);
+    expect(state.executions[0]).toEqual(existingExecution);
+    expect(state.activeExecution).toEqual(existingExecution);
   });
 });

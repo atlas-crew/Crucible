@@ -179,29 +179,45 @@ export function attachCrucibleBackend(
 
   app.post(`${apiBasePath}/simulations`, async (req, res) => {
     try {
-      const { scenarioId, ...triggerData } = req.body;
+      const { scenarioId, targetUrl, ...triggerData } = req.body;
       if (!scenarioId) {
         return res.status(400).json({ error: 'scenarioId is required' });
       }
 
-      const executionId = await engine.startScenario(scenarioId, 'simulation', triggerData);
+      const executionId = await engine.startScenario(
+        scenarioId,
+        'simulation',
+        triggerData,
+        undefined,
+        normalizeLaunchTargetUrl(targetUrl),
+      );
       res.json({ executionId, mode: 'simulation', wsUrl: buildWebSocketUrl(req, wsPath) });
-    } catch {
-      res.status(500).json({ error: 'Failed to start simulation' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to start simulation';
+      const status = error instanceof ScenarioTargetUrlError ? 400 : 500;
+      res.status(status).json({ error: message });
     }
   });
 
   app.post(`${apiBasePath}/assessments`, async (req, res) => {
     try {
-      const { scenarioId, ...triggerData } = req.body;
+      const { scenarioId, targetUrl, ...triggerData } = req.body;
       if (!scenarioId) {
         return res.status(400).json({ error: 'scenarioId is required' });
       }
 
-      const executionId = await engine.startScenario(scenarioId, 'assessment', triggerData);
+      const executionId = await engine.startScenario(
+        scenarioId,
+        'assessment',
+        triggerData,
+        undefined,
+        normalizeLaunchTargetUrl(targetUrl),
+      );
       res.json({ executionId, mode: 'assessment', reportUrl: `${apiBasePath}/reports/${executionId}` });
-    } catch {
-      res.status(500).json({ error: 'Failed to start assessment' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to start assessment';
+      const status = error instanceof ScenarioTargetUrlError ? 400 : 500;
+      res.status(status).json({ error: message });
     }
   });
 
@@ -270,6 +286,44 @@ export function attachCrucibleBackend(
       db.close();
     },
   };
+}
+
+class ScenarioTargetUrlError extends Error {}
+
+function normalizeLaunchTargetUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmed);
+  } catch {
+    throw new ScenarioTargetUrlError('Scenario target URL must be a valid absolute URL');
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    throw new ScenarioTargetUrlError('Scenario target URL must use http or https');
+  }
+
+  if (!parsedUrl.hostname) {
+    throw new ScenarioTargetUrlError('Scenario target URL must include a hostname');
+  }
+
+  if (parsedUrl.username || parsedUrl.password) {
+    throw new ScenarioTargetUrlError('Scenario target URL must not include credentials');
+  }
+
+  if (parsedUrl.hash) {
+    throw new ScenarioTargetUrlError('Scenario target URL must not include a fragment');
+  }
+
+  return trimmed.replace(/\/+$/, '');
 }
 
 function matchesWebSocketPath(request: IncomingMessage, wsPath: string): boolean {

@@ -7,6 +7,9 @@ import {
   WhenConditionSchema,
   ScenarioStepSchema,
   ScenarioSchema,
+  getScenarioStepType,
+  isScenarioHttpStep,
+  isScenarioRunnerStep,
 } from '../types.js';
 
 function minimalStep(overrides: Record<string, unknown> = {}) {
@@ -224,6 +227,47 @@ describe('ScenarioStepSchema', () => {
       },
     });
     expect(r.success).toBe(false);
+  });
+
+  it('treats legacy steps without an explicit type as http helpers', () => {
+    const step = minimalStep() as any;
+
+    expect(getScenarioStepType(step)).toBe('http');
+    expect(isScenarioHttpStep(step)).toBe(true);
+    expect(isScenarioRunnerStep(step)).toBe(false);
+  });
+
+  it('treats k6 and nuclei steps as runner helpers', () => {
+    const k6Step = {
+      id: 'k6-step',
+      type: 'k6',
+      name: 'Load test',
+      stage: 'exercise',
+      runner: { scriptRef: 'scripts/smoke.js' },
+    } as any;
+    const nucleiStep = {
+      id: 'nuclei-step',
+      type: 'nuclei',
+      name: 'Scan target',
+      stage: 'validate',
+      runner: { templateRef: 'templates/http/example.yaml' },
+    } as any;
+
+    expect(getScenarioStepType(k6Step)).toBe('k6');
+    expect(isScenarioRunnerStep(k6Step)).toBe(true);
+    expect(isScenarioHttpStep(k6Step)).toBe(false);
+
+    expect(getScenarioStepType(nucleiStep)).toBe('nuclei');
+    expect(isScenarioRunnerStep(nucleiStep)).toBe(true);
+    expect(isScenarioHttpStep(nucleiStep)).toBe(false);
+  });
+
+  it('does not classify unknown step types as http or runner steps', () => {
+    const malformedStep = { ...minimalStep(), type: 'grpc' } as any;
+
+    expect(getScenarioStepType(malformedStep)).toBe('http');
+    expect(isScenarioHttpStep(malformedStep)).toBe(false);
+    expect(isScenarioRunnerStep(malformedStep)).toBe(false);
   });
 });
 

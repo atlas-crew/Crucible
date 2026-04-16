@@ -188,11 +188,20 @@ export type ScenarioRunnerStep = ScenarioK6Step | ScenarioNucleiStep;
 export type ScenarioStep = z.infer<typeof ScenarioStepSchema>;
 
 export function getScenarioStepType(step: ScenarioStep): ScenarioStepType {
-  return step.type ?? 'http';
+  switch (step.type) {
+    case 'k6':
+      return 'k6';
+    case 'nuclei':
+      return 'nuclei';
+    case 'http':
+    case undefined:
+    default:
+      return 'http';
+  }
 }
 
 export function isScenarioHttpStep(step: ScenarioStep): step is ScenarioHttpStep {
-  return getScenarioStepType(step) === 'http';
+  return step.type === undefined || step.type === 'http';
 }
 
 export function isScenarioK6Step(step: ScenarioStep): step is ScenarioK6Step {
@@ -204,7 +213,7 @@ export function isScenarioNucleiStep(step: ScenarioStep): step is ScenarioNuclei
 }
 
 export function isScenarioRunnerStep(step: ScenarioStep): step is ScenarioRunnerStep {
-  return step.type === 'k6' || step.type === 'nuclei';
+  return isScenarioK6Step(step) || isScenarioNucleiStep(step);
 }
 
 // ── Scenario ────────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { isScenarioHttpStep, type Scenario, type ScenarioHttpStep, type ScenarioStep } from "@crucible/catalog"
+import { isScenarioHttpStep } from "@crucible/catalog/models/types"
+import type { Scenario, ScenarioHttpStep, ScenarioStep } from "@crucible/catalog/models/types"
 import { useCatalogStore } from "@/store/useCatalogStore"
 import { MetadataForm, type ScenarioDraft } from "./metadata-form"
 import { StepsList, emptyRequestDraft, emptyExecutionDraft, emptyExpectDraft, emptyExtractDraft } from "./steps-list"

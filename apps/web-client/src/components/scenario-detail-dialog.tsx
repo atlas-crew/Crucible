@@ -1,13 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import {
-  getScenarioStepType,
-  isScenarioHttpStep,
-  isScenarioRunnerStep,
-  type Scenario,
-  type ScenarioStep,
-} from "@crucible/catalog"
+import { getScenarioStepType, isScenarioHttpStep, isScenarioRunnerStep } from "@crucible/catalog/models/types"
+import type { Scenario, ScenarioStep } from "@crucible/catalog/models/types"
 import {
   Dialog,
   DialogContent,

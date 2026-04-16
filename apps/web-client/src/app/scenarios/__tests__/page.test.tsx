@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ScenariosPage from '../page';
 
 // ── TASK-19: Test scenario pages search, filter, and dialog ─────────
@@ -8,16 +8,30 @@ import ScenariosPage from '../page';
 const mockFetchScenarios = vi.fn();
 const mockStartSimulation = vi.fn();
 const mockStartAssessment = vi.fn();
+const mockSetTargetUrl = vi.fn();
+const mockClearError = vi.fn();
+const mockPush = vi.fn();
 
 let mockState: Record<string, unknown> = {};
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
 
 vi.mock('@/store/useCatalogStore', () => ({
   useCatalogStore: () => ({
     scenarios: mockState.scenarios ?? [],
     isLoading: mockState.isLoading ?? false,
+    error: mockState.error ?? null,
+    targetUrl: mockState.targetUrl ?? null,
+    targetStatus: mockState.targetStatus ?? 'unknown',
     fetchScenarios: mockFetchScenarios,
     startSimulation: mockStartSimulation,
     startAssessment: mockStartAssessment,
+    setTargetUrl: mockSetTargetUrl,
+    clearError: mockClearError,
   }),
 }));
 
@@ -50,7 +64,11 @@ describe('ScenariosPage', () => {
         makeScenario({ id: 'sc-3', name: 'SQL Injection', description: 'Database injection test', category: 'database', difficulty: 'beginner', tags: ['sql'] }),
       ],
       isLoading: false,
+      targetUrl: 'http://target.local',
+      targetStatus: 'online',
     };
+    mockStartSimulation.mockResolvedValue('sim-1');
+    mockStartAssessment.mockResolvedValue('assess-1');
   });
 
   it('calls fetchScenarios on mount', () => {
@@ -126,21 +144,40 @@ describe('ScenariosPage', () => {
     expect(screen.getByTestId('detail-dialog')).toBeDefined();
   });
 
-  it('Simulate button calls startSimulation with scenario id', () => {
+  it('updates the launch target override from the input field', () => {
     render(<ScenariosPage />);
 
-    const simulateButtons = screen.getAllByText(/simulate/i);
-    fireEvent.click(simulateButtons[0]);
+    const targetInput = screen.getByLabelText(/target url/i);
+    fireEvent.change(targetInput, { target: { value: '  http://demo.local  ' } });
 
-    expect(mockStartSimulation).toHaveBeenCalledWith('sc-1');
+    expect(mockSetTargetUrl).toHaveBeenCalledWith('http://demo.local');
   });
 
-  it('Assess button calls startAssessment with scenario id', () => {
+  it('Simulate button launches with the selected target and routes to simulations', async () => {
     render(<ScenariosPage />);
 
-    const assessButtons = screen.getAllByText(/assess/i);
+    const simulateButtons = screen.getAllByText(/^simulate$/i);
+    fireEvent.click(simulateButtons[0]);
+
+    await waitFor(() => {
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://target.local');
+    });
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/simulations');
+    });
+  });
+
+  it('Assess button launches with the selected target and routes to assessments', async () => {
+    render(<ScenariosPage />);
+
+    const assessButtons = screen.getAllByText(/^assess$/i);
     fireEvent.click(assessButtons[0]);
 
-    expect(mockStartAssessment).toHaveBeenCalledWith('sc-1');
+    await waitFor(() => {
+      expect(mockStartAssessment).toHaveBeenCalledWith('sc-1', 'http://target.local');
+    });
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/assessments');
+    });
   });
 });
