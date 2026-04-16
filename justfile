@@ -29,6 +29,59 @@ dev-web:
 dev-api:
     pnpm --filter @crucible/demo-dashboard dev
 
+# ── Tmux service lifecycle ────────────────────
+
+# TMUX_SESSION should stay shell-safe (letters, numbers, underscores, hyphens).
+svc_session := env_var_or_default("TMUX_SESSION", "crucible")
+svc_root := justfile_directory()
+svc_api_window := "crucible-api"
+svc_web_window := "crucible-web"
+
+# Validate the tmux session name before any recipe uses it as a target.
+_svc-validate-session:
+    @case "{{svc_session}}" in *[!A-Za-z0-9_-]*) echo "invalid TMUX_SESSION: {{svc_session}}" >&2; exit 1 ;; esac
+
+# Ensure the tmux session exists for service recipes
+_svc-init: _svc-validate-session
+    @tmux has-session -t "{{svc_session}}" 2>/dev/null || tmux new-session -d -s "{{svc_session}}" -c "{{svc_root}}"
+
+# Print the tmux session name used by service recipes
+svc-session:
+    @echo "{{svc_session}}"
+
+# Start the demo-dashboard API/server in tmux
+svc-api: _svc-init
+    @tmux kill-window -t "{{svc_session}}:{{svc_api_window}}" 2>/dev/null || true
+    @tmux new-window -d -t "{{svc_session}}:" -n "{{svc_api_window}}" -c "{{svc_root}}"
+    @tmux send-keys -t "{{svc_session}}:{{svc_api_window}}" "pnpm --filter @crucible/demo-dashboard dev" C-m
+
+# Start the Next.js web client in tmux
+svc-web: _svc-init
+    @tmux kill-window -t "{{svc_session}}:{{svc_web_window}}" 2>/dev/null || true
+    @tmux new-window -d -t "{{svc_session}}:" -n "{{svc_web_window}}" -c "{{svc_root}}"
+    @tmux send-keys -t "{{svc_session}}:{{svc_web_window}}" "pnpm --filter web-client dev" C-m
+
+# Start the main Crucible dev services in tmux
+svc-up: _svc-init svc-api svc-web
+
+# Show status for the tmux-backed dev services
+svc-status:
+    @TMUX_SESSION="{{svc_session}}" cortex tmux status "{{svc_api_window}}" 2>/dev/null || echo "{{svc_api_window}}: not running"
+    @TMUX_SESSION="{{svc_session}}" cortex tmux status "{{svc_web_window}}" 2>/dev/null || echo "{{svc_web_window}}: not running"
+
+# Stop the tmux-backed dev services
+svc-stop:
+    @tmux kill-window -t "{{svc_session}}:{{svc_api_window}}" 2>/dev/null || true
+    @tmux kill-window -t "{{svc_session}}:{{svc_web_window}}" 2>/dev/null || true
+    @# Intentionally keep the base tmux session so svc-shell can reattach later.
+
+# Restart the tmux-backed dev services
+svc-restart: svc-stop svc-up
+
+# Attach to the tmux session used by dev services
+svc-shell: _svc-init
+    tmux attach-session -t "{{svc_session}}"
+
 # ── Build ──────────────────────────────────────
 
 # Build every project via Nx
