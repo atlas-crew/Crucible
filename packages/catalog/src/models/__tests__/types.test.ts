@@ -10,6 +10,10 @@ import {
   getScenarioStepType,
   isScenarioHttpStep,
   isScenarioRunnerStep,
+  inferScenarioTargetFamily,
+  inferTargetFamilyFromUrl,
+  getScenarioTargetCompatibility,
+  countScenarioBlockingExpectations,
 } from '../types.js';
 
 function minimalStep(overrides: Record<string, unknown> = {}) {
@@ -278,5 +282,49 @@ describe('WhenConditionSchema', () => {
 
   it('accepts step with optional succeeded and status', () => {
     expect(WhenConditionSchema.safeParse({ step: 's1', succeeded: false, status: 403 }).success).toBe(true);
+  });
+});
+
+describe('Scenario target helpers', () => {
+  it('classifies chimera and lab-family scenarios from ids and tags', () => {
+    expect(inferScenarioTargetFamily(minimalScenario({ id: 'chimera-sqli', tags: ['chimera'] }))).toBe('chimera');
+    expect(inferScenarioTargetFamily(minimalScenario({ id: 'api-demo-auth-attacks' }))).toBe('chimera');
+    expect(inferScenarioTargetFamily(minimalScenario({ id: 'crapi-bola' }))).toBe('crapi');
+    expect(inferScenarioTargetFamily(minimalScenario({ id: 'vampi-mass-assignment' }))).toBe('vampi');
+    expect(inferScenarioTargetFamily(minimalScenario({ id: 'vp-demo-06-trap-endpoint' }))).toBe('vp-demo');
+  });
+
+  it('infers chimera targets from localhost:8880 and service hostnames', () => {
+    expect(inferTargetFamilyFromUrl('http://localhost:8880')).toBe('chimera');
+    expect(inferTargetFamilyFromUrl('http://chimera:8880')).toBe('chimera');
+    expect(inferTargetFamilyFromUrl('https://crapi.local')).toBe('crapi');
+    expect(inferTargetFamilyFromUrl('https://example.com')).toBeNull();
+  });
+
+  it('marks cross-lab scenarios as incompatible when the target family is known', () => {
+    const chimeraScenario = minimalScenario({ id: 'chimera-banking-idor', tags: ['chimera'] });
+    const crapiScenario = minimalScenario({ id: 'crapi-bola-vehicle-enumeration' });
+
+    expect(getScenarioTargetCompatibility(chimeraScenario, 'http://localhost:8880')).toBe('compatible');
+    expect(getScenarioTargetCompatibility(crapiScenario, 'http://localhost:8880')).toBe('incompatible');
+    expect(getScenarioTargetCompatibility(minimalScenario(), 'http://localhost:8880')).toBe('unknown');
+  });
+
+  it('counts blocked expectations across HTTP steps only', () => {
+    const scenario = minimalScenario({
+      steps: [
+        minimalStep({ expect: { blocked: true } }),
+        minimalStep({ id: 'http-2', expect: { status: 200 } }),
+        {
+          id: 'scan',
+          type: 'nuclei',
+          name: 'Scan target',
+          stage: 'validate',
+          runner: { templateRef: 'templates/http/example.yaml' },
+        },
+      ],
+    });
+
+    expect(countScenarioBlockingExpectations(scenario)).toBe(1);
   });
 });

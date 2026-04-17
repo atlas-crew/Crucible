@@ -2,7 +2,17 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import type { Scenario } from "@crucible/catalog"
+import {
+  countScenarioBlockingExpectations,
+  getScenarioTargetCompatibility,
+  inferScenarioTargetFamily,
+  inferTargetFamilyFromUrl,
+} from "@crucible/catalog"
+import type {
+  Scenario,
+  ScenarioTargetCompatibility,
+  ScenarioTargetFamily,
+} from "@crucible/catalog"
 import { useCatalogStore } from "@/store/useCatalogStore"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -42,27 +52,51 @@ export default function ScenariosPage() {
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [launchTargetDraft, setLaunchTargetDraft] = useState<string | null>(null)
   const [launching, setLaunching] = useState<{ scenarioId: string; mode: "simulation" | "assessment" } | null>(null)
+  const catalogTargetFamily = useMemo(() => inferTargetFamilyFromUrl(targetUrl), [targetUrl])
 
   useEffect(() => {
     fetchScenarios()
   }, [fetchScenarios])
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return scenarios
     const q = searchQuery.toLowerCase()
-    return scenarios.filter((s) =>
-      s.name.toLowerCase().includes(q) ||
-      s.id.toLowerCase().includes(q) ||
-      s.description?.toLowerCase().includes(q) ||
-      s.category?.toLowerCase().includes(q) ||
-      s.tags?.some((t) => t.toLowerCase().includes(q))
+    const matches = searchQuery.trim()
+      ? scenarios.filter((s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.id.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q) ||
+          s.category?.toLowerCase().includes(q) ||
+          s.tags?.some((t) => t.toLowerCase().includes(q))
+        )
+      : scenarios
+
+    if (!catalogTargetFamily) {
+      return matches
+    }
+
+    return [...matches].sort((left, right) =>
+      compareScenarioPriority(left, right, targetUrl, catalogTargetFamily),
     )
-  }, [scenarios, searchQuery])
+  }, [catalogTargetFamily, scenarios, searchQuery, targetUrl])
 
   const launchTargetState = useMemo<LaunchTargetState>(
     () => validateLaunchTargetInput(launchDialog?.targetUrl ?? ""),
     [launchDialog?.targetUrl],
   )
+  const effectiveLaunchTarget = launchTargetState.normalized ?? targetUrl ?? null
+  const launchTargetFamily = useMemo(
+    () => inferTargetFamilyFromUrl(effectiveLaunchTarget),
+    [effectiveLaunchTarget],
+  )
+  const launchScenarioFamily = launchDialog
+    ? inferScenarioTargetFamily(launchDialog.scenario)
+    : null
+  const launchCompatibility = launchDialog
+    ? getScenarioTargetCompatibility(launchDialog.scenario, effectiveLaunchTarget)
+    : "unknown"
+  const launchBlockingChecks = launchDialog
+    ? countScenarioBlockingExpectations(launchDialog.scenario)
+    : 0
 
   const openLaunchDialog = (scenario: Scenario, mode: "simulation" | "assessment") => {
     if (launching) {
@@ -108,7 +142,7 @@ export default function ScenariosPage() {
         if (submission.normalized) {
           setTargetUrl(submission.normalized)
         }
-        setLaunchTargetDraft(submission.normalized ?? "")
+        setLaunchTargetDraft(submission.normalized ?? null)
         setLaunchDialog(null)
         router.push("/simulations")
       } else {
@@ -116,7 +150,7 @@ export default function ScenariosPage() {
         if (submission.normalized) {
           setTargetUrl(submission.normalized)
         }
-        setLaunchTargetDraft(submission.normalized ?? "")
+        setLaunchTargetDraft(submission.normalized ?? null)
         setLaunchDialog(null)
         router.push("/assessments")
       }
@@ -147,6 +181,12 @@ export default function ScenariosPage() {
         </p>
       </div>
 
+      {catalogTargetFamily && (
+        <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          Current target profile: <span className="font-medium text-foreground">{getTargetFamilyLabel(catalogTargetFamily)}</span>. Matching scenarios are shown first, and known cross-lab scenarios are deprioritized.
+        </div>
+      )}
+
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -174,73 +214,14 @@ export default function ScenariosPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((scenario) => (
-            <Card
+            <ScenarioCatalogCard
               key={scenario.id}
-              className="flex flex-col cursor-pointer transition-shadow hover:shadow-md hover:border-foreground/20"
-              onClick={() => setSelectedScenario(scenario)}
-            >
-              <CardHeader>
-                <div className="flex justify-between items-start mb-2">
-                  <Badge variant={getDifficultyVariant(scenario.difficulty)}>
-                    {scenario.difficulty || "Beginner"}
-                  </Badge>
-                  <span className="type-timestamp text-muted-foreground uppercase">
-                    {scenario.category}
-                  </span>
-                </div>
-                <CardTitle className="line-clamp-1 text-base">{scenario.name}</CardTitle>
-                <CardDescription className="line-clamp-2 h-10">
-                  {scenario.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1">
-                <div className="text-sm text-muted-foreground">
-                  <span className="type-data text-foreground font-semibold">{scenario.steps.length}</span> attack steps
-                </div>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {scenario.tags?.slice(0, 3).map((tag: string) => (
-                    <Badge key={tag} variant="outline" className="type-tag">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  disabled={launching !== null}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openLaunchDialog(scenario, "simulation")
-                  }}
-                >
-                  {launching?.scenarioId === scenario.id && launching.mode === "simulation" ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Play className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  {launching?.scenarioId === scenario.id && launching.mode === "simulation" ? "Starting…" : "Simulate"}
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  disabled={launching !== null}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openLaunchDialog(scenario, "assessment")
-                  }}
-                >
-                  {launching?.scenarioId === scenario.id && launching.mode === "assessment" ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  {launching?.scenarioId === scenario.id && launching.mode === "assessment" ? "Starting…" : "Assess"}
-                </Button>
-              </CardFooter>
-            </Card>
+              scenario={scenario}
+              catalogTargetUrl={targetUrl}
+              launching={launching}
+              onCardOpen={() => setSelectedScenario(scenario)}
+              onLaunch={openLaunchDialog}
+            />
           ))}
         </div>
       )}
@@ -271,43 +252,57 @@ export default function ScenariosPage() {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <p id="launch-mode-label" className="text-sm font-medium">Launch mode</p>
-              <div role="radiogroup" aria-labelledby="launch-mode-label" className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={launchDialog?.mode === "simulation" ? "default" : "outline"}
-                  role="radio"
-                  aria-checked={launchDialog?.mode === "simulation"}
-                  onClick={() => {
-                    if (!launchDialog || launching) {
-                      return
+              <fieldset className="space-y-2">
+                <legend id="launch-mode-label" className="text-sm font-medium">Launch mode</legend>
+                <div className="grid grid-cols-2 gap-2" aria-labelledby="launch-mode-label">
+                  <label
+                    className={launchDialog?.mode === "simulation"
+                      ? "flex cursor-pointer items-center justify-center rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                      : "flex cursor-pointer items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground"
                     }
-                    setLaunchError(null)
-                    setLaunchDialog({ ...launchDialog, mode: "simulation" })
-                  }}
-                  disabled={launching !== null}
-                >
-                  <Play className="mr-1.5 h-3.5 w-3.5" />
-                  Simulation
-                </Button>
-                <Button
-                  type="button"
-                  variant={launchDialog?.mode === "assessment" ? "default" : "outline"}
-                  role="radio"
-                  aria-checked={launchDialog?.mode === "assessment"}
-                  onClick={() => {
-                    if (!launchDialog || launching) {
-                      return
+                  >
+                    <input
+                      type="radio"
+                      name="launch-mode"
+                      className="sr-only"
+                      checked={launchDialog?.mode === "simulation"}
+                      onChange={() => {
+                        if (!launchDialog || launching) {
+                          return
+                        }
+                        setLaunchError(null)
+                        setLaunchDialog({ ...launchDialog, mode: "simulation" })
+                      }}
+                      disabled={launching !== null}
+                    />
+                    <Play className="mr-1.5 h-3.5 w-3.5" />
+                    Simulation
+                  </label>
+                  <label
+                    className={launchDialog?.mode === "assessment"
+                      ? "flex cursor-pointer items-center justify-center rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                      : "flex cursor-pointer items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground"
                     }
-                    setLaunchError(null)
-                    setLaunchDialog({ ...launchDialog, mode: "assessment" })
-                  }}
-                  disabled={launching !== null}
-                >
-                  <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                  Assessment
-                </Button>
-              </div>
+                  >
+                    <input
+                      type="radio"
+                      name="launch-mode"
+                      className="sr-only"
+                      checked={launchDialog?.mode === "assessment"}
+                      onChange={() => {
+                        if (!launchDialog || launching) {
+                          return
+                        }
+                        setLaunchError(null)
+                        setLaunchDialog({ ...launchDialog, mode: "assessment" })
+                      }}
+                      disabled={launching !== null}
+                    />
+                    <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+                    Assessment
+                  </label>
+                </div>
+              </fieldset>
             </div>
 
             <div className="space-y-2">
@@ -330,7 +325,7 @@ export default function ScenariosPage() {
                 disabled={launching !== null}
               />
               <p className="text-sm text-muted-foreground">
-                Leave blank to fall back to the server default target for this run. The saved catalog target stays unchanged. Saved catalog target status:{" "}
+                Leave blank to fall back to the server default target for this run. Successful launches with an override also update the saved catalog target used for future launches. Saved catalog target status:{" "}
                 {getTargetStatusLabel(targetStatus)}.
               </p>
             </div>
@@ -341,6 +336,18 @@ export default function ScenariosPage() {
                 className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
               >
                 {launchTargetState.error}
+              </div>
+            )}
+
+            {launchCompatibility === "incompatible" && launchTargetFamily && launchScenarioFamily && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+                This scenario is labeled for <span className="font-medium">{getTargetFamilyLabel(launchScenarioFamily)}</span>, but the target URL looks like <span className="font-medium">{getTargetFamilyLabel(launchTargetFamily)}</span>. It may fail because the endpoint families do not line up.
+              </div>
+            )}
+
+            {launchTargetFamily === "chimera" && launchBlockingChecks > 0 && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+                This scenario includes <span className="font-medium">{launchBlockingChecks}</span> blocking {launchBlockingChecks === 1 ? "assertion" : "assertions"}. Live Chimera is intentionally vulnerable, so assessments may fail by design when those attacks succeed.
               </div>
             )}
 
@@ -387,6 +394,111 @@ export default function ScenariosPage() {
   )
 }
 
+interface ScenarioCatalogCardProps {
+  scenario: Scenario
+  catalogTargetUrl: string | null
+  launching: { scenarioId: string; mode: "simulation" | "assessment" } | null
+  onCardOpen: () => void
+  onLaunch: (scenario: Scenario, mode: "simulation" | "assessment") => void
+}
+
+function ScenarioCatalogCard({
+  scenario,
+  catalogTargetUrl,
+  launching,
+  onCardOpen,
+  onLaunch,
+}: ScenarioCatalogCardProps) {
+  const targetFamily = inferScenarioTargetFamily(scenario)
+  const compatibility = getScenarioTargetCompatibility(scenario, catalogTargetUrl)
+  const blockingChecks = countScenarioBlockingExpectations(scenario)
+
+  return (
+    <Card
+      className="flex flex-col cursor-pointer transition-shadow hover:shadow-md hover:border-foreground/20"
+      onClick={onCardOpen}
+    >
+      <CardHeader>
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <Badge variant={getDifficultyVariant(scenario.difficulty)}>
+            {scenario.difficulty || "Beginner"}
+          </Badge>
+          <span className="type-timestamp text-muted-foreground uppercase">
+            {scenario.category}
+          </span>
+        </div>
+        <CardTitle className="line-clamp-1 text-base">{scenario.name}</CardTitle>
+        <CardDescription className="line-clamp-2 h-10">
+          {scenario.description}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex-1">
+        <div className="text-sm text-muted-foreground">
+          <span className="type-data font-semibold text-foreground">{scenario.steps.length}</span> attack steps
+          {blockingChecks > 0 ? ` - ${blockingChecks} blocking check${blockingChecks === 1 ? "" : "s"}` : ""}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {targetFamily !== "unknown" && targetFamily !== "generic" && (
+            <Badge variant={compatibility === "incompatible" ? "destructive" : "secondary"} className="type-tag">
+              {getTargetFamilyLabel(targetFamily)}
+            </Badge>
+          )}
+          {compatibility === "unknown" && blockingChecks > 0 && (
+            <Badge variant="outline" className="type-tag">
+              control checks
+            </Badge>
+          )}
+          {scenario.tags?.slice(0, 3).map((tag: string) => (
+            <Badge key={tag} variant="outline" className="type-tag">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+        {compatibility === "incompatible" && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Known mismatch with the current target family.
+          </p>
+        )}
+      </CardContent>
+      <CardFooter className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          disabled={launching !== null}
+          onClick={(e) => {
+            e.stopPropagation()
+            onLaunch(scenario, "simulation")
+          }}
+        >
+          {launching?.scenarioId === scenario.id && launching.mode === "simulation" ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Play className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          {launching?.scenarioId === scenario.id && launching.mode === "simulation" ? "Starting…" : "Simulate"}
+        </Button>
+        <Button
+          size="sm"
+          className="flex-1"
+          disabled={launching !== null}
+          onClick={(e) => {
+            e.stopPropagation()
+            onLaunch(scenario, "assessment")
+          }}
+        >
+          {launching?.scenarioId === scenario.id && launching.mode === "assessment" ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          {launching?.scenarioId === scenario.id && launching.mode === "assessment" ? "Starting…" : "Assess"}
+        </Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
 function validateLaunchTargetInput(value: string): LaunchTargetState {
   const trimmed = value.trim()
   if (!trimmed) {
@@ -398,6 +510,8 @@ function validateLaunchTargetInput(value: string): LaunchTargetState {
 
   try {
     const parsed = new URL(trimmed)
+    parsed.username = ""
+    parsed.password = ""
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return {
         normalized: null,
@@ -405,8 +519,12 @@ function validateLaunchTargetInput(value: string): LaunchTargetState {
       }
     }
 
+    const normalized = parsed.toString()
+
     return {
-      normalized: parsed.toString(),
+      normalized: parsed.pathname === "/"
+        ? normalized.replace(/\/(?=(?:[?#]|$))/, "")
+        : normalized,
       error: null,
     }
   } catch {
@@ -441,5 +559,61 @@ function getDifficultyVariant(difficulty?: string): "default" | "secondary" | "d
       return 'secondary'
     default:
       return 'outline'
+  }
+}
+
+function compareScenarioPriority(
+  left: Scenario,
+  right: Scenario,
+  targetUrl: string | null,
+  targetFamily: ScenarioTargetFamily,
+): number {
+  const leftCompatibility = getScenarioTargetCompatibility(left, targetUrl)
+  const rightCompatibility = getScenarioTargetCompatibility(right, targetUrl)
+
+  const leftRank = getCompatibilityRank(leftCompatibility, inferScenarioTargetFamily(left), targetFamily)
+  const rightRank = getCompatibilityRank(rightCompatibility, inferScenarioTargetFamily(right), targetFamily)
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank
+  }
+
+  return left.name.localeCompare(right.name)
+}
+
+function getCompatibilityRank(
+  compatibility: ScenarioTargetCompatibility,
+  scenarioFamily: ScenarioTargetFamily,
+  targetFamily: ScenarioTargetFamily,
+): number {
+  if (compatibility === "compatible") {
+    return 0
+  }
+
+  if (compatibility === "unknown") {
+    return scenarioFamily === targetFamily ? 0 : 1
+  }
+
+  return 2
+}
+
+function getTargetFamilyLabel(targetFamily: ScenarioTargetFamily): string {
+  switch (targetFamily) {
+    case "chimera":
+      return "Chimera-first"
+    case "crapi":
+      return "crAPI"
+    case "vampi":
+      return "VAmPI"
+    case "vp-demo":
+      return "VP demo"
+    case "generic":
+      return "Generic"
+    case "unknown":
+      return "Unclassified"
+    default: {
+      const exhaustiveCheck: never = targetFamily
+      throw new Error(`Unhandled target family: ${exhaustiveCheck}`)
+    }
   }
 }

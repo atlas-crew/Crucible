@@ -11,6 +11,8 @@ export {
   ScenarioRunnerTypeSchema,
   RunnerExecutionModeSchema,
   RunnerFindingSeveritySchema,
+  ScenarioTargetFamilySchema,
+  ScenarioTargetCompatibilitySchema,
   ScenarioSchema,
   ScenarioStepSchema,
   ScenarioHttpStepSchema,
@@ -29,6 +31,8 @@ export {
   type ScenarioRunnerType,
   type RunnerExecutionMode,
   type RunnerFindingSeverity,
+  type ScenarioTargetFamily,
+  type ScenarioTargetCompatibility,
   type Scenario,
   type ScenarioStep,
   type ScenarioHttpStep,
@@ -42,6 +46,10 @@ export {
   isScenarioK6Step,
   isScenarioNucleiStep,
   isScenarioRunnerStep,
+  inferScenarioTargetFamily,
+  inferTargetFamilyFromUrl,
+  getScenarioTargetCompatibility,
+  countScenarioBlockingExpectations,
 } from './models/types.js';
 
 export {

@@ -86,6 +86,25 @@ export const RunnerFindingSeveritySchema = z.enum([
 
 export type RunnerFindingSeverity = z.infer<typeof RunnerFindingSeveritySchema>;
 
+export const ScenarioTargetFamilySchema = z.enum([
+  'chimera',
+  'crapi',
+  'vampi',
+  'vp-demo',
+  'generic',
+  'unknown',
+]);
+
+export type ScenarioTargetFamily = z.infer<typeof ScenarioTargetFamilySchema>;
+
+export const ScenarioTargetCompatibilitySchema = z.enum([
+  'compatible',
+  'incompatible',
+  'unknown',
+]);
+
+export type ScenarioTargetCompatibility = z.infer<typeof ScenarioTargetCompatibilitySchema>;
+
 // ── Scenario Step ───────────────────────────────────────────────────
 
 const ScenarioStepBaseSchema = z.object({
@@ -238,3 +257,112 @@ export const ScenarioSchema = z
   .passthrough();
 
 export type Scenario = z.infer<typeof ScenarioSchema>;
+
+function normalizeScenarioHints(values: readonly string[] | undefined): string[] {
+  return (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
+}
+
+function hasScenarioFamilyHint(
+  scenarioId: string,
+  tags: readonly string[],
+  target: string,
+  needle: string,
+): boolean {
+  return scenarioId.startsWith(`${needle}-`)
+    || tags.some((tag) => tag === needle || tag.startsWith(`${needle}-`))
+    || target.includes(needle);
+}
+
+export function inferScenarioTargetFamily(
+  scenario: Pick<Scenario, 'id' | 'tags' | 'target'>,
+): ScenarioTargetFamily {
+  const scenarioId = scenario.id.trim().toLowerCase();
+  const tags = normalizeScenarioHints(scenario.tags);
+  const target = typeof scenario.target === 'string' ? scenario.target.trim().toLowerCase() : '';
+
+  if (scenarioId.startsWith('chimera-') || scenarioId.startsWith('api-demo-') || hasScenarioFamilyHint(scenarioId, tags, target, 'chimera')) {
+    return 'chimera';
+  }
+
+  if (scenarioId.startsWith('crapi-') || hasScenarioFamilyHint(scenarioId, tags, target, 'crapi')) {
+    return 'crapi';
+  }
+
+  if (scenarioId.startsWith('vampi-') || hasScenarioFamilyHint(scenarioId, tags, target, 'vampi')) {
+    return 'vampi';
+  }
+
+  if (scenarioId.startsWith('vp-demo-') || hasScenarioFamilyHint(scenarioId, tags, target, 'vp-demo')) {
+    return 'vp-demo';
+  }
+
+  if (scenarioId.startsWith('api-')) {
+    return 'generic';
+  }
+
+  return 'unknown';
+}
+
+export function inferTargetFamilyFromUrl(
+  targetUrl?: string | null,
+): ScenarioTargetFamily | null {
+  if (!targetUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(targetUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    const port = parsed.port;
+
+    if (
+      hostname === 'chimera'
+      // Chimera's default local developer port. We still prefer the explicit
+      // service hostname when available, but localhost:8880 is the common path.
+      || (['localhost', '127.0.0.1'].includes(hostname) && port === '8880')
+    ) {
+      return 'chimera';
+    }
+
+    if (hostname.includes('crapi')) {
+      return 'crapi';
+    }
+
+    if (hostname.includes('vampi')) {
+      return 'vampi';
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function getScenarioTargetCompatibility(
+  scenario: Pick<Scenario, 'id' | 'tags' | 'target'>,
+  targetUrl?: string | null,
+): ScenarioTargetCompatibility {
+  const targetFamily = inferTargetFamilyFromUrl(targetUrl);
+  if (!targetFamily) {
+    return 'unknown';
+  }
+
+  const scenarioFamily = inferScenarioTargetFamily(scenario);
+  if (scenarioFamily === 'unknown' || scenarioFamily === 'generic') {
+    return 'unknown';
+  }
+
+  return scenarioFamily === targetFamily ? 'compatible' : 'incompatible';
+}
+
+export function countScenarioBlockingExpectations(
+  scenario: Pick<Scenario, 'steps'>,
+): number {
+  return scenario.steps.reduce((count, step) => {
+    if (!isScenarioHttpStep(step)) {
+      return count;
+    }
+
+    return count + (step.expect?.blocked === true ? 1 : 0);
+  }, 0);
+}
