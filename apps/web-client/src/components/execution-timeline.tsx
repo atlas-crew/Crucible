@@ -120,6 +120,95 @@ function formatDefinitionSummary(step: ScenarioStep): string {
   return `NUCLEI ${reference}`;
 }
 
+function formatLogEntry(message: string, timestamp?: number): string {
+  if (timestamp === undefined || timestamp === null) {
+    return message;
+  }
+
+  return `[${new Date(timestamp).toISOString()}] ${message}`;
+}
+
+function safeStringifyLogValue(value: unknown): string {
+  if (value === undefined) {
+    return "undefined";
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildDerivedLogs(
+  step: ExecutionStepResult,
+  definition: ScenarioStep | undefined,
+  passedAssertions: number,
+  totalAssertions: number,
+): string[] {
+  const derivedLogs: string[] = [];
+  const stepLabel = definition?.name ?? step.stepId;
+  const definitionSuffix = definition ? ` (${formatDefinitionSummary(definition)})` : "";
+
+  if (step.startedAt) {
+    derivedLogs.push(formatLogEntry(`Started ${stepLabel}${definitionSuffix}`, step.startedAt));
+  }
+
+  if (step.attempts > 0) {
+    derivedLogs.push(`Attempts performed: ${step.attempts}`);
+  }
+
+  if (step.details?.response) {
+    derivedLogs.push(
+      formatLogEntry(`Received HTTP ${step.details.response.status}`, step.completedAt ?? step.startedAt),
+    );
+  }
+
+  if (step.details?.runner) {
+    derivedLogs.push(
+      formatLogEntry(
+        `${step.details.runner.type.toUpperCase()} runner finished${step.details.runner.exitCode !== undefined ? ` (exit ${step.details.runner.exitCode})` : ""}`,
+        step.completedAt ?? step.startedAt,
+      ),
+    );
+    if (step.details.runner.summary) {
+      derivedLogs.push(step.details.runner.summary);
+    }
+  }
+
+  if (totalAssertions > 0) {
+    derivedLogs.push(`Assertions passed: ${passedAssertions}/${totalAssertions}`);
+    const failedAssertions = step.assertions?.filter((candidate) => !candidate.passed) ?? [];
+
+    for (const assertion of failedAssertions) {
+      derivedLogs.push(
+        `Assertion failed for ${assertion.field}: expected ${safeStringifyLogValue(assertion.expected)}, got ${safeStringifyLogValue(assertion.actual)}`,
+      );
+    }
+  }
+
+  if (step.error) {
+    derivedLogs.push(formatLogEntry(`Error: ${step.error}`, step.completedAt ?? step.startedAt));
+  } else if (step.status === "completed") {
+    derivedLogs.push(
+      formatLogEntry(`Completed successfully${step.duration !== undefined ? ` in ${formatDuration(step.duration)}` : ""}`, step.completedAt ?? step.startedAt),
+    );
+  } else if (step.status === "failed") {
+    derivedLogs.push(
+      formatLogEntry(`Failed${step.duration !== undefined ? ` after ${formatDuration(step.duration)}` : ""}`, step.completedAt ?? step.startedAt),
+    );
+  } else if (step.status === "skipped") {
+    derivedLogs.push("Step was skipped");
+  } else if (step.status === "cancelled") {
+    derivedLogs.push(
+      formatLogEntry(`Cancelled${step.duration !== undefined ? ` after ${formatDuration(step.duration)}` : ""}`, step.completedAt ?? step.startedAt),
+    );
+  }
+
+  return derivedLogs;
+}
+
 // ── Step card ───────────────────────────────────────────────────────
 
 function StepCard({ 
@@ -146,7 +235,11 @@ function StepCard({
   
   const hasResult = step.details?.response;
   const hasRunnerSummary = step.details?.runner;
-  const hasLogs = step.logs && step.logs.length > 0;
+  const hasCapturedLogs = !!(step.logs && step.logs.length > 0);
+  const derivedLogs = hasCapturedLogs
+    ? step.logs ?? []
+    : buildDerivedLogs(step, definition, passedAssertions, totalAssertions);
+  const hasLogs = derivedLogs.length > 0;
   const hasError = !!step.error;
   const hasDetail = hasResult || hasRunnerSummary || hasLogs || hasError || step.assertions?.length;
 
@@ -256,7 +349,9 @@ function StepCard({
               <TabsList className="w-full justify-start h-8 bg-muted/50 p-1 mb-2">
                 <TabsTrigger value="request" className="text-[11px] px-3 h-6">Request</TabsTrigger>
                 <TabsTrigger value="response" className="text-[11px] px-3 h-6" disabled={!hasResult}>Response</TabsTrigger>
-                <TabsTrigger value="logs" className="text-[11px] px-3 h-6" disabled={!hasLogs}>Logs</TabsTrigger>
+                <TabsTrigger value="logs" className="text-[11px] px-3 h-6" disabled={!hasLogs}>
+                  {hasCapturedLogs ? "Logs" : "Summary"}
+                </TabsTrigger>
                 <TabsTrigger value="terminal" className="text-[11px] px-3 h-6">Terminal</TabsTrigger>
                 {hasError && <TabsTrigger value="error" className="text-[11px] px-3 h-6 text-destructive">Error</TabsTrigger>}
               </TabsList>
@@ -419,14 +514,27 @@ function StepCard({
                 <div className="bg-black/95 rounded border border-border/50 p-3 overflow-hidden font-mono text-[11px] leading-relaxed">
                   <div className="flex items-center gap-2 mb-3 border-b border-white/10 pb-2">
                     <Terminal className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest">Execution Logs</span>
+                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest">
+                      {hasCapturedLogs ? "Execution Logs" : "Derived Execution Summary"}
+                    </span>
                   </div>
+                  {!hasCapturedLogs && (
+                    <div className="mb-3 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+                      No captured logs were stored for this step. Showing a derived summary instead.
+                    </div>
+                  )}
                   <div className="space-y-1 max-h-60 overflow-y-auto scrollbar-thin">
-                    {step.logs?.map((log, i) => (
-                      <div key={i} className="flex gap-3">
-                        <span className="text-white/20 shrink-0 select-none">[{String(i+1).padStart(3, '0')}]</span>
-                        <span className="text-white/80 whitespace-pre-wrap">{log}</span>
-                      </div>
+                    {derivedLogs.map((log, i) => (
+                      hasCapturedLogs ? (
+                        <div key={i} className="flex gap-3">
+                          <span className="text-white/20 shrink-0 select-none">[{String(i+1).padStart(3, '0')}]</span>
+                          <span className="text-white/80 whitespace-pre-wrap">{log}</span>
+                        </div>
+                      ) : (
+                        <div key={i} className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white/80">
+                          {log}
+                        </div>
+                      )
                     ))}
                   </div>
                 </div>
@@ -576,7 +684,7 @@ export function ExecutionTimeline({ execution, scenario }: ExecutionTimelineProp
                   key={step.stepId} 
                   step={step} 
                   index={i} 
-                  definition={scenario?.steps.find(s => s.id === step.stepId)}
+                  definition={scenario?.steps.find((candidate) => candidate.id === step.stepId)}
                   targetUrl={execution.targetUrl}
                   executionId={execution.id}
                   executionStatus={execution.status}

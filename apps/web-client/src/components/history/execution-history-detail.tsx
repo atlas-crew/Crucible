@@ -7,6 +7,7 @@ import { ExecutionTimeline } from "@/components/execution-timeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import type { ScenarioExecution } from "@/store/useCatalogStore";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -16,6 +17,7 @@ interface ExecutionHistoryDetailProps {
 }
 
 export function ExecutionHistoryDetail({ executionId }: ExecutionHistoryDetailProps) {
+  const { scenarios, fetchScenarios } = useCatalogStore();
   const [execution, setExecution] = useState<ScenarioExecution | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,12 @@ export function ExecutionHistoryDetail({ executionId }: ExecutionHistoryDetailPr
     };
   }, [executionId]);
 
+  useEffect(() => {
+    if (scenarios.length === 0) {
+      void fetchScenarios();
+    }
+  }, [fetchScenarios, scenarios.length]);
+
   return (
     <div className="space-y-6">
       <Button asChild variant="outline" className="w-fit">
@@ -75,7 +83,10 @@ export function ExecutionHistoryDetail({ executionId }: ExecutionHistoryDetailPr
           <CardContent className="py-10 text-center text-destructive">{error}</CardContent>
         </Card>
       ) : execution ? (
-        <ExecutionTimeline execution={execution} />
+        <ExecutionTimeline
+          execution={execution}
+          scenario={scenarios.find((scenario) => scenario.id === execution.scenarioId)}
+        />
       ) : (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import { ExecutionTimeline } from "@/components/execution-timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,12 +41,28 @@ const statusColor: Record<ExecutionStatus, string> = {
 };
 
 export default function SimulationsPage() {
-  const { executions, activeExecution, setActiveExecution, wsConnected, pauseAll, resumeAll, cancelAll } = useCatalogStore();
+  const {
+    executions,
+    activeExecution,
+    setActiveExecution,
+    wsConnected,
+    pauseAll,
+    resumeAll,
+    cancelAll,
+    scenarios,
+    fetchScenarios,
+  } = useCatalogStore();
 
   const simulations = executions.filter((e) => e.mode === "simulation");
   const hasRunning = simulations.some((e) => e.status === "running");
   const hasPaused = simulations.some((e) => e.status === "paused");
   const hasActive = simulations.some((e) => e.status === "running" || e.status === "pending" || e.status === "paused");
+
+  useEffect(() => {
+    if (scenarios.length === 0) {
+      void fetchScenarios();
+    }
+  }, [fetchScenarios, scenarios.length]);
 
   return (
     <div className="space-y-6">
@@ -156,7 +173,10 @@ export default function SimulationsPage() {
           {/* Timeline detail */}
           <div>
             {activeExecution ? (
-              <ExecutionTimeline execution={activeExecution} />
+              <ExecutionTimeline
+                execution={activeExecution}
+                scenario={scenarios.find((scenario) => scenario.id === activeExecution.scenarioId)}
+              />
             ) : (
               <Card className="flex items-center justify-center h-[400px]">
                 <p className="text-muted-foreground text-sm">

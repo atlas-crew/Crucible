@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import { ExecutionTimeline } from "@/components/execution-timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,9 +37,15 @@ const statusColor: Record<ExecutionStatus, string> = {
 };
 
 export default function AssessmentsPage() {
-  const { executions, activeExecution, setActiveExecution } = useCatalogStore();
+  const { executions, activeExecution, setActiveExecution, scenarios, fetchScenarios } = useCatalogStore();
 
   const assessments = executions.filter((e) => e.mode === "assessment");
+
+  useEffect(() => {
+    if (scenarios.length === 0) {
+      void fetchScenarios();
+    }
+  }, [fetchScenarios, scenarios.length]);
 
   return (
     <div className="space-y-6">
@@ -130,7 +137,10 @@ export default function AssessmentsPage() {
           {/* Timeline detail */}
           <div>
             {activeExecution ? (
-              <ExecutionTimeline execution={activeExecution} />
+              <ExecutionTimeline
+                execution={activeExecution}
+                scenario={scenarios.find((scenario) => scenario.id === activeExecution.scenarioId)}
+              />
             ) : (
               <Card className="flex items-center justify-center h-[400px]">
                 <p className="text-muted-foreground text-sm">
