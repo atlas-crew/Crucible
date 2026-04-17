@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ScenariosPage from '../page';
 
 // ── TASK-19: Test scenario pages search, filter, and dialog ─────────
@@ -144,40 +144,97 @@ describe('ScenariosPage', () => {
     expect(screen.getByTestId('detail-dialog')).toBeDefined();
   });
 
-  it('updates the launch target override from the input field', () => {
+  it('opens a launch dialog with the saved target prefilled', () => {
     render(<ScenariosPage />);
 
-    const targetInput = screen.getByLabelText(/target url/i);
-    fireEvent.change(targetInput, { target: { value: '  http://demo.local  ' } });
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
 
-    expect(mockSetTargetUrl).toHaveBeenCalledWith('http://demo.local');
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Launch Auth Bypass')).toBeDefined();
+    expect(within(dialog).getByLabelText(/target url/i)).toHaveValue('http://target.local');
   });
 
-  it('Simulate button launches with the selected target and routes to simulations', async () => {
+  it('launches a simulation from the dialog and persists the chosen target', async () => {
     render(<ScenariosPage />);
 
-    const simulateButtons = screen.getAllByText(/^simulate$/i);
-    fireEvent.click(simulateButtons[0]);
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: '  http://demo.local  ' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /start simulation/i }));
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://target.local');
+      expect(mockSetTargetUrl).toHaveBeenCalledWith('http://demo.local/');
+    });
+    await waitFor(() => {
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://demo.local/');
     });
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/simulations');
     });
   });
 
-  it('Assess button launches with the selected target and routes to assessments', async () => {
+  it('launches an assessment from the dialog and routes to assessments', async () => {
     render(<ScenariosPage />);
 
-    const assessButtons = screen.getAllByText(/^assess$/i);
-    fireEvent.click(assessButtons[0]);
+    fireEvent.click(screen.getAllByText(/^assess$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /start assessment/i }));
 
     await waitFor(() => {
-      expect(mockStartAssessment).toHaveBeenCalledWith('sc-1', 'http://target.local');
+      expect(mockStartAssessment).toHaveBeenCalledWith('sc-1', 'http://target.local/');
     });
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/assessments');
     });
+  });
+
+  it('lets the operator switch launch mode before confirming', async () => {
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('radio', { name: /^assessment$/i }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /start assessment/i }));
+
+    await waitFor(() => {
+      expect(mockStartAssessment).toHaveBeenCalledWith('sc-1', 'http://target.local/');
+    });
+    expect(mockStartSimulation).not.toHaveBeenCalled();
+  });
+
+  it('blocks invalid target URLs before launch', () => {
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'javascript:alert(1)' },
+    });
+
+    expect(within(dialog).getByText('Enter an http:// or https:// target URL.')).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: /start simulation/i })).toBeDisabled();
+  });
+
+  it('does not persist the saved target when launch fails', async () => {
+    mockStartSimulation.mockRejectedValueOnce(new Error('bad target'));
+    mockState.error = 'Target is invalid';
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'http://bad.local' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /start simulation/i }));
+
+    await waitFor(() => {
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://bad.local/');
+    });
+    expect(mockSetTargetUrl).not.toHaveBeenCalledWith('http://bad.local/');
+    consoleErrorSpy.mockRestore();
   });
 });

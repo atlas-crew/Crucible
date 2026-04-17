@@ -7,29 +7,40 @@ import { useCatalogStore } from "@/store/useCatalogStore"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Label } from "@/components/ui/label"
 import { ScenarioDetailDialog } from "@/components/scenario-detail-dialog"
-import { Play, ClipboardList, Search, Loader2, Crosshair, Radio } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Play, ClipboardList, Search, Loader2 } from "lucide-react"
+
+interface LaunchDialogState {
+  scenario: Scenario
+  mode: "simulation" | "assessment"
+  targetUrl: string
+}
+
+interface LaunchTargetState {
+  normalized: string | null
+  error: string | null
+}
 
 export default function ScenariosPage() {
   const router = useRouter()
   const {
     scenarios,
     isLoading,
-    error,
     targetUrl,
     targetStatus,
     fetchScenarios,
     startSimulation,
     startAssessment,
     setTargetUrl,
-    clearError,
   } = useCatalogStore()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
+  const [launchDialog, setLaunchDialog] = useState<LaunchDialogState | null>(null)
+  const [launchError, setLaunchError] = useState<string | null>(null)
+  const [launchTargetDraft, setLaunchTargetDraft] = useState<string | null>(null)
   const [launching, setLaunching] = useState<{ scenarioId: string; mode: "simulation" | "assessment" } | null>(null)
 
   useEffect(() => {
@@ -48,28 +59,70 @@ export default function ScenariosPage() {
     )
   }, [scenarios, searchQuery])
 
-  const handleTargetChange = (value: string) => {
-    if (error) {
-      clearError()
+  const launchTargetState = useMemo<LaunchTargetState>(
+    () => validateLaunchTargetInput(launchDialog?.targetUrl ?? ""),
+    [launchDialog?.targetUrl],
+  )
+
+  const openLaunchDialog = (scenario: Scenario, mode: "simulation" | "assessment") => {
+    if (launching) {
+      return
     }
-    const trimmed = value.trim()
-    setTargetUrl(trimmed.length > 0 ? trimmed : null)
+    setLaunchError(null)
+
+    setLaunchDialog({
+      scenario,
+      mode,
+      targetUrl: launchTargetDraft ?? targetUrl ?? "",
+    })
   }
 
-  const handleLaunch = async (scenarioId: string, mode: "simulation" | "assessment") => {
-    clearError()
-    setLaunching({ scenarioId, mode })
+  const closeLaunchDialog = () => {
+    if (launching) {
+      return
+    }
+
+    setLaunchDialog(null)
+    setLaunchError(null)
+  }
+
+  const handleLaunch = async () => {
+    if (!launchDialog) {
+      return
+    }
+
+    const submission = validateLaunchTargetInput(launchDialog.targetUrl)
+    if (submission.error) {
+      setLaunchError(submission.error)
+      return
+    }
+
+    setLaunchError(null)
+    const scenarioId = launchDialog.scenario.id
+    const launchMode = launchDialog.mode
+    setLaunching({ scenarioId, mode: launchMode })
 
     try {
-      if (mode === "simulation") {
-        await startSimulation(scenarioId, targetUrl)
+      if (launchMode === "simulation") {
+        await startSimulation(scenarioId, submission.normalized)
+        if (submission.normalized) {
+          setTargetUrl(submission.normalized)
+        }
+        setLaunchTargetDraft(submission.normalized ?? "")
+        setLaunchDialog(null)
         router.push("/simulations")
       } else {
-        await startAssessment(scenarioId, targetUrl)
+        await startAssessment(scenarioId, submission.normalized)
+        if (submission.normalized) {
+          setTargetUrl(submission.normalized)
+        }
+        setLaunchTargetDraft(submission.normalized ?? "")
+        setLaunchDialog(null)
         router.push("/assessments")
       }
-    } catch {
-      // The store already captures the launch error for inline display.
+    } catch (caughtError) {
+      setLaunchError(caughtError instanceof Error ? caughtError.message : "Failed to start scenario")
+      console.error("[scenarios] launch failed", caughtError)
     } finally {
       setLaunching(null)
     }
@@ -104,52 +157,15 @@ export default function ScenariosPage() {
         />
       </div>
 
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="type-heading flex items-center gap-2">
-            <Crosshair className="h-4 w-4 text-muted-foreground" />
-            Launch Target
-          </CardTitle>
-          <CardDescription>
-            Set the URL used for the next simulation or assessment run from the catalog.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-2">
-            <Label htmlFor="scenario-target-url">Target URL</Label>
-            <Input
-              id="scenario-target-url"
-              placeholder="http://localhost:8880"
-              value={targetUrl ?? ""}
-              onChange={(e) => handleTargetChange(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Radio className={cn(
-                "h-3.5 w-3.5",
-                targetStatus === "online"
-                  ? "text-success"
-                  : targetStatus === "offline"
-                    ? "text-destructive"
-                    : "text-muted-foreground"
-              )} />
-              <span className="uppercase tracking-wide">
-                {targetStatus === "online" ? "Reachable" : targetStatus === "offline" ? "Offline" : "Unchecked"}
-              </span>
-            </div>
-            <span>Leave blank to fall back to the server default target.</span>
-          </div>
-          {error && (
-            <div
-              role="alert"
-              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            >
-              {error}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {launching && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+        >
+          Starting the {launching.mode} run for this scenario. Additional launches will be available once the request finishes.
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
@@ -194,10 +210,10 @@ export default function ScenariosPage() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  disabled={launching?.scenarioId === scenario.id}
+                  disabled={launching !== null}
                   onClick={(e) => {
                     e.stopPropagation()
-                    void handleLaunch(scenario.id, "simulation")
+                    openLaunchDialog(scenario, "simulation")
                   }}
                 >
                   {launching?.scenarioId === scenario.id && launching.mode === "simulation" ? (
@@ -210,10 +226,10 @@ export default function ScenariosPage() {
                 <Button
                   size="sm"
                   className="flex-1"
-                  disabled={launching?.scenarioId === scenario.id}
+                  disabled={launching !== null}
                   onClick={(e) => {
                     e.stopPropagation()
-                    void handleLaunch(scenario.id, "assessment")
+                    openLaunchDialog(scenario, "assessment")
                   }}
                 >
                   {launching?.scenarioId === scenario.id && launching.mode === "assessment" ? (
@@ -234,8 +250,182 @@ export default function ScenariosPage() {
         open={selectedScenario !== null}
         onOpenChange={(open) => { if (!open) setSelectedScenario(null) }}
       />
+
+      <Dialog
+        open={launchDialog !== null}
+        onOpenChange={(open) => {
+          if (!open && !launching) {
+            closeLaunchDialog()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {launchDialog ? `Launch ${launchDialog.scenario.name}` : "Launch Scenario"}
+            </DialogTitle>
+            <DialogDescription>
+              Choose how to start this scenario and optionally override the target URL for this run.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p id="launch-mode-label" className="text-sm font-medium">Launch mode</p>
+              <div role="radiogroup" aria-labelledby="launch-mode-label" className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={launchDialog?.mode === "simulation" ? "default" : "outline"}
+                  role="radio"
+                  aria-checked={launchDialog?.mode === "simulation"}
+                  onClick={() => {
+                    if (!launchDialog || launching) {
+                      return
+                    }
+                    setLaunchError(null)
+                    setLaunchDialog({ ...launchDialog, mode: "simulation" })
+                  }}
+                  disabled={launching !== null}
+                >
+                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                  Simulation
+                </Button>
+                <Button
+                  type="button"
+                  variant={launchDialog?.mode === "assessment" ? "default" : "outline"}
+                  role="radio"
+                  aria-checked={launchDialog?.mode === "assessment"}
+                  onClick={() => {
+                    if (!launchDialog || launching) {
+                      return
+                    }
+                    setLaunchError(null)
+                    setLaunchDialog({ ...launchDialog, mode: "assessment" })
+                  }}
+                  disabled={launching !== null}
+                >
+                  <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+                  Assessment
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="scenario-launch-target" className="text-sm font-medium">
+                Target URL
+              </label>
+              <Input
+                id="scenario-launch-target"
+                placeholder="http://localhost:8880"
+                value={launchDialog?.targetUrl ?? ""}
+                aria-invalid={launchTargetState.error ? true : undefined}
+                onChange={(event) => {
+                  if (!launchDialog || launching) {
+                    return
+                  }
+                  setLaunchError(null)
+                  setLaunchTargetDraft(event.target.value)
+                  setLaunchDialog({ ...launchDialog, targetUrl: event.target.value })
+                }}
+                disabled={launching !== null}
+              />
+              <p className="text-sm text-muted-foreground">
+                Leave blank to fall back to the server default target for this run. The saved catalog target stays unchanged. Saved catalog target status:{" "}
+                {getTargetStatusLabel(targetStatus)}.
+              </p>
+            </div>
+
+            {launchTargetState.error && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                {launchTargetState.error}
+              </div>
+            )}
+
+            {launchError && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                {launchError}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeLaunchDialog} disabled={launching !== null}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                void handleLaunch()
+              }}
+              disabled={
+                launchDialog
+                  ? launching !== null || launchTargetState.error !== null
+                  : false
+              }
+            >
+              {launchDialog && launching?.scenarioId === launchDialog.scenario.id ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Starting…
+                </>
+              ) : launchDialog?.mode === "assessment" ? (
+                "Start assessment"
+              ) : (
+                "Start simulation"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
+}
+
+function validateLaunchTargetInput(value: string): LaunchTargetState {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return {
+      normalized: null,
+      error: null,
+    }
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return {
+        normalized: null,
+        error: "Enter an http:// or https:// target URL.",
+      }
+    }
+
+    return {
+      normalized: parsed.toString(),
+      error: null,
+    }
+  } catch {
+    return {
+      normalized: null,
+      error: "Enter a valid target URL before starting the scenario.",
+    }
+  }
+}
+
+function getTargetStatusLabel(status: "online" | "offline" | "unknown"): string {
+  switch (status) {
+    case "online":
+      return "Reachable"
+    case "offline":
+      return "Offline"
+    case "unknown":
+      return "Unchecked"
+  }
 }
 
 function getDifficultyVariant(difficulty?: string): "default" | "secondary" | "destructive" | "outline" {
