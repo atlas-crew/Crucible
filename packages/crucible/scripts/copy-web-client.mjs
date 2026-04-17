@@ -23,7 +23,10 @@ for (const relativePath of ['.next', 'public']) {
   }
 
   const targetPath = resolve(targetDir, relativePath);
-  await cp(sourcePath, targetPath, { recursive: true });
+  await mkdir(targetPath, { recursive: true });
+  // Copying the directory contents into a pre-created destination avoids
+  // intermittent mkdir races around the top-level .next folder during full workspace builds.
+  await cp(resolve(sourcePath, '.'), targetPath, { recursive: true, force: true });
 }
 
 for (const relativePath of ['.next/cache', '.next/standalone', '.next/trace', '.next/trace-build', '.next/types']) {

@@ -310,6 +310,11 @@ describe('Scenario target helpers', () => {
     expect(getScenarioTargetCompatibility(minimalScenario(), 'http://localhost:8880')).toBe('unknown');
   });
 
+  it('returns unknown compatibility when the target URL is missing', () => {
+    expect(getScenarioTargetCompatibility(minimalScenario(), null)).toBe('unknown');
+    expect(getScenarioTargetCompatibility(minimalScenario(), undefined)).toBe('unknown');
+  });
+
   it('counts blocked expectations across HTTP steps only', () => {
     const scenario = minimalScenario({
       steps: [

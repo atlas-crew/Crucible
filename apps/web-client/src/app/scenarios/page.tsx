@@ -1,18 +1,18 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   countScenarioBlockingExpectations,
   getScenarioTargetCompatibility,
   inferScenarioTargetFamily,
   inferTargetFamilyFromUrl,
-} from "@crucible/catalog"
+} from "@crucible/catalog/models/types"
 import type {
   Scenario,
   ScenarioTargetCompatibility,
   ScenarioTargetFamily,
-} from "@crucible/catalog"
+} from "@crucible/catalog/models/types"
 import { useCatalogStore } from "@/store/useCatalogStore"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -32,6 +32,13 @@ interface LaunchDialogState {
 interface LaunchTargetState {
   normalized: string | null
   error: string | null
+}
+
+interface ScenarioCatalogEntry {
+  scenario: Scenario
+  targetFamily: ScenarioTargetFamily
+  compatibility: ScenarioTargetCompatibility
+  blockingChecks: number
 }
 
 export default function ScenariosPage() {
@@ -58,9 +65,9 @@ export default function ScenariosPage() {
     fetchScenarios()
   }, [fetchScenarios])
 
-  const filtered = useMemo(() => {
+  const filtered = useMemo<ScenarioCatalogEntry[]>(() => {
     const q = searchQuery.toLowerCase()
-    const matches = searchQuery.trim()
+    const matches = (searchQuery.trim()
       ? scenarios.filter((s) =>
           s.name.toLowerCase().includes(q) ||
           s.id.toLowerCase().includes(q) ||
@@ -68,22 +75,27 @@ export default function ScenariosPage() {
           s.category?.toLowerCase().includes(q) ||
           s.tags?.some((t) => t.toLowerCase().includes(q))
         )
-      : scenarios
+      : scenarios).map((scenario) => ({
+        scenario,
+        targetFamily: inferScenarioTargetFamily(scenario),
+        compatibility: getScenarioTargetCompatibility(scenario, targetUrl),
+        blockingChecks: countScenarioBlockingExpectations(scenario),
+      }))
 
     if (!catalogTargetFamily) {
       return matches
     }
 
-    return [...matches].sort((left, right) =>
-      compareScenarioPriority(left, right, targetUrl, catalogTargetFamily),
-    )
+    return [...matches].sort((left, right) => compareScenarioPriority(left, right, catalogTargetFamily))
   }, [catalogTargetFamily, scenarios, searchQuery, targetUrl])
 
   const launchTargetState = useMemo<LaunchTargetState>(
     () => validateLaunchTargetInput(launchDialog?.targetUrl ?? ""),
     [launchDialog?.targetUrl],
   )
-  const effectiveLaunchTarget = launchTargetState.normalized ?? targetUrl ?? null
+  const effectiveLaunchTarget = launchDialog
+    ? (launchDialog.targetUrl.trim() ? launchTargetState.normalized : null)
+    : targetUrl ?? null
   const launchTargetFamily = useMemo(
     () => inferTargetFamilyFromUrl(effectiveLaunchTarget),
     [effectiveLaunchTarget],
@@ -91,14 +103,14 @@ export default function ScenariosPage() {
   const launchScenarioFamily = launchDialog
     ? inferScenarioTargetFamily(launchDialog.scenario)
     : null
-  const launchCompatibility = launchDialog
+  const launchCompatibility = launchDialog && effectiveLaunchTarget
     ? getScenarioTargetCompatibility(launchDialog.scenario, effectiveLaunchTarget)
     : "unknown"
   const launchBlockingChecks = launchDialog
     ? countScenarioBlockingExpectations(launchDialog.scenario)
     : 0
 
-  const openLaunchDialog = (scenario: Scenario, mode: "simulation" | "assessment") => {
+  const openLaunchDialog = useCallback((scenario: Scenario, mode: "simulation" | "assessment") => {
     if (launching) {
       return
     }
@@ -109,7 +121,7 @@ export default function ScenariosPage() {
       mode,
       targetUrl: launchTargetDraft ?? targetUrl ?? "",
     })
-  }
+  }, [launchTargetDraft, launching, targetUrl])
 
   const closeLaunchDialog = () => {
     if (launching) {
@@ -213,13 +225,15 @@ export default function ScenariosPage() {
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((scenario) => (
+          {filtered.map(({ scenario, targetFamily, compatibility, blockingChecks }) => (
             <ScenarioCatalogCard
               key={scenario.id}
               scenario={scenario}
-              catalogTargetUrl={targetUrl}
+              targetFamily={targetFamily}
+              compatibility={compatibility}
+              blockingChecks={blockingChecks}
               launching={launching}
-              onCardOpen={() => setSelectedScenario(scenario)}
+              onCardOpen={setSelectedScenario}
               onLaunch={openLaunchDialog}
             />
           ))}
@@ -251,15 +265,11 @@ export default function ScenariosPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <fieldset className="space-y-2">
-                <legend id="launch-mode-label" className="text-sm font-medium">Launch mode</legend>
-                <div className="grid grid-cols-2 gap-2" aria-labelledby="launch-mode-label">
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Launch mode</legend>
+              <div className="grid grid-cols-2 gap-2">
                   <label
-                    className={launchDialog?.mode === "simulation"
-                      ? "flex cursor-pointer items-center justify-center rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-                      : "flex cursor-pointer items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground"
-                    }
+                    className={getLaunchModeLabelClasses(launchDialog?.mode === "simulation", launching !== null)}
                   >
                     <input
                       type="radio"
@@ -275,14 +285,11 @@ export default function ScenariosPage() {
                       }}
                       disabled={launching !== null}
                     />
-                    <Play className="mr-1.5 h-3.5 w-3.5" />
+                    <Play aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />
                     Simulation
                   </label>
                   <label
-                    className={launchDialog?.mode === "assessment"
-                      ? "flex cursor-pointer items-center justify-center rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-                      : "flex cursor-pointer items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground"
-                    }
+                    className={getLaunchModeLabelClasses(launchDialog?.mode === "assessment", launching !== null)}
                   >
                     <input
                       type="radio"
@@ -298,12 +305,11 @@ export default function ScenariosPage() {
                       }}
                       disabled={launching !== null}
                     />
-                    <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+                    <ClipboardList aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />
                     Assessment
                   </label>
-                </div>
-              </fieldset>
-            </div>
+              </div>
+            </fieldset>
 
             <div className="space-y-2">
               <label htmlFor="scenario-launch-target" className="text-sm font-medium">
@@ -396,27 +402,27 @@ export default function ScenariosPage() {
 
 interface ScenarioCatalogCardProps {
   scenario: Scenario
-  catalogTargetUrl: string | null
+  targetFamily: ScenarioTargetFamily
+  compatibility: ScenarioTargetCompatibility
+  blockingChecks: number
   launching: { scenarioId: string; mode: "simulation" | "assessment" } | null
-  onCardOpen: () => void
+  onCardOpen: (scenario: Scenario) => void
   onLaunch: (scenario: Scenario, mode: "simulation" | "assessment") => void
 }
 
-function ScenarioCatalogCard({
+const ScenarioCatalogCard = memo(function ScenarioCatalogCard({
   scenario,
-  catalogTargetUrl,
+  targetFamily,
+  compatibility,
+  blockingChecks,
   launching,
   onCardOpen,
   onLaunch,
 }: ScenarioCatalogCardProps) {
-  const targetFamily = inferScenarioTargetFamily(scenario)
-  const compatibility = getScenarioTargetCompatibility(scenario, catalogTargetUrl)
-  const blockingChecks = countScenarioBlockingExpectations(scenario)
-
   return (
     <Card
       className="flex flex-col cursor-pointer transition-shadow hover:shadow-md hover:border-foreground/20"
-      onClick={onCardOpen}
+      onClick={() => onCardOpen(scenario)}
     >
       <CardHeader>
         <div className="mb-2 flex items-start justify-between gap-3">
@@ -497,7 +503,7 @@ function ScenarioCatalogCard({
       </CardFooter>
     </Card>
   )
-}
+})
 
 function validateLaunchTargetInput(value: string): LaunchTargetState {
   const trimmed = value.trim()
@@ -519,12 +525,12 @@ function validateLaunchTargetInput(value: string): LaunchTargetState {
       }
     }
 
-    const normalized = parsed.toString()
+    const normalized = parsed.pathname === "/"
+      ? `${parsed.origin}${parsed.search}${parsed.hash}`
+      : parsed.toString()
 
     return {
-      normalized: parsed.pathname === "/"
-        ? normalized.replace(/\/(?=(?:[?#]|$))/, "")
-        : normalized,
+      normalized,
       error: null,
     }
   } catch {
@@ -562,24 +568,39 @@ function getDifficultyVariant(difficulty?: string): "default" | "secondary" | "d
   }
 }
 
+function getLaunchModeLabelClasses(selected: boolean, disabled: boolean): string {
+  const stateClasses = selected
+    ? "border-primary bg-primary text-primary-foreground"
+    : "border-border text-foreground"
+
+  const interactionClasses = disabled
+    ? "cursor-not-allowed opacity-60"
+    : "cursor-pointer"
+
+  return [
+    "flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium",
+    "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+    stateClasses,
+    interactionClasses,
+  ].join(" ")
+}
+
 function compareScenarioPriority(
-  left: Scenario,
-  right: Scenario,
-  targetUrl: string | null,
+  left: ScenarioCatalogEntry,
+  right: ScenarioCatalogEntry,
   targetFamily: ScenarioTargetFamily,
 ): number {
-  const leftCompatibility = getScenarioTargetCompatibility(left, targetUrl)
-  const rightCompatibility = getScenarioTargetCompatibility(right, targetUrl)
-
-  const leftRank = getCompatibilityRank(leftCompatibility, inferScenarioTargetFamily(left), targetFamily)
-  const rightRank = getCompatibilityRank(rightCompatibility, inferScenarioTargetFamily(right), targetFamily)
+  const leftRank = getCompatibilityRank(left.compatibility, left.targetFamily, targetFamily)
+  const rightRank = getCompatibilityRank(right.compatibility, right.targetFamily, targetFamily)
 
   if (leftRank !== rightRank) {
     return leftRank - rightRank
   }
 
-  return left.name.localeCompare(right.name)
+  return SCENARIO_NAME_COLLATOR.compare(left.scenario.name, right.scenario.name)
 }
+
+const SCENARIO_NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: "base" })
 
 function getCompatibilityRank(
   compatibility: ScenarioTargetCompatibility,
@@ -613,7 +634,7 @@ function getTargetFamilyLabel(targetFamily: ScenarioTargetFamily): string {
       return "Unclassified"
     default: {
       const exhaustiveCheck: never = targetFamily
-      throw new Error(`Unhandled target family: ${exhaustiveCheck}`)
+      return String(exhaustiveCheck)
     }
   }
 }
