@@ -23,7 +23,8 @@
     "nanoid": "^5.0.7",
     "node-pty": "^1.1.0",
     "pdfkit": "^0.17.2",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

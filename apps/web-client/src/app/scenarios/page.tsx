@@ -7,19 +7,22 @@ import {
   getScenarioTargetCompatibility,
   inferScenarioTargetFamily,
   inferTargetFamilyFromUrl,
-} from "@crucible/catalog/models/types"
+  normalizeScenarioTargetUrl,
+} from "@crucible/catalog/client"
 import type {
   Scenario,
   ScenarioTargetCompatibility,
   ScenarioTargetFamily,
-} from "@crucible/catalog/models/types"
+} from "@crucible/catalog/client"
 import { useCatalogStore } from "@/store/useCatalogStore"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import { ScenarioDetailDialog } from "@/components/scenario-detail-dialog"
 import { Play, ClipboardList, Search, Loader2 } from "lucide-react"
 
@@ -27,6 +30,7 @@ interface LaunchDialogState {
   scenario: Scenario
   mode: "simulation" | "assessment"
   targetUrl: string
+  expectWafBlocking: boolean
 }
 
 interface LaunchTargetState {
@@ -93,9 +97,17 @@ export default function ScenariosPage() {
     () => validateLaunchTargetInput(launchDialog?.targetUrl ?? ""),
     [launchDialog?.targetUrl],
   )
-  const effectiveLaunchTarget = launchDialog
-    ? (launchDialog.targetUrl.trim() ? launchTargetState.normalized : null)
-    : targetUrl ?? null
+  const effectiveLaunchTarget = useMemo(() => {
+    if (!launchDialog) {
+      return targetUrl ?? null
+    }
+
+    if (!launchDialog.targetUrl.trim() || launchTargetState.error) {
+      return targetUrl ?? null
+    }
+
+    return launchTargetState.normalized
+  }, [launchDialog, launchTargetState.error, launchTargetState.normalized, targetUrl])
   const launchTargetFamily = useMemo(
     () => inferTargetFamilyFromUrl(effectiveLaunchTarget),
     [effectiveLaunchTarget],
@@ -120,6 +132,7 @@ export default function ScenariosPage() {
       scenario,
       mode,
       targetUrl: launchTargetDraft ?? targetUrl ?? "",
+      expectWafBlocking: true,
     })
   }, [launchTargetDraft, launching, targetUrl])
 
@@ -150,7 +163,10 @@ export default function ScenariosPage() {
 
     try {
       if (launchMode === "simulation") {
-        await startSimulation(scenarioId, submission.normalized)
+        await startSimulation(scenarioId, {
+          targetUrl: submission.normalized,
+          expectWafBlocking: launchDialog.expectWafBlocking,
+        })
         if (submission.normalized) {
           setTargetUrl(submission.normalized)
         }
@@ -336,6 +352,33 @@ export default function ScenariosPage() {
               </p>
             </div>
 
+            {launchDialog?.mode === "simulation" && (
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="simulation-waf-blocking" className="text-sm font-medium">
+                      Expect WAF blocking
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Turn this off when this simulation run should treat allowed attack responses as the expected outcome for <code>expect.blocked</code> assertions instead of requiring a 403 or 429 block.
+                    </p>
+                  </div>
+                  <Switch
+                    id="simulation-waf-blocking"
+                    checked={launchDialog.expectWafBlocking}
+                    onCheckedChange={(checked) => {
+                      if (!launchDialog || launching) {
+                        return
+                      }
+                      setLaunchDialog({ ...launchDialog, expectWafBlocking: checked })
+                    }}
+                    disabled={launching !== null}
+                    aria-label="Expect WAF blocking"
+                  />
+                </div>
+              </div>
+            )}
+
             {launchTargetState.error && (
               <div
                 role="alert"
@@ -345,13 +388,19 @@ export default function ScenariosPage() {
               </div>
             )}
 
-            {launchCompatibility === "incompatible" && launchTargetFamily && launchScenarioFamily && (
+            {!targetUrl && (launchTargetState.error || !launchDialog?.targetUrl.trim()) && (
+              <div className="rounded-md border border-border/60 bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                Compatibility guidance will appear once the target URL is valid.
+              </div>
+            )}
+
+            {!launchTargetState.error && launchCompatibility === "incompatible" && launchTargetFamily && launchScenarioFamily && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
                 This scenario is labeled for <span className="font-medium">{getTargetFamilyLabel(launchScenarioFamily)}</span>, but the target URL looks like <span className="font-medium">{getTargetFamilyLabel(launchTargetFamily)}</span>. It may fail because the endpoint families do not line up.
               </div>
             )}
 
-            {launchTargetFamily === "chimera" && launchBlockingChecks > 0 && (
+            {!launchTargetState.error && launchTargetFamily === "chimera" && launchBlockingChecks > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
                 This scenario includes <span className="font-medium">{launchBlockingChecks}</span> blocking {launchBlockingChecks === 1 ? "assertion" : "assertions"}. Live Chimera is intentionally vulnerable, so assessments may fail by design when those attacks succeed.
               </div>
@@ -506,37 +555,26 @@ const ScenarioCatalogCard = memo(function ScenarioCatalogCard({
 })
 
 function validateLaunchTargetInput(value: string): LaunchTargetState {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return {
-      normalized: null,
-      error: null,
-    }
-  }
-
   try {
-    const parsed = new URL(trimmed)
-    parsed.username = ""
-    parsed.password = ""
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return {
-        normalized: null,
-        error: "Enter an http:// or https:// target URL.",
-      }
-    }
-
-    const normalized = parsed.pathname === "/"
-      ? `${parsed.origin}${parsed.search}${parsed.hash}`
-      : parsed.toString()
-
     return {
-      normalized,
+      normalized: normalizeScenarioTargetUrl(value) ?? null,
       error: null,
     }
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Enter a valid target URL before starting the scenario."
+    const catalogPrefix = "Scenario target URL "
     return {
       normalized: null,
-      error: "Enter a valid target URL before starting the scenario.",
+      error:
+        message === "Scenario target URL must use http or https"
+          ? "Enter an http:// or https:// target URL."
+          : message === "Scenario target URL must not include credentials"
+            ? "Target URLs must not include credentials."
+            : message === "Scenario target URL must not include a fragment"
+              ? "Target URLs must not include fragments."
+              : message.startsWith(catalogPrefix)
+                ? `Target URL ${message.slice(catalogPrefix.length)}.`
+                : "Enter a valid target URL before starting the scenario.",
     }
   }
 }
@@ -634,7 +672,8 @@ function getTargetFamilyLabel(targetFamily: ScenarioTargetFamily): string {
       return "Unclassified"
     default: {
       const exhaustiveCheck: never = targetFamily
-      return String(exhaustiveCheck)
+      console.warn("Unsupported scenario target family label", exhaustiveCheck)
+      return `Unknown family (${String(exhaustiveCheck)})`
     }
   }
 }

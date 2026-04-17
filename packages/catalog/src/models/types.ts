@@ -338,6 +338,44 @@ export function inferTargetFamilyFromUrl(
   }
 }
 
+export class ScenarioTargetUrlError extends Error {}
+
+export function normalizeScenarioTargetUrl(value: string | null | undefined): string | undefined {
+  if (value == null) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmed);
+  } catch {
+    throw new ScenarioTargetUrlError('Scenario target URL must be a valid absolute URL');
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    throw new ScenarioTargetUrlError('Scenario target URL must use http or https');
+  }
+
+  if (!parsedUrl.hostname) {
+    throw new ScenarioTargetUrlError('Scenario target URL must include a hostname');
+  }
+
+  if (parsedUrl.username || parsedUrl.password) {
+    throw new ScenarioTargetUrlError('Scenario target URL must not include credentials');
+  }
+
+  if (parsedUrl.hash) {
+    throw new ScenarioTargetUrlError('Scenario target URL must not include a fragment');
+  }
+
+  return parsedUrl.toString().replace(/\/+$/, '');
+}
+
 export function getScenarioTargetCompatibility(
   scenario: Pick<Scenario, 'id' | 'tags' | 'target'>,
   targetUrl?: string | null,

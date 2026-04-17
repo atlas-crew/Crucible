@@ -75,6 +75,17 @@ export interface ScenarioEngineOptions {
   outboundAllowlist?: string;
 }
 
+interface AssertionContext {
+  blockedExpectationOverride?: boolean;
+}
+
+function validateSimulationTriggerData(triggerData?: Record<string, unknown>): void {
+  const override = triggerData?.expectWafBlocking;
+  if (override !== undefined && typeof override !== 'boolean') {
+    throw new Error('Simulation triggerData.expectWafBlocking must be a boolean when provided');
+  }
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const DEFAULT_TARGET_URL = 'http://localhost:8880';
@@ -193,6 +204,9 @@ export class ScenarioEngine extends EventEmitter {
       throw new Error(
         `Scenario ${scenarioId} contains runner steps that are not executable yet: ${unsupportedStepTypes.join(', ')}`,
       );
+    }
+    if (mode === 'simulation') {
+      validateSimulationTriggerData(triggerData);
     }
 
     // Resolve the effective target for this run. Validation runs before any
@@ -402,7 +416,9 @@ export class ScenarioEngine extends EventEmitter {
                   this.runExtract(httpStep.extract, response, context);
                 }
 
-                const assertions = httpStep ? this.evaluateAssertions(httpStep, response) : [];
+                const assertions = httpStep
+                  ? this.evaluateAssertions(httpStep, response, this.getAssertionContext(execution))
+                  : [];
                 if (assertions.length > 0) {
                   result.assertions = assertions;
                 }
@@ -807,6 +823,7 @@ export class ScenarioEngine extends EventEmitter {
   private evaluateAssertions(
     step: ScenarioHttpStep,
     response: { status: number; headers: Record<string, string>; body: unknown },
+    context: AssertionContext,
   ): AssertionResult[] {
     const results: AssertionResult[] = [];
     const expect = step.expect;
@@ -824,11 +841,19 @@ export class ScenarioEngine extends EventEmitter {
     if (expect.blocked !== undefined) {
       // A blocked request returns 403 or 429
       const isBlocked = response.status === 403 || response.status === 429;
+      const expectedBlocked = context.blockedExpectationOverride ?? expect.blocked;
+      const blockedExpectationWasOverridden = expectedBlocked !== expect.blocked;
       results.push({
         field: 'blocked',
-        expected: expect.blocked,
+        expected: expectedBlocked,
         actual: isBlocked,
-        passed: expect.blocked === isBlocked,
+        passed: expectedBlocked === isBlocked,
+        ...(blockedExpectationWasOverridden
+          ? {
+              overridden: true,
+              authoredExpected: expect.blocked,
+            }
+          : {}),
       });
     }
 
@@ -877,6 +902,20 @@ export class ScenarioEngine extends EventEmitter {
     }
 
     return results;
+  }
+
+  private getAssertionContext(
+    execution: Pick<ScenarioExecution, 'mode' | 'triggerData'>,
+  ): AssertionContext {
+    if (execution.mode !== 'simulation') {
+      return {};
+    }
+
+    // Defensive: triggerData can come from persisted executions or internal callers
+    // that bypass the route-level schema validation.
+    validateSimulationTriggerData(execution.triggerData);
+    const override = execution.triggerData?.expectWafBlocking;
+    return typeof override === 'boolean' ? { blockedExpectationOverride: override } : {};
   }
 
   // ── Execution control methods ────────────────────────────────────

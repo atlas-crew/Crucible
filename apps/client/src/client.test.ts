@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CrucibleClient } from './client.js';
-import { CrucibleApiError } from './errors.js';
+import { CrucibleApiError, CrucibleClientValidationError } from './errors.js';
 
 function mockFetch(body: unknown, options?: { status?: number; statusText?: string }) {
   const status = options?.status ?? 200;
@@ -189,11 +189,64 @@ describe('CrucibleClient', () => {
       fetch = mockFetch({ executionId: 'e1', mode: 'simulation', wsUrl: 'ws://...' });
       client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
 
-      await client.simulations.start('s1', { key: 'value' });
+      await client.simulations.start('s1', { triggerData: { expectWafBlocking: false } });
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/simulations',
         expect.objectContaining({
-          body: JSON.stringify({ scenarioId: 's1', key: 'value' }),
+          body: JSON.stringify({
+            scenarioId: 's1',
+            triggerData: { expectWafBlocking: false },
+          }),
+        }),
+      );
+    });
+
+    it('start() preserves legacy top-level triggerData fields for backward compatibility', async () => {
+      fetch = mockFetch({ executionId: 'e1', mode: 'simulation', wsUrl: 'ws://...' });
+      client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
+
+      await client.simulations.start('s1', { expectWafBlocking: false });
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/simulations',
+        expect.objectContaining({
+          body: JSON.stringify({
+            scenarioId: 's1',
+            triggerData: { expectWafBlocking: false },
+          }),
+        }),
+      );
+    });
+
+    it('start() prefers nested triggerData over deprecated top-level keys', async () => {
+      fetch = mockFetch({ executionId: 'e1', mode: 'simulation', wsUrl: 'ws://...' });
+      client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
+
+      const result = client.simulations.start('s1', {
+        expectWafBlocking: false,
+        triggerData: { expectWafBlocking: true },
+      });
+      await expect(result).rejects.toBeInstanceOf(CrucibleClientValidationError);
+      await expect(result).rejects.toThrow(
+        'Cannot pass expectWafBlocking both at the top level and under triggerData.',
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('start() ignores nested undefined overrides when a top-level value is provided', async () => {
+      fetch = mockFetch({ executionId: 'e1', mode: 'simulation', wsUrl: 'ws://...' });
+      client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
+
+      await client.simulations.start('s1', {
+        expectWafBlocking: false,
+        triggerData: { expectWafBlocking: undefined },
+      });
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/simulations',
+        expect.objectContaining({
+          body: JSON.stringify({
+            scenarioId: 's1',
+            triggerData: { expectWafBlocking: false },
+          }),
         }),
       );
     });
@@ -208,6 +261,29 @@ describe('CrucibleClient', () => {
       const result = await client.assessments.start('s1');
       expect(result).toEqual(response);
     });
+
+    it('start() forwards assessment triggerData when supplied', async () => {
+      const response = { executionId: 'e1', mode: 'assessment', reportUrl: '/api/reports/e1' };
+      fetch = mockFetch(response);
+      client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
+
+      await client.assessments.start('s1', {
+        targetUrl: 'http://demo.local',
+        triggerData: { note: 'legacy-compatible' },
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/assessments',
+        expect.objectContaining({
+          body: JSON.stringify({
+            scenarioId: 's1',
+            targetUrl: 'http://demo.local',
+            triggerData: { note: 'legacy-compatible' },
+          }),
+        }),
+      );
+    });
+
   });
 
   describe('reports', () => {

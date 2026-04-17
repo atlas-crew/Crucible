@@ -10,6 +10,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
     "./models/types": {
       "import": "./dist/models/types.js",
       "types": "./dist/models/types.d.ts"

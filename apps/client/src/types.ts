@@ -160,6 +160,8 @@ export interface AssertionResult {
   expected: unknown;
   actual: unknown;
   passed: boolean;
+  overridden?: boolean;
+  authoredExpected?: unknown;
 }
 
 export interface RunnerSummary {
@@ -218,6 +220,10 @@ export interface PausedState {
   context: Record<string, unknown>;
   passedSteps: number;
   stepResults: Record<string, ExecutionStepResult>;
+}
+
+export interface SimulationTriggerData extends Record<string, unknown> {
+  expectWafBlocking?: boolean;
 }
 
 export interface ScenarioExecution {
@@ -370,7 +376,25 @@ export interface WebSocketCommand {
 
 // ── Trigger data ────────────────────────────────────────────────────
 
-export type TriggerData = Record<string, unknown>;
+export interface SimulationLaunchOptions {
+  targetUrl?: string | null;
+  triggerData?: SimulationTriggerData;
+  /**
+   * @deprecated Pass triggerData.expectWafBlocking instead.
+   */
+  expectWafBlocking?: boolean;
+}
+
+export type SimulationStartOptions = SimulationLaunchOptions;
+
+export type AssessmentTriggerData = Record<string, unknown> & {
+  expectWafBlocking?: never;
+};
+
+export interface AssessmentStartOptions {
+  targetUrl?: string | null;
+  triggerData?: AssessmentTriggerData;
+}
 
 // ── Report options ──────────────────────────────────────────────────
 

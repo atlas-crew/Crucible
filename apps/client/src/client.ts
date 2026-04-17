@@ -1,8 +1,9 @@
 import type { Scenario, ScenarioExecution } from './types.js';
-import { CrucibleApiError } from './errors.js';
+import { CrucibleApiError, CrucibleClientValidationError } from './errors.js';
 import { CrucibleSocket } from './socket.js';
 import type {
   AssessmentResponse,
+  AssessmentStartOptions,
   BulkActionResponse,
   CrucibleClientOptions,
   CrucibleSocketOptions,
@@ -12,8 +13,17 @@ import type {
   OkResponse,
   RestartResponse,
   SimulationResponse,
-  TriggerData,
+  SimulationStartOptions,
 } from './types.js';
+
+function stripUndefinedValues<T extends Record<string, unknown>>(value: T | undefined): Partial<T> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const definedEntries = Object.entries(value).filter(([, entryValue]) => entryValue !== undefined);
+  return definedEntries.length > 0 ? Object.fromEntries(definedEntries) as Partial<T> : undefined;
+}
 
 /**
  * Typed client for the Crucible REST API.
@@ -192,9 +202,41 @@ class ExecutionsNamespace {
 class SimulationsNamespace {
   constructor(private client: CrucibleClient) {}
 
-  /** Start a simulation for a scenario. */
-  async start(scenarioId: string, triggerData?: TriggerData): Promise<SimulationResponse> {
-    return this.client.post(`${this.client.api}/simulations`, { scenarioId, ...triggerData });
+  /**
+   * Start a simulation for a scenario.
+   * Deprecated top-level expectWafBlocking may be used during the migration window,
+   * but it cannot be combined with triggerData.expectWafBlocking.
+   */
+  async start(scenarioId: string, options?: SimulationStartOptions): Promise<SimulationResponse> {
+    const payload: Record<string, unknown> = { scenarioId };
+    if (options && 'targetUrl' in options) {
+      payload.targetUrl = options.targetUrl;
+    }
+
+    if (options) {
+      const nestedTriggerData = stripUndefinedValues(options.triggerData);
+      if (
+        options.expectWafBlocking !== undefined
+        && nestedTriggerData?.expectWafBlocking !== undefined
+      ) {
+        throw new CrucibleClientValidationError(
+          'Cannot pass expectWafBlocking both at the top level and under triggerData.',
+        );
+      }
+      const mergedTriggerData =
+        options.expectWafBlocking !== undefined || nestedTriggerData
+          ? {
+              ...(options.expectWafBlocking !== undefined ? { expectWafBlocking: options.expectWafBlocking } : {}),
+              ...(nestedTriggerData ?? {}),
+            }
+          : undefined;
+
+      if (mergedTriggerData && Object.keys(mergedTriggerData).length > 0) {
+        payload.triggerData = mergedTriggerData;
+      }
+    }
+
+    return this.client.post(`${this.client.api}/simulations`, payload);
   }
 }
 
@@ -202,8 +244,12 @@ class AssessmentsNamespace {
   constructor(private client: CrucibleClient) {}
 
   /** Start an assessment for a scenario. */
-  async start(scenarioId: string, triggerData?: TriggerData): Promise<AssessmentResponse> {
-    return this.client.post(`${this.client.api}/assessments`, { scenarioId, ...triggerData });
+  async start(scenarioId: string, options?: AssessmentStartOptions): Promise<AssessmentResponse> {
+    return this.client.post(`${this.client.api}/assessments`, {
+      scenarioId,
+      ...(options && 'targetUrl' in options ? { targetUrl: options.targetUrl } : {}),
+      ...(options?.triggerData ? { triggerData: options.triggerData } : {}),
+    });
   }
 }
 

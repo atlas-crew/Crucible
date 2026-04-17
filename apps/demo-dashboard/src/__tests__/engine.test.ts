@@ -480,6 +480,92 @@ describe('ScenarioEngine', () => {
       );
     });
 
+    it('simulation mode can override blocked expectations to allow attack success', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-sim-override',
+        name: 'Assert Simulation Override',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: { blocked: true },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'allowed'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-sim-override', 'simulation', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('completed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'blocked',
+            expected: false,
+            actual: false,
+            passed: true,
+            overridden: true,
+            authoredExpected: true,
+          }),
+        ]),
+      );
+    });
+
+    it('assessment mode ignores the simulation blocked-expectation override', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-assessment-override',
+        name: 'Assert Assessment Override',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: { blocked: true },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'allowed'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-assessment-override', 'assessment', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ field: 'blocked', expected: true, actual: false, passed: false }),
+        ]),
+      );
+    });
+
+    it('rejects a simulation override when it is not boolean', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-invalid-sim-override',
+        name: 'Assert Invalid Simulation Override',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: { blocked: true },
+          },
+        ],
+      });
+      await expect(engine.startScenario('assert-invalid-sim-override', 'simulation', {
+        expectWafBlocking: 'false',
+      } as any)).rejects.toThrow('must be a boolean');
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(engine.listExecutions()).toHaveLength(0);
+    });
+
     // ── TASK-2: bodyContains ──────────────────────────────────────────
 
     it('bodyContains passes when substring is present', async () => {

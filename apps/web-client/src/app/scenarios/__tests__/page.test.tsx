@@ -185,10 +185,31 @@ describe('ScenariosPage', () => {
       expect(mockSetTargetUrl).toHaveBeenCalledWith('http://demo.local');
     });
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://demo.local');
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', {
+        targetUrl: 'http://demo.local',
+        expectWafBlocking: true,
+      });
     });
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/simulations');
+    });
+  });
+
+  it('lets the operator disable WAF-blocking expectations for a simulation run', async () => {
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    const blockingToggle = within(dialog).getByRole('switch', { name: /expect waf blocking/i });
+
+    fireEvent.click(blockingToggle);
+    fireEvent.click(within(dialog).getByRole('button', { name: /start simulation/i }));
+
+    await waitFor(() => {
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', {
+        targetUrl: 'http://target.local',
+        expectWafBlocking: false,
+      });
     });
   });
 
@@ -197,6 +218,7 @@ describe('ScenariosPage', () => {
 
     fireEvent.click(screen.getAllByText(/^assess$/i)[0]);
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByRole('switch', { name: /expect waf blocking/i })).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /start assessment/i }));
 
     await waitFor(() => {
@@ -213,6 +235,7 @@ describe('ScenariosPage', () => {
     fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
     const dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: /^assessment$/i }));
+    expect(within(dialog).queryByRole('switch', { name: /expect waf blocking/i })).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /start assessment/i }));
 
     await waitFor(() => {
@@ -287,8 +310,44 @@ describe('ScenariosPage', () => {
       target: { value: 'http//missing-colon' },
     });
 
-    expect(within(dialog).getByText('Enter a valid target URL before starting the scenario.')).toBeDefined();
+    expect(within(dialog).getByText('Target URL must be a valid absolute URL.')).toBeDefined();
     expect(within(dialog).getByRole('button', { name: /start simulation/i })).toBeDisabled();
+  });
+
+  it('shows a compatibility hint while the first target URL is still invalid', () => {
+    mockState.targetUrl = null;
+
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'http//missing-colon' },
+    });
+
+    expect(within(dialog).getByText('Compatibility guidance will appear once the target URL is valid.')).toBeDefined();
+  });
+
+  it('suppresses stale compatibility guidance while an edited target is invalid', () => {
+    mockState.scenarios = [
+      makeScenario({
+        id: 'crapi-bola',
+        name: 'crAPI BOLA',
+        tags: ['crapi'],
+      }),
+    ];
+    mockState.targetUrl = 'http://localhost:8880';
+
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /simulate/i }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'http//missing-colon' },
+    });
+
+    expect(within(dialog).queryByText('Compatibility guidance will appear once the target URL is valid.')).toBeNull();
+    expect(within(dialog).queryByText(/this scenario is labeled for/i)).toBeNull();
   });
 
   it('falls back to the server default target when the override is blank', async () => {
@@ -302,7 +361,10 @@ describe('ScenariosPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /start simulation/i }));
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', null);
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', {
+        targetUrl: null,
+        expectWafBlocking: true,
+      });
     });
     expect(mockSetTargetUrl).not.toHaveBeenCalled();
 
@@ -311,7 +373,7 @@ describe('ScenariosPage', () => {
     expect(within(reopenedDialog).getByLabelText(/target url/i)).toHaveValue('http://target.local');
   });
 
-  it('strips credentials and trailing slashes from accepted target URLs', async () => {
+  it('rejects target URLs with embedded credentials', () => {
     render(<ScenariosPage />);
 
     fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
@@ -319,12 +381,53 @@ describe('ScenariosPage', () => {
     fireEvent.change(within(dialog).getByLabelText(/target url/i), {
       target: { value: 'http://user:secret@demo.local/' },
     });
+
+    expect(within(dialog).getByText('Target URLs must not include credentials.')).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: /start simulation/i })).toBeDisabled();
+  });
+
+  it('rejects target URLs with fragments', () => {
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'http://demo.local/#frag' },
+    });
+
+    expect(within(dialog).getByText('Target URLs must not include fragments.')).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: /start simulation/i })).toBeDisabled();
+  });
+
+  it('surfaces specific absolute-url guidance for malformed target URLs', () => {
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'http://' },
+    });
+
+    expect(within(dialog).getByText('Target URL must be a valid absolute URL.')).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: /start simulation/i })).toBeDisabled();
+  });
+
+  it('preserves queries while trimming a root slash from accepted target URLs', async () => {
+    render(<ScenariosPage />);
+
+    fireEvent.click(screen.getAllByText(/^simulate$/i)[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/target url/i), {
+      target: { value: 'http://demo.local/?q=1' },
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: /start simulation/i }));
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://demo.local');
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', {
+        targetUrl: 'http://demo.local/?q=1',
+        expectWafBlocking: true,
+      });
     });
-    expect(mockSetTargetUrl).toHaveBeenCalledWith('http://demo.local');
   });
 
   it('does not persist the saved target when launch fails', async () => {
@@ -342,7 +445,10 @@ describe('ScenariosPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /start simulation/i }));
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', 'http://bad.local');
+      expect(mockStartSimulation).toHaveBeenCalledWith('sc-1', {
+        targetUrl: 'http://bad.local',
+        expectWafBlocking: true,
+      });
     });
     expect(mockSetTargetUrl).not.toHaveBeenCalledWith('http://bad.local');
     consoleErrorSpy.mockRestore();

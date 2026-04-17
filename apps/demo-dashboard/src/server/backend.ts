@@ -5,8 +5,11 @@ import cors from 'cors';
 import express, { type Express, type Request, type Response } from 'express';
 import { config } from 'dotenv';
 import { WebSocketServer } from 'ws';
+import { normalizeScenarioTargetUrl, ScenarioTargetUrlError } from '@crucible/catalog/client';
+import { z } from 'zod';
 import { ReportService } from './reports.js';
 import { TerminalService } from './terminal.js';
+import type { SimulationTriggerData } from '../shared/types.js';
 import {
   createCrucibleRuntime,
   type CreateCrucibleRuntimeOptions,
@@ -28,6 +31,161 @@ export interface CrucibleBackendHandle extends CrucibleRuntime {
   wsPath: string;
   wss: WebSocketServer;
   close: () => void;
+}
+
+const LaunchTargetUrlSchema: z.ZodType<string | null | undefined> = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value, ctx) => {
+    if (value == null) {
+      return value;
+    }
+
+    try {
+      return normalizeScenarioTargetUrl(value);
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error instanceof Error ? error.message : 'Scenario target URL is invalid',
+      });
+      return z.NEVER;
+    }
+  });
+
+const SimulationTriggerDataSchema: z.ZodType<SimulationTriggerData> = z
+  .object({
+    expectWafBlocking: z.boolean().optional(),
+  })
+  .catchall(z.unknown());
+
+const LegacyTriggerDataSchema = z.record(z.string(), z.unknown());
+
+function stripUndefinedValues<T extends Record<string, unknown>>(value: T | undefined): Partial<T> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const definedEntries = Object.entries(value).filter(([, entryValue]) => entryValue !== undefined);
+  return definedEntries.length > 0 ? Object.fromEntries(definedEntries) as Partial<T> : undefined;
+}
+
+function addOverlapIssue(ctx: z.RefinementCtx, key: string): void {
+  const message =
+    'Pass overlapping triggerData keys either at the top level or under triggerData, not both ('
+    + key
+    + ')';
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    message,
+    path: [key],
+  });
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    message,
+    path: ['triggerData', key],
+  });
+}
+
+const SimulationLaunchRequestSchema = z
+  .object({
+    scenarioId: z.string().min(1, 'scenarioId is required'),
+    targetUrl: LaunchTargetUrlSchema,
+    triggerData: SimulationTriggerDataSchema.optional(),
+  })
+  .strict();
+
+const RawSimulationLaunchRequestSchema = z
+  .object({
+    scenarioId: z.string().min(1, 'scenarioId is required'),
+    targetUrl: LaunchTargetUrlSchema,
+    triggerData: SimulationTriggerDataSchema.optional(),
+    expectWafBlocking: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.expectWafBlocking !== undefined
+      && value.triggerData?.expectWafBlocking !== undefined
+    ) {
+      addOverlapIssue(ctx, 'expectWafBlocking');
+    }
+  });
+
+const AssessmentLaunchRequestSchema = z
+  .object({
+    scenarioId: z.string().min(1, 'scenarioId is required'),
+    targetUrl: LaunchTargetUrlSchema,
+    triggerData: LegacyTriggerDataSchema.optional(),
+  })
+  .strict();
+
+const RawAssessmentLaunchRequestSchema = z
+  .object({
+    scenarioId: z.string().min(1, 'scenarioId is required'),
+    targetUrl: LaunchTargetUrlSchema,
+    triggerData: LegacyTriggerDataSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.triggerData?.expectWafBlocking !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'expectWafBlocking is only supported for simulation launches',
+        path: ['triggerData', 'expectWafBlocking'],
+      });
+    }
+  });
+
+export type SimulationLaunchRequest = z.infer<typeof SimulationLaunchRequestSchema>;
+export type AssessmentLaunchRequest = z.infer<typeof AssessmentLaunchRequestSchema>;
+
+function isScenarioTargetUrlError(error: unknown): boolean {
+  return error instanceof ScenarioTargetUrlError;
+}
+
+export function parseSimulationLaunchRequest(
+  body: unknown,
+): z.SafeParseReturnType<unknown, SimulationLaunchRequest> {
+  const parsed = RawSimulationLaunchRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return parsed;
+  }
+
+  const { scenarioId, targetUrl, triggerData, expectWafBlocking } = parsed.data;
+  const sanitizedTriggerData = stripUndefinedValues(triggerData);
+  const mergedTriggerData =
+    expectWafBlocking !== undefined || sanitizedTriggerData
+      ? {
+          ...(expectWafBlocking !== undefined ? { expectWafBlocking } : {}),
+          ...(sanitizedTriggerData ?? {}),
+        }
+      : undefined;
+
+  return SimulationLaunchRequestSchema.safeParse({
+    scenarioId,
+    targetUrl,
+    ...(mergedTriggerData && Object.keys(mergedTriggerData).length > 0 ? { triggerData: mergedTriggerData } : {}),
+  });
+}
+
+export function parseAssessmentLaunchRequest(
+  body: unknown,
+): z.SafeParseReturnType<unknown, AssessmentLaunchRequest> {
+  return RawAssessmentLaunchRequestSchema.safeParse(body);
+}
+
+function formatValidationError(error: z.ZodError) {
+  return {
+    error: error.issues[0]?.message ?? 'Invalid request',
+    issues: error.issues.map((issue) => ({
+      code: issue.code,
+      message: issue.message,
+      path: issue.path.join('.'),
+    })),
+  };
 }
 
 export function attachCrucibleBackend(
@@ -179,44 +337,48 @@ export function attachCrucibleBackend(
 
   app.post(`${apiBasePath}/simulations`, async (req, res) => {
     try {
-      const { scenarioId, targetUrl, ...triggerData } = req.body;
-      if (!scenarioId) {
-        return res.status(400).json({ error: 'scenarioId is required' });
+      const parsedRequest = parseSimulationLaunchRequest(req.body);
+      if (!parsedRequest.success) {
+        return res.status(400).json(formatValidationError(parsedRequest.error));
       }
+
+      const { scenarioId, targetUrl, triggerData } = parsedRequest.data;
 
       const executionId = await engine.startScenario(
         scenarioId,
         'simulation',
         triggerData,
         undefined,
-        normalizeLaunchTargetUrl(targetUrl),
+        targetUrl ?? undefined,
       );
       res.json({ executionId, mode: 'simulation', wsUrl: buildWebSocketUrl(req, wsPath) });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start simulation';
-      const status = error instanceof ScenarioTargetUrlError ? 400 : 500;
+      const status = isScenarioTargetUrlError(error) ? 400 : 500;
       res.status(status).json({ error: message });
     }
   });
 
   app.post(`${apiBasePath}/assessments`, async (req, res) => {
     try {
-      const { scenarioId, targetUrl, ...triggerData } = req.body;
-      if (!scenarioId) {
-        return res.status(400).json({ error: 'scenarioId is required' });
+      const parsedRequest = parseAssessmentLaunchRequest(req.body);
+      if (!parsedRequest.success) {
+        return res.status(400).json(formatValidationError(parsedRequest.error));
       }
+
+      const { scenarioId, targetUrl, triggerData } = parsedRequest.data;
 
       const executionId = await engine.startScenario(
         scenarioId,
         'assessment',
         triggerData,
         undefined,
-        normalizeLaunchTargetUrl(targetUrl),
+        targetUrl ?? undefined,
       );
       res.json({ executionId, mode: 'assessment', reportUrl: `${apiBasePath}/reports/${executionId}` });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start assessment';
-      const status = error instanceof ScenarioTargetUrlError ? 400 : 500;
+      const status = isScenarioTargetUrlError(error) ? 400 : 500;
       res.status(status).json({ error: message });
     }
   });
@@ -286,44 +448,6 @@ export function attachCrucibleBackend(
       db.close();
     },
   };
-}
-
-class ScenarioTargetUrlError extends Error {}
-
-function normalizeLaunchTargetUrl(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(trimmed);
-  } catch {
-    throw new ScenarioTargetUrlError('Scenario target URL must be a valid absolute URL');
-  }
-
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    throw new ScenarioTargetUrlError('Scenario target URL must use http or https');
-  }
-
-  if (!parsedUrl.hostname) {
-    throw new ScenarioTargetUrlError('Scenario target URL must include a hostname');
-  }
-
-  if (parsedUrl.username || parsedUrl.password) {
-    throw new ScenarioTargetUrlError('Scenario target URL must not include credentials');
-  }
-
-  if (parsedUrl.hash) {
-    throw new ScenarioTargetUrlError('Scenario target URL must not include a fragment');
-  }
-
-  return trimmed.replace(/\/+$/, '');
 }
 
 function matchesWebSocketPath(request: IncomingMessage, wsPath: string): boolean {

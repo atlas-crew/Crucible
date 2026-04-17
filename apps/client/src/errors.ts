@@ -18,3 +18,10 @@ export class CrucibleApiError extends Error {
     this.body = body;
   }
 }
+
+export class CrucibleClientValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CrucibleClientValidationError';
+  }
+}

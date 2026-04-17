@@ -16,6 +16,12 @@ export interface AssertionResult {
   expected: unknown;
   actual: unknown;
   passed: boolean;
+  overridden?: boolean;
+  authoredExpected?: unknown;
+}
+
+export interface SimulationTriggerData extends Record<string, unknown> {
+  expectWafBlocking?: boolean;
 }
 
 export type RunnerFindingSeverity =

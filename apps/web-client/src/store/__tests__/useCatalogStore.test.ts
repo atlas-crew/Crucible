@@ -534,6 +534,29 @@ describe('useCatalogStore', () => {
       expect(id).toBe('exec-123');
     });
 
+    it('includes the simulation blocked-expectation override in launch payloads', async () => {
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(200, { executionId: 'exec-123' }));
+
+      await useCatalogStore.getState().startSimulation('scenario-1', {
+        targetUrl: 'http://demo.local',
+        expectWafBlocking: false,
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/simulations'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            scenarioId: 'scenario-1',
+            targetUrl: 'http://demo.local',
+            triggerData: {
+              expectWafBlocking: false,
+            },
+          }),
+        }),
+      );
+    });
+
     it('sets error and throws on failure', async () => {
       mockFetch.mockResolvedValueOnce(mockJsonResponse(500, {}));
 
@@ -542,6 +565,19 @@ describe('useCatalogStore', () => {
       );
 
       expect(useCatalogStore.getState().error).toBe('HTTP 500');
+    });
+
+    it('preserves a saved target URL when normalization fails before launch', async () => {
+      useCatalogStore.setState({ targetUrl: 'ftp://bad.local', targetStatus: 'online' });
+
+      await expect(useCatalogStore.getState().startSimulation('scenario-1')).rejects.toThrow(
+        'Scenario target URL must use http or https',
+      );
+
+      const state = useCatalogStore.getState();
+      expect(state.targetUrl).toBe('ftp://bad.local');
+      expect(state.targetStatus).toBe('online');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 

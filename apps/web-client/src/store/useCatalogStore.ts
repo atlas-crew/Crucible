@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { normalizeScenarioTargetUrl } from '@crucible/catalog/client';
 import type { Scenario } from '@crucible/catalog';
 
 // ── Types (mirrors demo-dashboard/shared/types.ts) ──────────────────
@@ -28,6 +29,10 @@ export interface AssertionResult {
   expected: unknown;
   actual: unknown;
   passed: boolean;
+}
+
+export interface SimulationTriggerData extends Record<string, unknown> {
+  expectWafBlocking?: boolean;
 }
 
 export type RunnerFindingSeverity =
@@ -141,6 +146,11 @@ export interface ExecutionHistoryFilters {
   dateTo: string;
 }
 
+interface SimulationLaunchOptions {
+  targetUrl?: string | null;
+  expectWafBlocking?: SimulationTriggerData['expectWafBlocking'];
+}
+
 type ExecutionMetricsSnapshot = Omit<ExecutionMetricsPoint, 'timestamp'>;
 
 const DEFAULT_METRICS_HISTORY_LIMIT = 60;
@@ -200,7 +210,7 @@ interface CatalogState {
   resetExecutionHistory: () => void;
   fetchHealth: () => Promise<void>;
   updateScenario: (id: string, data: Scenario) => Promise<void>;
-  startSimulation: (scenarioId: string, targetUrl?: string | null) => Promise<string>;
+  startSimulation: (scenarioId: string, options?: SimulationLaunchOptions) => Promise<string>;
   startAssessment: (scenarioId: string, targetUrl?: string | null) => Promise<string>;
   updateExecution: (execution: ScenarioExecution) => void;
   applyExecutionDelta: (delta: ScenarioExecutionDelta) => void;
@@ -549,15 +559,24 @@ export const useCatalogStore = create<CatalogState>()(
           }));
         },
 
-        startSimulation: async (scenarioId: string, targetUrl?: string | null) => {
+        startSimulation: async (scenarioId: string, options: SimulationLaunchOptions = {}) => {
           try {
+            const usingSavedTarget = options.targetUrl === undefined;
             const launchTargetUrl = normalizeLaunchTargetUrl(
-              targetUrl !== undefined ? targetUrl : get().targetUrl,
+              usingSavedTarget ? get().targetUrl : options.targetUrl,
             );
+            const triggerData =
+              options.expectWafBlocking !== undefined
+                ? { expectWafBlocking: options.expectWafBlocking }
+                : undefined;
             const response = await fetch(`${API_BASE}/simulations`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scenarioId, ...(launchTargetUrl ? { targetUrl: launchTargetUrl } : {}) }),
+              body: JSON.stringify({
+                scenarioId,
+                ...(launchTargetUrl ? { targetUrl: launchTargetUrl } : {}),
+                ...(triggerData ? { triggerData } : {}),
+              }),
             });
             if (!response.ok) {
               const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
@@ -576,7 +595,7 @@ export const useCatalogStore = create<CatalogState>()(
         startAssessment: async (scenarioId: string, targetUrl?: string | null) => {
           try {
             const launchTargetUrl = normalizeLaunchTargetUrl(
-              targetUrl !== undefined ? targetUrl : get().targetUrl,
+              targetUrl === undefined ? get().targetUrl : targetUrl,
             );
             const response = await fetch(`${API_BASE}/assessments`, {
               method: 'POST',
@@ -828,8 +847,7 @@ function buildExecutionHistoryUrl(
 }
 
 function normalizeLaunchTargetUrl(value: string | null | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
+  return normalizeScenarioTargetUrl(value);
 }
 
 function toStartOfDayTimestamp(value: string): number | undefined {

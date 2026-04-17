@@ -1,7 +1,7 @@
 // Client
 export { CrucibleClient } from './client.js';
 export { CrucibleSocket } from './socket.js';
-export { CrucibleApiError } from './errors.js';
+export { CrucibleApiError, CrucibleClientValidationError } from './errors.js';
 
 // Types (client-specific + domain types — all self-contained)
 export type {
@@ -15,7 +15,11 @@ export type {
   RestartResponse,
   ListExecutionsParams,
   GetReportOptions,
-  TriggerData,
+  SimulationTriggerData,
+  SimulationLaunchOptions,
+  SimulationStartOptions,
+  AssessmentTriggerData,
+  AssessmentStartOptions,
   WebSocketCommand,
   WebSocketCommandType,
   WebSocketEventMap,
