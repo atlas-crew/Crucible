@@ -14,6 +14,9 @@ import {
   inferTargetFamilyFromUrl,
   getScenarioTargetCompatibility,
   countScenarioBlockingExpectations,
+  countSimulationOverridableBlockingExpectations,
+  normalizeScenarioTargetUrl,
+  ScenarioTargetUrlError,
 } from '../types.js';
 
 function minimalStep(overrides: Record<string, unknown> = {}) {
@@ -331,5 +334,32 @@ describe('Scenario target helpers', () => {
     });
 
     expect(countScenarioBlockingExpectations(scenario)).toBe(1);
+  });
+
+  it('counts only author-approved simulation-overridable blocking expectations', () => {
+    const scenario = minimalScenario({
+      steps: [
+        minimalStep({ expect: { blocked: true, blockedOverridableInSimulation: true } }),
+        minimalStep({ id: 'http-2', expect: { status: 403, blockedOverridableInSimulation: true } }),
+        minimalStep({ id: 'http-3', expect: { blocked: true } }),
+        minimalStep({ id: 'http-4', expect: { blocked: false, blockedOverridableInSimulation: true } }),
+      ],
+    });
+
+    expect(countSimulationOverridableBlockingExpectations(scenario)).toBe(2);
+  });
+
+  it('preserves trailing slashes for non-root paths while normalizing origin-only URLs', () => {
+    expect(normalizeScenarioTargetUrl('http://example.com/?q=1')).toBe('http://example.com?q=1');
+    expect(normalizeScenarioTargetUrl('http://example.com/api/')).toBe('http://example.com/api/');
+    expect(normalizeScenarioTargetUrl('http://example.com/#/app')).toBe('http://example.com');
+  });
+
+  it('surfaces machine-readable target URL validation codes', () => {
+    expect(() => normalizeScenarioTargetUrl('ftp://example.com')).toThrowError(
+      expect.objectContaining<Partial<ScenarioTargetUrlError>>({
+        code: 'protocol',
+      }),
+    );
   });
 });

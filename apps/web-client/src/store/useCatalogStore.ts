@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { normalizeScenarioTargetUrl } from '@crucible/catalog/client';
+import { normalizeScenarioTargetUrl, ScenarioTargetUrlError } from '@crucible/catalog/client';
 import type { Scenario } from '@crucible/catalog';
 
 // ── Types (mirrors demo-dashboard/shared/types.ts) ──────────────────
@@ -29,6 +29,8 @@ export interface AssertionResult {
   expected: unknown;
   actual: unknown;
   passed: boolean;
+  overridden?: boolean;
+  authoredExpected?: unknown;
 }
 
 export interface SimulationTriggerData extends Record<string, unknown> {
@@ -388,11 +390,15 @@ export const useCatalogStore = create<CatalogState>()(
                 : [seededExecution, ...state.historyExecutions]
               : state.historyExecutions;
 
+          const preservedError = state.error?.startsWith('Saved target URL was invalid')
+            ? state.error
+            : null;
+
           return {
             executions,
             historyExecutions,
             activeExecution: seededExecution,
-            error: null,
+            error: preservedError,
           };
         });
       };
@@ -562,9 +568,23 @@ export const useCatalogStore = create<CatalogState>()(
         startSimulation: async (scenarioId: string, options: SimulationLaunchOptions = {}) => {
           try {
             const usingSavedTarget = options.targetUrl === undefined;
-            const launchTargetUrl = normalizeLaunchTargetUrl(
-              usingSavedTarget ? get().targetUrl : options.targetUrl,
-            );
+            let launchTargetUrl: string | undefined;
+            try {
+              launchTargetUrl = normalizeLaunchTargetUrl(
+                usingSavedTarget ? get().targetUrl : options.targetUrl,
+              );
+            } catch (error) {
+              if (usingSavedTarget && error instanceof ScenarioTargetUrlError) {
+                set({
+                  targetUrl: null,
+                  targetStatus: 'unknown',
+                  error: 'Saved target URL was invalid and has been cleared. Launching against the server default target.',
+                });
+                launchTargetUrl = undefined;
+              } else {
+                throw error;
+              }
+            }
             const triggerData =
               options.expectWafBlocking !== undefined
                 ? { expectWafBlocking: options.expectWafBlocking }
@@ -594,9 +614,24 @@ export const useCatalogStore = create<CatalogState>()(
 
         startAssessment: async (scenarioId: string, targetUrl?: string | null) => {
           try {
-            const launchTargetUrl = normalizeLaunchTargetUrl(
-              targetUrl === undefined ? get().targetUrl : targetUrl,
-            );
+            const usingSavedTarget = targetUrl === undefined;
+            let launchTargetUrl: string | undefined;
+            try {
+              launchTargetUrl = normalizeLaunchTargetUrl(
+                usingSavedTarget ? get().targetUrl : targetUrl,
+              );
+            } catch (error) {
+              if (usingSavedTarget && error instanceof ScenarioTargetUrlError) {
+                set({
+                  targetUrl: null,
+                  targetStatus: 'unknown',
+                  error: 'Saved target URL was invalid and has been cleared. Launching against the server default target.',
+                });
+                launchTargetUrl = undefined;
+              } else {
+                throw error;
+              }
+            }
             const response = await fetch(`${API_BASE}/assessments`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -799,6 +834,17 @@ export const useCatalogStore = create<CatalogState>()(
         targetUrl: state.targetUrl,
         pinnedScenarioIds: state.pinnedScenarioIds,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<CatalogStateSnapshot>;
+        return {
+          ...currentState,
+          ...persisted,
+          targetUrl: normalizePersistedTargetUrl(persisted.targetUrl),
+          pinnedScenarioIds: Array.isArray(persisted.pinnedScenarioIds)
+            ? persisted.pinnedScenarioIds
+            : currentState.pinnedScenarioIds,
+        };
+      },
       // Defer rehydration until after React mounts so SSR output and the
       // first client render match. AppInitializer triggers rehydrate().
       skipHydration: true,
@@ -848,6 +894,14 @@ function buildExecutionHistoryUrl(
 
 function normalizeLaunchTargetUrl(value: string | null | undefined): string | undefined {
   return normalizeScenarioTargetUrl(value);
+}
+
+function normalizePersistedTargetUrl(value: string | null | undefined): string | null {
+  try {
+    return normalizeScenarioTargetUrl(value) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function toStartOfDayTimestamp(value: string): number | undefined {

@@ -28,6 +28,7 @@ export type ExecutionConfig = z.infer<typeof ExecutionConfigSchema>;
 export const ExpectSchema = z.object({
   status: z.number().int().optional(),
   blocked: z.boolean().optional(),
+  blockedOverridableInSimulation: z.boolean().optional(),
   bodyContains: z.string().optional(),
   bodyNotContains: z.string().optional(),
   headerPresent: z.string().optional(),
@@ -338,7 +339,21 @@ export function inferTargetFamilyFromUrl(
   }
 }
 
-export class ScenarioTargetUrlError extends Error {}
+export type ScenarioTargetUrlErrorCode =
+  | 'invalid'
+  | 'protocol'
+  | 'hostname'
+  | 'credentials';
+
+export class ScenarioTargetUrlError extends Error {
+  constructor(
+    public readonly code: ScenarioTargetUrlErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ScenarioTargetUrlError';
+  }
+}
 
 export function normalizeScenarioTargetUrl(value: string | null | undefined): string | undefined {
   if (value == null) {
@@ -354,26 +369,30 @@ export function normalizeScenarioTargetUrl(value: string | null | undefined): st
   try {
     parsedUrl = new URL(trimmed);
   } catch {
-    throw new ScenarioTargetUrlError('Scenario target URL must be a valid absolute URL');
+    throw new ScenarioTargetUrlError('invalid', 'Scenario target URL must be a valid absolute URL');
   }
 
   if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    throw new ScenarioTargetUrlError('Scenario target URL must use http or https');
+    throw new ScenarioTargetUrlError('protocol', 'Scenario target URL must use http or https');
   }
 
   if (!parsedUrl.hostname) {
-    throw new ScenarioTargetUrlError('Scenario target URL must include a hostname');
+    throw new ScenarioTargetUrlError('hostname', 'Scenario target URL must include a hostname');
   }
 
   if (parsedUrl.username || parsedUrl.password) {
-    throw new ScenarioTargetUrlError('Scenario target URL must not include credentials');
+    throw new ScenarioTargetUrlError('credentials', 'Scenario target URL must not include credentials');
   }
 
-  if (parsedUrl.hash) {
-    throw new ScenarioTargetUrlError('Scenario target URL must not include a fragment');
+  // Fragments are client-side only and never reach the target server.
+  // Strip them so previously saved `#/...` application routes remain launchable.
+  parsedUrl.hash = '';
+
+  if (parsedUrl.pathname === '/') {
+    return `${parsedUrl.origin}${parsedUrl.search}`;
   }
 
-  return parsedUrl.toString().replace(/\/+$/, '');
+  return parsedUrl.toString();
 }
 
 export function getScenarioTargetCompatibility(
@@ -402,5 +421,27 @@ export function countScenarioBlockingExpectations(
     }
 
     return count + (step.expect?.blocked === true ? 1 : 0);
+  }, 0);
+}
+
+export function countSimulationOverridableBlockingExpectations(
+  scenario: Pick<Scenario, 'steps'>,
+): number {
+  return scenario.steps.reduce((count, step) => {
+    if (!isScenarioHttpStep(step)) {
+      return count;
+    }
+
+    const expect = step.expect;
+    if (expect?.blockedOverridableInSimulation !== true) {
+      return count;
+    }
+
+    const hasBlockingCheck =
+      expect.blocked === true
+      || expect.status === 403
+      || expect.status === 429;
+
+    return count + (hasBlockingCheck ? 1 : 0);
   }, 0);
 }

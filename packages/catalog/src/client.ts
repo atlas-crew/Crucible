@@ -1,5 +1,6 @@
 export {
   countScenarioBlockingExpectations,
+  countSimulationOverridableBlockingExpectations,
   getScenarioTargetCompatibility,
   inferScenarioTargetFamily,
   inferTargetFamilyFromUrl,

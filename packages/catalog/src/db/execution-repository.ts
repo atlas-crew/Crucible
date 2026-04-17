@@ -18,6 +18,8 @@ export interface AssertionResult {
   expected: unknown;
   actual: unknown;
   passed: boolean;
+  overridden?: boolean;
+  authoredExpected?: unknown;
 }
 
 export type RunnerFindingSeverity =

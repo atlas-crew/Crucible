@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { CatalogService, ExecutionRepository } from '@crucible/catalog';
 import {
   isScenarioHttpStep,
+  type Expect,
   type Extract,
   type Scenario,
   type ScenarioHttpStep,
@@ -77,6 +78,19 @@ export interface ScenarioEngineOptions {
 
 interface AssertionContext {
   blockedExpectationOverride?: boolean;
+}
+
+interface BlockedAssertionResolution {
+  authoredExpected: boolean;
+  expected: boolean;
+  overridden: boolean;
+}
+
+interface StatusAssertionResolution {
+  overridden: boolean;
+  expected: Array<number | string>;
+  authoredExpected: number;
+  passes: boolean;
 }
 
 function validateSimulationTriggerData(triggerData?: Record<string, unknown>): void {
@@ -400,6 +414,7 @@ export class ScenarioEngine extends EventEmitter {
 
         void (async () => {
           try {
+            const assertionContext = this.getAssertionContext(execution);
             const maxAttempts = (step.execution?.retries ?? 0) + 1;
             const signal = ctrl?.abortController.signal;
             let latestResponse: StepHttpResponse | undefined;
@@ -417,7 +432,7 @@ export class ScenarioEngine extends EventEmitter {
                 }
 
                 const assertions = httpStep
-                  ? this.evaluateAssertions(httpStep, response, this.getAssertionContext(execution))
+                  ? this.evaluateAssertions(httpStep, response, assertionContext)
                   : [];
                 if (assertions.length > 0) {
                   result.assertions = assertions;
@@ -829,20 +844,29 @@ export class ScenarioEngine extends EventEmitter {
     const expect = step.expect;
     if (!expect) return results;
 
+    const blockedResolution = this.resolveBlockedAssertionExpectation(expect, context);
+    const statusResolution = this.resolveStatusAssertionExpectation(expect, response.status, context);
+
     if (expect.status !== undefined) {
       results.push({
         field: 'status',
-        expected: expect.status,
+        expected: statusResolution?.expected ?? expect.status,
         actual: response.status,
-        passed: response.status === expect.status,
+        passed: statusResolution?.passes ?? response.status === expect.status,
+        ...(statusResolution?.overridden
+          ? {
+              overridden: true,
+              authoredExpected: statusResolution.authoredExpected,
+            }
+          : {}),
       });
     }
 
     if (expect.blocked !== undefined) {
       // A blocked request returns 403 or 429
       const isBlocked = response.status === 403 || response.status === 429;
-      const expectedBlocked = context.blockedExpectationOverride ?? expect.blocked;
-      const blockedExpectationWasOverridden = expectedBlocked !== expect.blocked;
+      const blockedExpectationWasOverridden = blockedResolution?.overridden ?? false;
+      const expectedBlocked = blockedResolution?.expected ?? expect.blocked;
       results.push({
         field: 'blocked',
         expected: expectedBlocked,
@@ -851,7 +875,7 @@ export class ScenarioEngine extends EventEmitter {
         ...(blockedExpectationWasOverridden
           ? {
               overridden: true,
-              authoredExpected: expect.blocked,
+              authoredExpected: blockedResolution?.authoredExpected ?? expect.blocked,
             }
           : {}),
       });
@@ -911,11 +935,56 @@ export class ScenarioEngine extends EventEmitter {
       return {};
     }
 
-    // Defensive: triggerData can come from persisted executions or internal callers
-    // that bypass the route-level schema validation.
-    validateSimulationTriggerData(execution.triggerData);
     const override = execution.triggerData?.expectWafBlocking;
     return typeof override === 'boolean' ? { blockedExpectationOverride: override } : {};
+  }
+
+  private resolveBlockedAssertionExpectation(
+    expect: Pick<Expect, 'blocked' | 'blockedOverridableInSimulation'>,
+    context: AssertionContext,
+  ): BlockedAssertionResolution | undefined {
+    const authoredExpected = expect.blocked;
+    if (authoredExpected === undefined) {
+      return undefined;
+    }
+
+    const overridden =
+      authoredExpected === true
+      && expect.blockedOverridableInSimulation === true
+      && context.blockedExpectationOverride !== undefined
+      && context.blockedExpectationOverride !== authoredExpected;
+    const override = context.blockedExpectationOverride;
+
+    return {
+      authoredExpected,
+      expected: overridden && override !== undefined ? override : authoredExpected,
+      overridden,
+    };
+  }
+
+  private resolveStatusAssertionExpectation(
+    expect: Pick<Expect, 'status' | 'blockedOverridableInSimulation'>,
+    actualStatus: number,
+    context: AssertionContext,
+  ): StatusAssertionResolution | undefined {
+    const authoredExpected = expect.status;
+    const overridden =
+      expect.blockedOverridableInSimulation === true
+      && context.blockedExpectationOverride === false
+      && (authoredExpected === 403 || authoredExpected === 429);
+
+    if (!overridden) {
+      return undefined;
+    }
+
+    return {
+      overridden: true,
+      expected: [authoredExpected, 'any non-blocking status'],
+      authoredExpected,
+      passes:
+        actualStatus === authoredExpected
+        || (actualStatus !== 403 && actualStatus !== 429),
+    };
   }
 
   // ── Execution control methods ────────────────────────────────────
@@ -1215,8 +1284,12 @@ function normalizeConfiguredTargetUrl(rawTargetUrl: string, label: string = 'CRU
     throw new Error(`${label} must not be empty`);
   }
 
-  parseValidatedAbsoluteUrl(trimmedTargetUrl, label);
-  return trimmedTargetUrl.replace(/\/+$/, '');
+  const parsedUrl = parseValidatedAbsoluteUrl(trimmedTargetUrl, label);
+  parsedUrl.hash = '';
+  const normalized = parsedUrl.pathname === '/'
+    ? `${parsedUrl.origin}${parsedUrl.search}`
+    : parsedUrl.toString();
+  return normalized.replace(/\/+$/, '');
 }
 
 function parseValidatedAbsoluteUrl(rawUrl: string, label: string): URL {
@@ -1238,10 +1311,6 @@ function parseValidatedAbsoluteUrl(rawUrl: string, label: string): URL {
 
   if (parsedUrl.username || parsedUrl.password) {
     throw new Error(`${label} must not include credentials`);
-  }
-
-  if (parsedUrl.hash) {
-    throw new Error(`${label} must not include a fragment`);
   }
 
   return parsedUrl;

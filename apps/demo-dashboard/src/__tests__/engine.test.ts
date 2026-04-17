@@ -490,7 +490,7 @@ describe('ScenarioEngine', () => {
             name: 'Check',
             stage: 'main',
             request: { method: 'GET', url: 'http://localhost/resource' },
-            expect: { blocked: true },
+            expect: { blocked: true, blockedOverridableInSimulation: true },
           },
         ],
       });
@@ -511,6 +511,205 @@ describe('ScenarioEngine', () => {
             passed: true,
             overridden: true,
             authoredExpected: true,
+          }),
+        ]),
+      );
+    });
+
+    it('simulation mode does not override blocked expectations that are not author-approved', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-sim-no-override',
+        name: 'Assert Simulation No Override',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: { blocked: true },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'allowed'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-sim-no-override', 'simulation', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'blocked',
+            expected: true,
+            actual: false,
+            passed: false,
+          }),
+        ]),
+      );
+    });
+
+    it('simulation mode relaxes paired block status assertions when the block expectation is overridden', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-sim-status-override',
+        name: 'Assert Simulation Status Override',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: {
+              status: 403,
+              blocked: true,
+              blockedOverridableInSimulation: true,
+            },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(200, 'allowed'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-sim-status-override', 'simulation', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('completed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'status',
+            expected: [403, 'any non-blocking status'],
+            actual: 200,
+            passed: true,
+            overridden: true,
+            authoredExpected: 403,
+          }),
+          expect.objectContaining({
+            field: 'blocked',
+            expected: false,
+            actual: false,
+            passed: true,
+            overridden: true,
+            authoredExpected: true,
+          }),
+        ]),
+      );
+    });
+
+    it('simulation mode treats non-blocking server errors as a successful bypass when blocking is not expected', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-sim-status-non-success',
+        name: 'Assert Simulation Status Non Success',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: {
+              status: 403,
+              blockedOverridableInSimulation: true,
+            },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(500, 'broken'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-sim-status-non-success', 'simulation', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('completed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'status',
+            expected: [403, 'any non-blocking status'],
+            actual: 500,
+            passed: true,
+            overridden: true,
+            authoredExpected: 403,
+          }),
+        ]),
+      );
+    });
+
+    it('simulation mode accepts non-blocking success statuses for status-only overrides', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-sim-status-created',
+        name: 'Assert Simulation Status Created',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: {
+              status: 403,
+              blockedOverridableInSimulation: true,
+            },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(201, 'created'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-sim-status-created', 'simulation', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('completed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'status',
+            expected: [403, 'any non-blocking status'],
+            actual: 201,
+            passed: true,
+            overridden: true,
+            authoredExpected: 403,
+          }),
+        ]),
+      );
+    });
+
+    it('simulation mode still accepts authored block statuses for status-only overridable checks', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'assert-sim-status-still-blocked',
+        name: 'Assert Simulation Status Still Blocked',
+        steps: [
+          {
+            id: 'check',
+            name: 'Check',
+            stage: 'main',
+            request: { method: 'GET', url: 'http://localhost/resource' },
+            expect: {
+              status: 403,
+              blockedOverridableInSimulation: true,
+            },
+          },
+        ],
+      });
+
+      mockFetch.mockResolvedValueOnce(mockResponse(403, 'still blocked'));
+
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario('assert-sim-status-still-blocked', 'simulation', { expectWafBlocking: false });
+      const execution = await done;
+
+      expect(execution.steps[0].status).toBe('completed');
+      expect(execution.steps[0].assertions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'status',
+            expected: [403, 'any non-blocking status'],
+            actual: 403,
+            passed: true,
+            overridden: true,
+            authoredExpected: 403,
           }),
         ]),
       );
@@ -3192,17 +3391,19 @@ describe('ScenarioEngine', () => {
       ).rejects.toThrow('Scenario target URL must not include credentials');
     });
 
-    it('rejects an override containing a fragment', async () => {
+    it('strips fragments from per-run target overrides', async () => {
       mockCatalog.getScenario.mockReturnValue(singleStepScenario);
-      await expect(
-        engine.startScenario(
-          'target-override',
-          'simulation',
-          undefined,
-          undefined,
-          'http://example.test#frag',
-        ),
-      ).rejects.toThrow('Scenario target URL must not include a fragment');
+      mockFetch.mockResolvedValueOnce(mockResponse(200, { ok: true }, { 'content-type': 'application/json' }));
+      const done = waitForEvent(engine, 'execution:completed');
+      await engine.startScenario(
+        'target-override',
+        'simulation',
+        undefined,
+        undefined,
+        'http://example.test#frag',
+      );
+      const execution = await done;
+      expect(execution.targetUrl).toBe('http://example.test');
     });
 
     it('preserves per-run allowlist isolation between concurrent executions', async () => {

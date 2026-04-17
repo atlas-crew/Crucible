@@ -4,10 +4,12 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   countScenarioBlockingExpectations,
+  countSimulationOverridableBlockingExpectations,
   getScenarioTargetCompatibility,
   inferScenarioTargetFamily,
   inferTargetFamilyFromUrl,
   normalizeScenarioTargetUrl,
+  ScenarioTargetUrlError,
 } from "@crucible/catalog/client"
 import type {
   Scenario,
@@ -120,6 +122,9 @@ export default function ScenariosPage() {
     : "unknown"
   const launchBlockingChecks = launchDialog
     ? countScenarioBlockingExpectations(launchDialog.scenario)
+    : 0
+  const launchOverridableBlockingChecks = launchDialog
+    ? countSimulationOverridableBlockingExpectations(launchDialog.scenario)
     : 0
 
   const openLaunchDialog = useCallback((scenario: Scenario, mode: "simulation" | "assessment") => {
@@ -360,7 +365,7 @@ export default function ScenariosPage() {
                       Expect WAF blocking
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Turn this off when this simulation run should treat allowed attack responses as the expected outcome for <code>expect.blocked</code> assertions instead of requiring a 403 or 429 block.
+                      Turn this off when this simulation run should treat successful attack responses as the expected outcome for scenario-authored blocking checks that explicitly opt into simulation override.
                     </p>
                   </div>
                   <Switch
@@ -376,6 +381,11 @@ export default function ScenariosPage() {
                     aria-label="Expect WAF blocking"
                   />
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {launchOverridableBlockingChecks > 0
+                    ? `${launchOverridableBlockingChecks} blocking ${launchOverridableBlockingChecks === 1 ? "check is" : "checks are"} marked as overridable in simulation mode for this scenario.`
+                    : "This scenario does not mark any blocking checks as overridable, so this toggle will not change pass/fail behavior."}
+                </p>
               </div>
             )}
 
@@ -388,7 +398,7 @@ export default function ScenariosPage() {
               </div>
             )}
 
-            {!targetUrl && (launchTargetState.error || !launchDialog?.targetUrl.trim()) && (
+            {(launchTargetState.error || (!targetUrl && !launchDialog?.targetUrl.trim())) && (
               <div className="rounded-md border border-border/60 bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                 Compatibility guidance will appear once the target URL is valid.
               </div>
@@ -562,19 +572,21 @@ function validateLaunchTargetInput(value: string): LaunchTargetState {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Enter a valid target URL before starting the scenario."
-    const catalogPrefix = "Scenario target URL "
+    if (error instanceof ScenarioTargetUrlError) {
+      switch (error.code) {
+        case "protocol":
+          return { normalized: null, error: "Enter an http:// or https:// target URL." }
+        case "credentials":
+          return { normalized: null, error: "Target URLs must not include credentials." }
+        case "hostname":
+          return { normalized: null, error: "Target URL must include a hostname." }
+        case "invalid":
+          return { normalized: null, error: "Target URL must be a valid absolute URL." }
+      }
+    }
     return {
       normalized: null,
-      error:
-        message === "Scenario target URL must use http or https"
-          ? "Enter an http:// or https:// target URL."
-          : message === "Scenario target URL must not include credentials"
-            ? "Target URLs must not include credentials."
-            : message === "Scenario target URL must not include a fragment"
-              ? "Target URLs must not include fragments."
-              : message.startsWith(catalogPrefix)
-                ? `Target URL ${message.slice(catalogPrefix.length)}.`
-                : "Enter a valid target URL before starting the scenario.",
+      error: message,
     }
   }
 }

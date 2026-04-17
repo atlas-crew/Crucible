@@ -18,6 +18,7 @@ function mockJsonResponse(status: number, data: unknown) {
 describe('useCatalogStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     useCatalogStore.getState().resetMetricsHistory();
     useCatalogStore.setState({
       ...catalogInitialState,
@@ -26,6 +27,7 @@ describe('useCatalogStore', () => {
 
   afterEach(() => {
     useCatalogStore.getState().resetMetricsHistory();
+    localStorage.clear();
     vi.useRealTimers();
   });
 
@@ -43,6 +45,22 @@ describe('useCatalogStore', () => {
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
       expect(state.wsConnected).toBe(false);
+    });
+
+    it('normalizes persisted target URLs during rehydration', async () => {
+      localStorage.setItem('crucible-storage', JSON.stringify({
+        state: {
+          targetUrl: 'http://demo.local/#/app',
+          pinnedScenarioIds: ['scenario-1'],
+        },
+        version: 0,
+      }));
+
+      await useCatalogStore.persist.rehydrate();
+
+      const state = useCatalogStore.getState();
+      expect(state.targetUrl).toBe('http://demo.local');
+      expect(state.pinnedScenarioIds).toEqual(['scenario-1']);
     });
   });
 
@@ -567,17 +585,23 @@ describe('useCatalogStore', () => {
       expect(useCatalogStore.getState().error).toBe('HTTP 500');
     });
 
-    it('preserves a saved target URL when normalization fails before launch', async () => {
+    it('clears an invalid saved target URL and falls back to the server default target', async () => {
       useCatalogStore.setState({ targetUrl: 'ftp://bad.local', targetStatus: 'online' });
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(200, { executionId: 'exec-123' }));
 
-      await expect(useCatalogStore.getState().startSimulation('scenario-1')).rejects.toThrow(
-        'Scenario target URL must use http or https',
-      );
+      await expect(useCatalogStore.getState().startSimulation('scenario-1')).resolves.toBe('exec-123');
 
       const state = useCatalogStore.getState();
-      expect(state.targetUrl).toBe('ftp://bad.local');
-      expect(state.targetStatus).toBe('online');
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(state.targetUrl).toBeNull();
+      expect(state.targetStatus).toBe('unknown');
+      expect(state.error).toBe('Saved target URL was invalid and has been cleared. Launching against the server default target.');
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/simulations'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ scenarioId: 'scenario-1' }),
+        }),
+      );
     });
   });
 
