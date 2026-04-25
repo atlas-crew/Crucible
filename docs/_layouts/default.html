@@ -64,6 +64,17 @@
   </div>
 
   <script src="https://unpkg.com/lunr@2.3.9/lunr.min.js"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    document.querySelectorAll('pre > code.language-mermaid').forEach(function(codeEl) {
+      var pre = codeEl.parentElement;
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = codeEl.textContent;
+      pre.replaceWith(div);
+    });
+    mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'strict' });
+  </script>
   <script>
     document.querySelector('.nav-toggle').addEventListener('click', function() {
       document.querySelector('.nav-links').classList.toggle('open');
