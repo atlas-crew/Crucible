@@ -1,6 +1,7 @@
 {
   "id": "api-demo-idor-access-control",
   "name": "Chimera IDOR & Access Control Bypass",
+  "kind": "deprecated-mock",
   "category": "Access Control",
   "difficulty": "Intermediate",
   "description": "Insecure Direct Object References and authorization bypass attacks",
@@ -64,7 +65,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/admin/users",
+        "url": "/api/v1/admin/users",
         "headers": {
           "Authorization": "Bearer {{user_token}}",
           "X-Admin-Override": "true",

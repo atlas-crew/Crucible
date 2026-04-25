@@ -1,6 +1,7 @@
 {
   "id": "api-demo-owasp-top10",
   "name": "Chimera OWASP Top 10 Comprehensive Chain",
+  "kind": "deprecated-mock",
   "category": "OWASP Top 10",
   "difficulty": "Expert",
   "description": "Comprehensive attack chain covering all OWASP API Security Top 10 categories",
@@ -54,7 +55,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/users/profile?include_sensitive=true&fields=*",
+        "url": "/api/v1/users/profile?include_sensitive=true&fields=*",
         "headers": {
           "Authorization": "Bearer {{token}}"
         }

@@ -1,6 +1,7 @@
 {
   "id": "api-demo-botnet-showcase",
   "name": "Botnet Console Showcase - Distributed Attack Simulation",
+  "kind": "deprecated-mock",
   "category": "Advanced Persistent Threats",
   "difficulty": "Advanced",
   "description": "Demonstrates distributed botnet behavior with credential stuffing, account takeover attempts, and bot detection evasion techniques. Showcases ThreatX Botnet Console capabilities through coordinated multi-IP attacks with realistic timing patterns.",
@@ -503,7 +504,7 @@
       "stage": "persistence",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -533,7 +534,7 @@
       "stage": "persistence",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (Version/17.1 Safari/605.1.15)",
@@ -597,7 +598,7 @@
       "stage": "persistence",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -652,7 +653,7 @@
       "stage": "exfiltration",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

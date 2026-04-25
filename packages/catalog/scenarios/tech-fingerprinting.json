@@ -1,5 +1,6 @@
 {
   "name": "Technology Fingerprinting",
+  "kind": "recon",
   "description": "Passive technology and version identification through common files and headers over 10-15 minutes",
   "category": "Reconnaissance",
   "difficulty": "Beginner",
@@ -138,7 +139,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "GET",
-        "url": "/api/version",
+        "url": "/api/system/version",
         "headers": {
           "User-Agent": "Mozilla/5.0 (compatible; TechScanner/1.0)"
         }

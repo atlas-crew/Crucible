@@ -1,6 +1,7 @@
 {
   "id": "api-demo-data-exfiltration",
   "name": "Chimera Data Exfiltration Techniques",
+  "kind": "deprecated-mock",
   "category": "Data Leakage",
   "difficulty": "Advanced",
   "description": "Advanced data exfiltration and information disclosure attacks",
@@ -128,7 +129,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/users/profile?expand=*&include=hidden,internal,private",
+        "url": "/api/v1/users/profile?expand=*&include=hidden,internal,private",
         "headers": {
           "Authorization": "Bearer {{token}}"
         }

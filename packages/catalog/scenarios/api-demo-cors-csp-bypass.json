@@ -1,6 +1,7 @@
 {
   "id": "api-demo-cors-csp-bypass",
   "name": "Chimera CORS & CSP Bypass Techniques",
+  "kind": "pattern-demo",
   "category": "Cross-Origin",
   "difficulty": "Advanced",
   "description": "Cross-Origin Resource Sharing and Content Security Policy bypass attacks",
@@ -27,7 +28,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/users/profile",
+        "url": "/api/v1/users/profile",
         "headers": {
           "Origin": "null"
         }

