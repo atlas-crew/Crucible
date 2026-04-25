@@ -7,14 +7,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
   XCircle,
   Loader2,
   Circle,
   ClipboardList,
+  X,
+  Trash2,
 } from "lucide-react";
 import type { ExecutionStatus } from "@/store/useCatalogStore";
+
+const TERMINAL_STATUSES: ReadonlySet<ExecutionStatus> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "skipped",
+]);
 
 const statusIcon: Record<ExecutionStatus, typeof CheckCircle2> = {
   pending: Circle,
@@ -37,9 +47,18 @@ const statusColor: Record<ExecutionStatus, string> = {
 };
 
 export default function AssessmentsPage() {
-  const { executions, activeExecution, setActiveExecution, scenarios, fetchScenarios } = useCatalogStore();
+  const {
+    executions,
+    activeExecution,
+    setActiveExecution,
+    scenarios,
+    fetchScenarios,
+    dismissExecution,
+    clearFinishedExecutions,
+  } = useCatalogStore();
 
   const assessments = executions.filter((e) => e.mode === "assessment");
+  const hasFinished = assessments.some((e) => TERMINAL_STATUSES.has(e.status));
 
   useEffect(() => {
     if (scenarios.length === 0) {
@@ -62,13 +81,25 @@ export default function AssessmentsPage() {
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           {/* Assessment list sidebar */}
           <Card className="lg:sticky lg:top-20 lg:self-start">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
               <CardTitle className="type-label text-muted-foreground">
                 Assessments
                 <Badge variant="outline" className="ml-2 type-tag">
                   {assessments.length}
                 </Badge>
               </CardTitle>
+              {hasFinished && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => clearFinishedExecutions("assessment")}
+                  className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground"
+                  title="Remove all finished assessments from this list"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear finished
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[calc(100vh-260px)]">
@@ -76,57 +107,74 @@ export default function AssessmentsPage() {
                   {assessments.map((exec) => {
                     const Icon = statusIcon[exec.status];
                     const isActive = activeExecution?.id === exec.id;
+                    const isTerminal = TERMINAL_STATUSES.has(exec.status);
                     return (
-                      <button
-                        key={exec.id}
-                        onClick={() => setActiveExecution(exec.id)}
-                        className={cn(
-                          "w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
-                          isActive
-                            ? "bg-primary/10 border border-primary/20"
-                            : "hover:bg-secondary border border-transparent"
-                        )}
-                      >
-                        <Icon
+                      <div key={exec.id} className="relative group">
+                        <button
+                          onClick={() => setActiveExecution(exec.id)}
                           className={cn(
-                            "h-4 w-4 shrink-0",
-                            statusColor[exec.status],
-                            exec.status === "running" && "animate-spin"
+                            "w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
+                            isActive
+                              ? "bg-primary/10 border border-primary/20"
+                              : "hover:bg-secondary border border-transparent",
+                            isTerminal && "pr-9"
                           )}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="type-body font-medium truncate">
-                            {exec.scenarioId}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <p className="type-timestamp text-muted-foreground truncate">
-                              {exec.id.slice(0, 12)}
-                            </p>
-                            {exec.report && (
-                              <span className={cn(
-                                "type-tag",
-                                exec.report.passed ? "text-success" : "text-destructive"
-                              )}>
-                                {exec.report.score}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <Badge
-                          variant={
-                            exec.status === "completed" && exec.report?.passed ? "secondary" :
-                            exec.status === "completed" && !exec.report?.passed ? "destructive" :
-                            exec.status === "running" ? "default" :
-                            "outline"
-                          }
-                          className="type-tag shrink-0"
                         >
-                          {exec.report
-                            ? (exec.report.passed ? "PASS" : "FAIL")
-                            : exec.status.toUpperCase()
-                          }
-                        </Badge>
-                      </button>
+                          <Icon
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              statusColor[exec.status],
+                              exec.status === "running" && "animate-spin"
+                            )}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="type-body font-medium truncate">
+                              {exec.scenarioId}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="type-timestamp text-muted-foreground truncate">
+                                {exec.id.slice(0, 12)}
+                              </p>
+                              {exec.report && (
+                                <span className={cn(
+                                  "type-tag",
+                                  exec.report.passed ? "text-success" : "text-destructive"
+                                )}>
+                                  {exec.report.score}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Badge
+                            variant={
+                              exec.status === "completed" && exec.report?.passed ? "secondary" :
+                              exec.status === "completed" && !exec.report?.passed ? "destructive" :
+                              exec.status === "running" ? "default" :
+                              "outline"
+                            }
+                            className="type-tag shrink-0"
+                          >
+                            {exec.report
+                              ? (exec.report.passed ? "PASS" : "FAIL")
+                              : exec.status.toUpperCase()
+                            }
+                          </Badge>
+                        </button>
+                        {isTerminal && (
+                          <button
+                            type="button"
+                            aria-label={`Dismiss ${exec.scenarioId}`}
+                            title="Dismiss from list"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              dismissExecution(exec.id);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

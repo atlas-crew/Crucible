@@ -17,8 +17,17 @@ import {
   Pause,
   Play,
   Square,
+  X,
+  Trash2,
 } from "lucide-react";
 import type { ExecutionStatus } from "@/store/useCatalogStore";
+
+const TERMINAL_STATUSES: ReadonlySet<ExecutionStatus> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "skipped",
+]);
 
 const statusIcon: Record<ExecutionStatus, typeof CheckCircle2> = {
   pending: Circle,
@@ -51,12 +60,15 @@ export default function SimulationsPage() {
     cancelAll,
     scenarios,
     fetchScenarios,
+    dismissExecution,
+    clearFinishedExecutions,
   } = useCatalogStore();
 
   const simulations = executions.filter((e) => e.mode === "simulation");
   const hasRunning = simulations.some((e) => e.status === "running");
   const hasPaused = simulations.some((e) => e.status === "paused");
   const hasActive = simulations.some((e) => e.status === "running" || e.status === "pending" || e.status === "paused");
+  const hasFinished = simulations.some((e) => TERMINAL_STATUSES.has(e.status));
 
   useEffect(() => {
     if (scenarios.length === 0) {
@@ -111,13 +123,25 @@ export default function SimulationsPage() {
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           {/* Execution list sidebar */}
           <Card className="lg:sticky lg:top-20 lg:self-start">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
               <CardTitle className="type-label text-muted-foreground">
                 Executions
                 <Badge variant="outline" className="ml-2 type-tag">
                   {simulations.length}
                 </Badge>
               </CardTitle>
+              {hasFinished && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => clearFinishedExecutions("simulation")}
+                  className="h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground"
+                  title="Remove all finished simulations from this list"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear finished
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[calc(100vh-260px)]">
@@ -125,44 +149,61 @@ export default function SimulationsPage() {
                   {simulations.map((exec) => {
                     const Icon = statusIcon[exec.status];
                     const isActive = activeExecution?.id === exec.id;
+                    const isTerminal = TERMINAL_STATUSES.has(exec.status);
                     return (
-                      <button
-                        key={exec.id}
-                        onClick={() => setActiveExecution(exec.id)}
-                        className={cn(
-                          "w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
-                          isActive
-                            ? "bg-primary/10 border border-primary/20"
-                            : "hover:bg-secondary border border-transparent"
-                        )}
-                      >
-                        <Icon
+                      <div key={exec.id} className="relative group">
+                        <button
+                          onClick={() => setActiveExecution(exec.id)}
                           className={cn(
-                            "h-4 w-4 shrink-0",
-                            statusColor[exec.status],
-                            exec.status === "running" && "animate-spin"
+                            "w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
+                            isActive
+                              ? "bg-primary/10 border border-primary/20"
+                              : "hover:bg-secondary border border-transparent",
+                            isTerminal && "pr-9"
                           )}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="type-body font-medium truncate">
-                            {exec.scenarioId}
-                          </p>
-                          <p className="type-timestamp text-muted-foreground truncate">
-                            {exec.id.slice(0, 12)}
-                            {exec.steps.length > 0 && ` · ${exec.steps.length} steps`}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={
-                            exec.status === "running" ? "default" :
-                            exec.status === "failed" ? "destructive" :
-                            "outline"
-                          }
-                          className="type-tag shrink-0"
                         >
-                          {exec.status.toUpperCase()}
-                        </Badge>
-                      </button>
+                          <Icon
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              statusColor[exec.status],
+                              exec.status === "running" && "animate-spin"
+                            )}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="type-body font-medium truncate">
+                              {exec.scenarioId}
+                            </p>
+                            <p className="type-timestamp text-muted-foreground truncate">
+                              {exec.id.slice(0, 12)}
+                              {exec.steps.length > 0 && ` · ${exec.steps.length} steps`}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              exec.status === "running" ? "default" :
+                              exec.status === "failed" ? "destructive" :
+                              "outline"
+                            }
+                            className="type-tag shrink-0"
+                          >
+                            {exec.status.toUpperCase()}
+                          </Badge>
+                        </button>
+                        {isTerminal && (
+                          <button
+                            type="button"
+                            aria-label={`Dismiss ${exec.scenarioId}`}
+                            title="Dismiss from list"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              dismissExecution(exec.id);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

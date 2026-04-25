@@ -201,6 +201,7 @@ interface CatalogState {
   targetUrl: string | null;
   targetStatus: 'online' | 'offline' | 'unknown';
   pinnedScenarioIds: string[];
+  dismissedExecutionIds: string[];
 
   fetchScenarios: () => Promise<void>;
   fetchExecutionHistory: (options?: {
@@ -234,9 +235,20 @@ interface CatalogState {
 
   togglePinnedScenario: (id: string) => void;
   setTargetUrl: (url: string | null) => void;
+  dismissExecution: (id: string) => void;
+  clearFinishedExecutions: (mode: ScenarioExecution['mode']) => void;
   sanitizeTransientState: () => void;
   destroy: () => void;
 }
+
+const TERMINAL_EXECUTION_STATUSES: ReadonlySet<ExecutionStatus> = new Set([
+  'completed',
+  'failed',
+  'cancelled',
+  'skipped',
+]);
+
+const MAX_DISMISSED_EXECUTION_IDS = 1000;
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 const METRICS_HISTORY_LIMIT = parsePositiveInteger(
@@ -271,6 +283,7 @@ type CatalogStateSnapshot = Pick<
   | 'targetUrl'
   | 'targetStatus'
   | 'pinnedScenarioIds'
+  | 'dismissedExecutionIds'
 >;
 
 export const catalogInitialState: CatalogStateSnapshot = {
@@ -295,6 +308,7 @@ export const catalogInitialState: CatalogStateSnapshot = {
   targetUrl: null,
   targetStatus: 'unknown',
   pinnedScenarioIds: [],
+  dismissedExecutionIds: [],
 };
 
 export const useCatalogStore = create<CatalogState>()(
@@ -379,6 +393,9 @@ export const useCatalogStore = create<CatalogState>()(
           const existingExecution = state.executions.find((existing) => existing.id === executionId);
           const seededExecution = existingExecution ?? execution;
           const executions = existingExecution ? state.executions : [execution, ...state.executions];
+          const dismissedExecutionIds = state.dismissedExecutionIds.includes(executionId)
+            ? state.dismissedExecutionIds.filter((id) => id !== executionId)
+            : state.dismissedExecutionIds;
           const existingHistoryExecution =
             mode === 'assessment'
               ? state.historyExecutions.find((existing) => existing.id === executionId)
@@ -399,6 +416,7 @@ export const useCatalogStore = create<CatalogState>()(
             historyExecutions,
             activeExecution: seededExecution,
             error: preservedError,
+            dismissedExecutionIds,
           };
         });
       };
@@ -653,7 +671,12 @@ export const useCatalogStore = create<CatalogState>()(
 
         updateExecution: (execution: ScenarioExecution) => {
           set((state) => {
-            const newExecutions = state.executions.some((e) => e.id === execution.id)
+            const alreadyListed = state.executions.some((e) => e.id === execution.id);
+            if (!alreadyListed && state.dismissedExecutionIds.includes(execution.id)) {
+              // Row was dismissed from the sidebar; drop late snapshots rather than resurrect it.
+              return {};
+            }
+            const newExecutions = alreadyListed
               ? state.executions.map((e) => (e.id === execution.id ? execution : e))
               : [execution, ...state.executions];
             const historyExecutions = state.historyExecutions.some((e) => e.id === execution.id)
@@ -797,6 +820,44 @@ export const useCatalogStore = create<CatalogState>()(
           return count;
         },
 
+        dismissExecution: (id: string) => {
+          set((state) => {
+            const target = state.executions.find((e) => e.id === id);
+            if (!target || !TERMINAL_EXECUTION_STATUSES.has(target.status)) {
+              return {};
+            }
+            const executions = state.executions.filter((e) => e.id !== id);
+            const activeExecution =
+              state.activeExecution?.id === id ? null : state.activeExecution;
+            const dismissedExecutionIds = state.dismissedExecutionIds.includes(id)
+              ? state.dismissedExecutionIds
+              : [...state.dismissedExecutionIds, id].slice(-MAX_DISMISSED_EXECUTION_IDS);
+            return { executions, activeExecution, dismissedExecutionIds };
+          });
+        },
+
+        clearFinishedExecutions: (mode: ScenarioExecution['mode']) => {
+          set((state) => {
+            const removedIds: string[] = [];
+            const executions = state.executions.filter((e) => {
+              const shouldRemove = e.mode === mode && TERMINAL_EXECUTION_STATUSES.has(e.status);
+              if (shouldRemove) removedIds.push(e.id);
+              return !shouldRemove;
+            });
+            if (removedIds.length === 0) return {};
+            const activeExecution =
+              state.activeExecution && removedIds.includes(state.activeExecution.id)
+                ? null
+                : state.activeExecution;
+            const merged = [...state.dismissedExecutionIds];
+            for (const id of removedIds) {
+              if (!merged.includes(id)) merged.push(id);
+            }
+            const dismissedExecutionIds = merged.slice(-MAX_DISMISSED_EXECUTION_IDS);
+            return { executions, activeExecution, dismissedExecutionIds };
+          });
+        },
+
         togglePinnedScenario: (id: string) => {
           set((state) => ({
             pinnedScenarioIds: state.pinnedScenarioIds.includes(id)
@@ -833,6 +894,7 @@ export const useCatalogStore = create<CatalogState>()(
       partialize: (state) => ({
         targetUrl: state.targetUrl,
         pinnedScenarioIds: state.pinnedScenarioIds,
+        dismissedExecutionIds: state.dismissedExecutionIds,
       }),
       merge: (persistedState, currentState) => {
         const persisted = (persistedState ?? {}) as Partial<CatalogStateSnapshot>;
@@ -843,6 +905,9 @@ export const useCatalogStore = create<CatalogState>()(
           pinnedScenarioIds: Array.isArray(persisted.pinnedScenarioIds)
             ? persisted.pinnedScenarioIds
             : currentState.pinnedScenarioIds,
+          dismissedExecutionIds: Array.isArray(persisted.dismissedExecutionIds)
+            ? persisted.dismissedExecutionIds.slice(-MAX_DISMISSED_EXECUTION_IDS)
+            : currentState.dismissedExecutionIds,
         };
       },
       // Defer rehydration until after React mounts so SSR output and the
