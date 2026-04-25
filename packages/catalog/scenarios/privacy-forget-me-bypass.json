@@ -4,7 +4,9 @@
   "category": "Privacy",
   "difficulty": "Advanced",
   "description": "Probes if user data is still accessible via legacy or analytics endpoints after account deletion.",
-  "rule_ids": ["GDPR-ART-17"],
+  "rule_ids": [
+    "GDPR-ART-17"
+  ],
   "steps": [
     {
       "id": "request-deletion",
@@ -52,7 +54,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/v1/integrations/analytics/data"
+        "url": "/api/integrations/analytics/data"
       },
       "execution": {
         "delayMs": 500

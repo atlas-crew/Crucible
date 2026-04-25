@@ -11,7 +11,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "GET",
-        "url": "/api/v1/oauth/authorize?client_id=public-spa&response_type=code&redirect_uri=https://app.example.com/callback&scope=openid profile"
+        "url": "/api/oauth/authorize?client_id=public-spa&response_type=code&redirect_uri=https://app.example.com/callback&scope=openid profile"
       },
       "execution": {
         "delayMs": 500
@@ -23,7 +23,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/oauth/token",
+        "url": "/api/oauth/token",
         "headers": {
           "Content-Type": "application/x-www-form-urlencoded"
         },
@@ -45,7 +45,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/oauth/token",
+        "url": "/api/oauth/token",
         "headers": {
           "Content-Type": "application/x-www-form-urlencoded"
         },

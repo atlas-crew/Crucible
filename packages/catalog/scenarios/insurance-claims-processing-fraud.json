@@ -364,7 +364,7 @@
       "stage": "exfiltration",
       "request": {
         "method": "POST",
-        "url": "/api/payments/process",
+        "url": "/api/v1/payments/process",
         "headers": {
           "Content-Type": "application/json",
           "Authorization": "Bearer persistent_admin_token",

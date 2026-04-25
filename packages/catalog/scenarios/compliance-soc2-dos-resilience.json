@@ -4,7 +4,9 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Launches application-layer DoS against the status endpoint to test availability controls.",
-  "rule_ids": ["CC7.1"],
+  "rule_ids": [
+    "CC7.1"
+  ],
   "steps": [
     {
       "id": "status-dos-flood",
@@ -12,7 +14,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/v1/status"
+        "url": "/api/v1/healthz"
       },
       "execution": {
         "delayMs": 10,

@@ -205,7 +205,7 @@
       "stage": "impact",
       "request": {
         "method": "POST",
-        "url": "/api/v1/insurance/claims/bulk",
+        "url": "/api/v1/insurance/claims",
         "headers": {
           "Content-Type": "application/json"
         },

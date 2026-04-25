@@ -4,7 +4,9 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Attempts to negotiate weak or non-FIPS compliant TLS ciphers.",
-  "rule_ids": ["164.312-e-1"],
+  "rule_ids": [
+    "164.312-e-1"
+  ],
   "steps": [
     {
       "id": "weak-cipher-probe",
@@ -12,7 +14,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "HEAD",
-        "url": "/api/v1/health",
+        "url": "/api/v1/healthz",
         "headers": {
           "X-SSL-Cipher-Suites": "TLS_RSA_WITH_3DES_EDE_CBC_SHA"
         }

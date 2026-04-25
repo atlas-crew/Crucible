@@ -172,7 +172,7 @@
       "stage": "lateral-movement",
       "request": {
         "method": "GET",
-        "url": "/api/v1/integrations/discovery",
+        "url": "/api/integrations/discovery",
         "headers": {
           "Content-Type": "application/json",
           "Authorization": "Bearer compromised_service_token",
@@ -227,7 +227,11 @@
           "Authorization": "Bearer log_management_token"
         },
         "body": {
-          "systems": ["siem", "firewall", "waf"]
+          "systems": [
+            "siem",
+            "firewall",
+            "waf"
+          ]
         }
       },
       "execution": {

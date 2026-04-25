@@ -36,7 +36,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "GET",
-        "url": "/api/payments/methods",
+        "url": "/api/v1/payments/methods",
         "headers": {
           "Accept": "application/json",
           "X-API-Version": "v1"
@@ -120,7 +120,7 @@
       "stage": "delivery",
       "request": {
         "method": "POST",
-        "url": "/api/payments/process",
+        "url": "/api/v1/payments/process",
         "headers": {
           "Content-Type": "application/json",
           "X-Client-IP": "198.51.100.33",
@@ -144,7 +144,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/payments/process",
+        "url": "/api/v1/payments/process",
         "headers": {
           "Content-Type": "application/json",
           "X-Forwarded-For": "10.0.0.1",
@@ -168,7 +168,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/payments/process",
+        "url": "/api/v1/payments/process",
         "headers": {
           "Content-Type": "application/json",
           "X-CVV-Skip": "merchant_request"
@@ -307,7 +307,7 @@
       "stage": "exfiltration",
       "request": {
         "method": "POST",
-        "url": "/api/payments/process",
+        "url": "/api/v1/payments/process",
         "headers": {
           "Content-Type": "application/json",
           "Authorization": "Bearer persistent_token_001",

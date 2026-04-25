@@ -235,7 +235,7 @@
       "name": "Establish C2 Channel",
       "stage": "command-control",
       "request": {
-        "method": "POST",
+        "method": "GET",
         "url": "/api/payments/gateway/status",
         "headers": {
           "Content-Type": "application/json",
@@ -262,7 +262,7 @@
       "stage": "exfiltration",
       "request": {
         "method": "GET",
-        "url": "/api/v1/banking/statements?start_date=2020-01-01&format=csv&size=unlimited",
+        "url": "/api/v1/banking/accounts?start_date=2020-01-01&format=csv&size=unlimited",
         "headers": {
           "Authorization": "Bearer {{escalated_token}}",
           "Accept-Encoding": "gzip, deflate, br"

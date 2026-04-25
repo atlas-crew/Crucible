@@ -11,7 +11,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/auth/callback",
+        "url": "/api/v1/auth/saml/callback",
         "headers": {
           "Content-Type": "application/json"
         },

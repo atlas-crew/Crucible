@@ -217,7 +217,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/payment/methods/add",
+        "url": "/api/v1/payments/methods/add",
         "headers": {
           "Content-Type": "application/json"
         },

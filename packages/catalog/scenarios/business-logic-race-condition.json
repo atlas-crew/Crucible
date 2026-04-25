@@ -16,7 +16,9 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "codes": ["WELCOME2024"],
+          "codes": [
+            "WELCOME2024"
+          ],
           "cart_id": "cart_{{timestamp}}"
         }
       },
@@ -34,7 +36,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/banking/transfer",
+        "url": "/api/v1/banking/wire-transfer",
         "headers": {
           "Content-Type": "application/json"
         },

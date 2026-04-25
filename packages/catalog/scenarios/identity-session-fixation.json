@@ -24,7 +24,10 @@
         "delayMs": 500
       },
       "extract": {
-        "attacker_refresh_token": { "from": "body", "path": "refresh_token" }
+        "attacker_refresh_token": {
+          "from": "body",
+          "path": "refresh_token"
+        }
       }
     },
     {
@@ -58,7 +61,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/v1/auth/token/refresh",
+        "url": "/api/v1/saas/auth/token/refresh",
         "headers": {
           "Content-Type": "application/json"
         },

@@ -11,7 +11,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -30,7 +30,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json"
         },

@@ -23,7 +23,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "GET",
-        "url": "/api/login"
+        "url": "/banking/login"
       },
       "execution": {
         "delayMs": 50
@@ -35,7 +35,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -58,7 +58,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "X-Forwarded-For": "192.168.1.100"
@@ -84,7 +84,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "X-Real-IP": "10.0.0.50",
@@ -111,7 +111,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "X-Forwarded-For": "203.0.113.45",
@@ -140,7 +140,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -167,7 +167,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "Authorization": "Bearer fake.token.here",
@@ -221,7 +221,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/x-www-form-urlencoded"
         },
@@ -243,7 +243,7 @@
       "stage": "exfiltration",
       "request": {
         "method": "POST",
-        "url": "/api/auth/login",
+        "url": "/api/v1/auth/login",
         "headers": {
           "Content-Type": "application/json",
           "X-Forwarded-For": "1.2.3.4, 5.6.7.8, 9.10.11.12",

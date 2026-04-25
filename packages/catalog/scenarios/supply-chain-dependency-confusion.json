@@ -26,13 +26,16 @@
       "stage": "reconnaissance",
       "request": {
         "method": "GET",
-        "url": "/api/v1/system/version"
+        "url": "/api/system/version"
       },
       "execution": {
         "delayMs": 300
       },
       "extract": {
-        "internal_pkg": { "from": "body", "path": "dependencies.@internal-corp/auth-lib" }
+        "internal_pkg": {
+          "from": "body",
+          "path": "dependencies.@internal-corp/auth-lib"
+        }
       }
     },
     {

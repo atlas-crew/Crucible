@@ -11,7 +11,7 @@
       "stage": "reconnaissance",
       "request": {
         "method": "GET",
-        "url": "/api/user/profile?id=123"
+        "url": "/api/v1/users/profile?id=123"
       },
       "execution": {
         "delayMs": 300
@@ -23,7 +23,7 @@
       "stage": "exploitation",
       "request": {
         "method": "GET",
-        "url": "/api/user/profile?id=123&id=456"
+        "url": "/api/v1/users/profile?id=123&id=456"
       },
       "execution": {
         "delayMs": 500
@@ -43,9 +43,8 @@
         "method": "POST",
         "url": "/api/admin/settings",
         "params": {
-          "admin": "false",
-          "user_id": "999",
-          "admin": "true"
+          "admin": "true",
+          "user_id": "999"
         }
       },
       "execution": {

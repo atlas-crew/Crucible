@@ -4,7 +4,13 @@
   "category": "SSRF",
   "difficulty": "Advanced",
   "description": "SSRF to access cloud metadata endpoints and internal services, targeting AWS, GCP, and localhost resources",
-  "tags": ["chimera", "ssrf", "cloud-metadata", "aws", "owasp-a10"],
+  "tags": [
+    "chimera",
+    "ssrf",
+    "cloud-metadata",
+    "aws",
+    "owasp-a10"
+  ],
   "steps": [
     {
       "id": "ssrf-aws-metadata",
@@ -85,7 +91,7 @@
       "stage": "exploitation",
       "request": {
         "method": "POST",
-        "url": "/api/integrations/webhook/register",
+        "url": "/api/webhooks/register",
         "headers": {
           "Content-Type": "application/json"
         },
