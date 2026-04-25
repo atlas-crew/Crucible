@@ -1,0 +1,42 @@
+{
+  "id": "compliance-pci-strong-crypto",
+  "name": "PCI DSS Strong Cryptography Check",
+  "category": "Compliance",
+  "difficulty": "Intermediate",
+  "description": "Verifies that sensitive cardholder data or PHI endpoints require strong cryptography (TLS 1.2+) and reject insecure plain-text connections.",
+  "rule_ids": ["4.2.1"],
+  "tags": ["pci-dss", "encryption", "tls", "network-security"],
+  "steps": [
+    {
+      "id": "insecure-connection-attempt",
+      "name": "Attempt Insecure HTTP Connection",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "GET",
+        "url": "http://{{target}}/api/v1/payments/vault/status"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "id": "secure-connection-check",
+      "name": "Verify Secure Connection Headers",
+      "stage": "reconnaissance",
+      "request": {
+        "method": "HEAD",
+        "url": "/api/v1/payments/vault/status"
+      },
+      "execution": {
+        "delayMs": 500
+      },
+      "expect": {
+        "status": 200,
+        "headerPresent": "Strict-Transport-Security"
+      }
+    }
+  ]
+}
