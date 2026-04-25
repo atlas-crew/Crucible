@@ -1,9 +1,10 @@
 ---
 id: TASK-30
 title: Build AI/LLM security scenarios (OWASP LLM Top 10)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-07 23:28'
+updated_date: '2026-04-12 04:40'
 labels:
   - scenarios
   - ai-llm
