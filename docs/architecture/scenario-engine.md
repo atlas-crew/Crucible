@@ -99,12 +99,48 @@ flowchart TD
     I -- No --> FAIL["Mark FAILED"]
 ```
 
+### Target Resolution
+
+Each execution runs against an **effective target URL**. This is the base URL that relative step paths (e.g., `/health`) are prepended with, and the only origin that the per-execution outbound allowlist permits. The engine resolves the effective target using this precedence chain:
+
+1. **Per-run override** — passed explicitly to `startScenario(…, targetUrl)` by the caller. Takes precedence over every other source.
+2. **Engine constructor option** — `new ScenarioEngine(catalog, repo, reports, { targetUrl: "…" })`.
+3. **`CRUCIBLE_TARGET_URL` environment variable** — read at engine construction time.
+4. **`DEFAULT_TARGET_URL`** — hard-coded fallback (`http://localhost:8880`).
+
+The effective target is persisted on the execution record at creation time, so reports, history, and restart flows always replay or render against the exact target the run originally used. Restart does **not** expose a new override parameter — it reads the persisted `targetUrl` from the originating execution and replays against that, keeping restart idempotent even as the engine default drifts.
+
+Overrides are validated up front via `normalizeConfiguredTargetUrl` / `parseValidatedAbsoluteUrl` before any execution state is created. Invalid overrides throw with a descriptive error and leave the engine untouched (no DB row, no control state, no runtime state). Rejection criteria:
+
+| Failure | Example |
+|---|---|
+| Missing or empty | `""` |
+| Unparseable | `"not-a-url"` |
+| Non-http/https protocol | `"ftp://example.test"` |
+| Missing hostname | `"http:///path"` |
+| Embedded credentials | `"http://user:pass@host"` |
+| URL fragment | `"http://host#section"` |
+
+### Outbound Allowlist
+
+To prevent a compromised scenario from pivoting off its intended target (SSRF), the engine builds a strict outbound allowlist for every execution. Step requests that resolve to a host outside the allowlist are rejected **before** `fetch` is called.
+
+The allowlist is **scoped per execution**, not per engine. Each `startScenario` call builds a fresh `OutboundAllowlist` from:
+
+- The execution's effective target (exact host+port, automatically added).
+- The comma-separated `CRUCIBLE_OUTBOUND_ALLOWLIST` environment variable, which may contain additional exact hosts, wildcard domains (`*.example.com`), explicit host:port pairs, IP addresses, or CIDR ranges.
+
+Per-execution scoping means concurrent runs pointing at different targets never share an allowlist — a run against `http://10.0.0.1` cannot pivot to `http://10.0.0.2` just because another concurrent run happens to target it. A compromised scenario is bounded to what the operator explicitly chose for that run.
+
+The allowlist check runs at the validated URL stage, before DNS resolution. For sensitive targets, prefer exact IP or CIDR entries plus network-layer controls (firewall, egress policy) — DNS-based allowlists alone don't protect against DNS rebinding (see TASK-59 for the documented DNS-rebinding limits).
+
 ### Template Resolution
 
 Before each request, the engine replaces `{{variable}}` placeholders in the URL, headers, and body:
 
 | Variable | Source | Example Value |
 |----------|--------|--------------|
+| `{{target}}` | Effective target URL for this execution | `http://localhost:8880` |
 | `{{random}}` | Built-in | `a7f3b2c1` |
 | `{{random_ip}}` | Built-in | `192.168.42.17` |
 | `{{timestamp}}` | Built-in | `1708700000000` |
