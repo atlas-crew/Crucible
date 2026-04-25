@@ -1,6 +1,7 @@
 {
   "id": "regulatory-compliance-evasion",
   "name": "Regulatory Compliance Evasion",
+  "kind": "deprecated-mock",
   "description": "Advanced attack targeting financial regulatory systems to bypass AML monitoring, evade suspicious activity reporting, and manipulate KYC verification processes through systematic compliance system exploitation.",
   "category": "Financial Services",
   "difficulty": "Expert",

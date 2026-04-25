@@ -1,6 +1,7 @@
 {
   "id": "business-logic-manipulation",
   "name": "Business Logic Manipulation Campaign",
+  "kind": "pattern-demo",
   "category": "Logic Flaws",
   "difficulty": "Expert",
   "description": "Advanced business logic attack exploiting race conditions, workflow bypasses, parameter pollution, and economic logic flaws in e-commerce and financial applications",

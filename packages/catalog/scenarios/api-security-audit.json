@@ -1,6 +1,7 @@
 {
   "id": "api-security-audit",
   "name": "API Security Audit",
+  "kind": "deprecated-mock",
   "category": "API Security",
   "difficulty": "Intermediate",
   "description": "Comprehensive API security testing including authentication bypass, parameter pollution, and business logic flaws",

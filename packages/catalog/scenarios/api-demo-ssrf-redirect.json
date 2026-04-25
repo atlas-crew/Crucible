@@ -1,6 +1,7 @@
 {
   "id": "api-demo-ssrf-redirect",
   "name": "Chimera SSRF & Open Redirect Chains",
+  "kind": "deprecated-mock",
   "category": "SSRF",
   "difficulty": "Advanced",
   "description": "Server-Side Request Forgery and redirect-based attacks",

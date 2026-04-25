@@ -1,5 +1,6 @@
 {
   "name": "Directory Enumeration",
+  "kind": "recon",
   "description": "Slow directory and file discovery probing common paths over 10-15 minutes",
   "category": "Reconnaissance",
   "difficulty": "Beginner",

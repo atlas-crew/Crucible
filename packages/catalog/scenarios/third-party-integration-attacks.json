@@ -1,6 +1,7 @@
 {
   "id": "third-party-integration-attacks",
   "name": "Third-Party Integration Attacks",
+  "kind": "deprecated-mock",
   "category": "Identity & Integration Security",
   "difficulty": "Expert",
   "description": "Sophisticated attacks targeting OAuth provider impersonation, SAML manipulation, webhook hijacking, callback exploitation, and CDN/payment processor abuse through compromised third-party integrations",

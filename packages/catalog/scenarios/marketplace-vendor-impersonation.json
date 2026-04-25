@@ -1,6 +1,7 @@
 {
   "id": "marketplace-vendor-impersonation",
   "name": "Marketplace Vendor Impersonation Campaign",
+  "kind": "deprecated-mock",
   "category": "E-commerce Fraud",
   "difficulty": "Expert",
   "description": "Advanced marketplace exploitation targeting seller account takeover, product listing manipulation, review system gaming, rating inflation, and payment redirection attacks",

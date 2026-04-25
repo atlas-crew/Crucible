@@ -1,5 +1,6 @@
 {
   "name": "Directory Enumeration (Python/Flask API)",
+  "kind": "recon",
   "description": "Slow directory and file discovery targeting Python/Flask API paths over 10-15 minutes",
   "category": "Reconnaissance",
   "difficulty": "Beginner",

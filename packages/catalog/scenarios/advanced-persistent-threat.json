@@ -1,6 +1,7 @@
 {
   "id": "advanced-persistent-threat",
   "name": "Advanced Persistent Threat (APT)",
+  "kind": "deprecated-mock",
   "category": "Nation-State Operations",
   "difficulty": "Expert",
   "description": "Ultra-sophisticated nation-state level attack featuring long-term reconnaissance, lateral movement techniques, compliance system evasion, audit trail manipulation, and multi-vector coordination with advanced persistence mechanisms",

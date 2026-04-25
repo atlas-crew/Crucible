@@ -1,6 +1,7 @@
 {
   "id": "ssrf-cloud-metadata",
   "name": "SSRF Cloud Metadata Exploitation",
+  "kind": "pattern-demo",
   "category": "Server-Side Attacks",
   "difficulty": "Expert",
   "description": "Server-Side Request Forgery targeting cloud metadata services, internal networks, and backend systems",

@@ -1,5 +1,6 @@
 {
   "name": "Technology Fingerprinting (Python/Flask API)",
+  "kind": "recon",
   "description": "Passive technology and version identification for Python/Flask APIs through common files and headers over 10-15 minutes",
   "category": "Reconnaissance",
   "difficulty": "Beginner",

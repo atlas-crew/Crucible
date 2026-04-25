@@ -1,6 +1,7 @@
 {
   "id": "http-request-smuggling",
   "name": "HTTP Request Smuggling Attack Chain",
+  "kind": "pattern-demo",
   "category": "Protocol Manipulation",
   "difficulty": "Expert",
   "description": "Advanced HTTP request smuggling campaign exploiting Content-Length and Transfer-Encoding header discrepancies to bypass security controls and poison responses",

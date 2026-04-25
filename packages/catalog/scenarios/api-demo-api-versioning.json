@@ -1,6 +1,7 @@
 {
   "id": "api-demo-api-versioning",
   "name": "Chimera Version & Endpoint Discovery",
+  "kind": "deprecated-mock",
   "category": "API Security",
   "difficulty": "Intermediate",
   "description": "API versioning exploits and deprecated endpoint discovery",

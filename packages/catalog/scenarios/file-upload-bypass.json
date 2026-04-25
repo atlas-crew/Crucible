@@ -1,6 +1,7 @@
 {
   "id": "file-upload-bypass",
   "name": "Malicious File Upload Bypass",
+  "kind": "pattern-demo",
   "category": "File Upload Attacks",
   "difficulty": "Intermediate",
   "description": "File upload filter bypass techniques including extension manipulation, MIME type spoofing, and payload embedding",

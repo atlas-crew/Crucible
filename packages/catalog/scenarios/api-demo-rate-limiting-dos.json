@@ -1,6 +1,7 @@
 {
   "id": "api-demo-rate-limiting-dos",
   "name": "Chimera Rate Limiting & DoS Attacks",
+  "kind": "pattern-demo",
   "category": "Denial of Service",
   "difficulty": "Intermediate",
   "description": "Rate limiting bypass and resource exhaustion attacks",

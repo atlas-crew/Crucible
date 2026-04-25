@@ -1,6 +1,7 @@
 {
   "id": "ssti-template-engines",
   "name": "Server-Side Template Injection Multi-Engine",
+  "kind": "pattern-demo",
   "category": "Template Injection",
   "difficulty": "Expert",
   "description": "Advanced SSTI campaign targeting multiple template engines (Jinja2, Twig, Freemarker, Velocity) with RCE payloads and sandbox escapes",

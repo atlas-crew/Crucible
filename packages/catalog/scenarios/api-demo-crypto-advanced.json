@@ -1,6 +1,7 @@
 {
   "id": "api-demo-crypto-advanced",
   "name": "Chimera Cryptographic & Advanced Attacks",
+  "kind": "deprecated-mock",
   "category": "Cryptographic",
   "difficulty": "Expert",
   "description": "Advanced cryptographic attacks and sophisticated exploitation techniques",

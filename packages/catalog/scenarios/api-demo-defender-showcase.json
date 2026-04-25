@@ -1,6 +1,7 @@
 {
   "id": "api-demo-defender-showcase",
   "name": "API Defender Showcase - Advanced API Protection",
+  "kind": "deprecated-mock",
   "category": "API Security",
   "difficulty": "Advanced",
   "description": "Demonstrates ThreatX API Defender capabilities including rate limiting, schema validation, anomaly detection, and behavioral analytics. Shows how API Defender protects against sophisticated API attacks.",

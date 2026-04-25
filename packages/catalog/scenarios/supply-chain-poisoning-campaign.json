@@ -1,6 +1,7 @@
 {
   "id": "supply-chain-poisoning-campaign",
   "name": "Supply Chain Poisoning Campaign",
+  "kind": "deprecated-mock",
   "category": "Supply Chain Attacks",
   "difficulty": "Expert",
   "description": "Advanced supply chain attack exploiting vulnerable components, dependency confusion, package repositories, CDN poisoning, and software integrity failures (OWASP A06/A08)",

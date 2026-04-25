@@ -1,6 +1,7 @@
 {
   "id": "xxe-injection-xml",
   "name": "XML External Entity (XXE) Injection",
+  "kind": "pattern-demo",
   "category": "Injection Attacks",
   "difficulty": "Advanced",
   "description": "XML External Entity injection targeting XML parsers through malicious DTD declarations and external entity references",

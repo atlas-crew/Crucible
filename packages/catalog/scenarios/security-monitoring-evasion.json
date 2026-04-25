@@ -1,6 +1,7 @@
 {
   "id": "security-monitoring-evasion",
   "name": "Security Monitoring Blind Spot Exploitation",
+  "kind": "deprecated-mock",
   "category": "Monitoring Evasion",
   "difficulty": "Expert",
   "description": "Advanced campaign exploiting security logging and monitoring failures through log injection, blind spots, alert fatigue, correlation bypass, and SIEM evasion techniques (OWASP A09)",

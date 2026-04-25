@@ -1,6 +1,7 @@
 {
   "id": "api-endpoint-discovery",
   "name": "API Endpoint Discovery",
+  "kind": "recon",
   "description": "API surface mapping through common endpoint and documentation discovery over 10-15 minutes",
   "category": "API Reconnaissance",
   "difficulty": "Intermediate",

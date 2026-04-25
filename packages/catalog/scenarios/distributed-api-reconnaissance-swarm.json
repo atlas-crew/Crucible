@@ -1,6 +1,7 @@
 {
   "id": "distributed-api-reconnaissance-swarm",
   "name": "Distributed API Reconnaissance Swarm",
+  "kind": "recon",
   "category": "Advanced Reconnaissance",
   "difficulty": "Expert",
   "description": "Ultra-sophisticated multi-IP distributed reconnaissance campaign using botnet-style coordination, advanced evasion, timing diversification, and API fingerprinting to remain undetected while mapping attack surface",

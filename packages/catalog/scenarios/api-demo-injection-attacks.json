@@ -1,6 +1,7 @@
 {
   "id": "api-demo-injection-attacks",
   "name": "Chimera Injection Attacks",
+  "kind": "deprecated-mock",
   "category": "Injection",
   "difficulty": "Advanced",
   "description": "Comprehensive injection attacks including SQL, NoSQL, Command, LDAP, and XXE",

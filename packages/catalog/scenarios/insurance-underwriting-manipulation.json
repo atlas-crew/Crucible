@@ -1,6 +1,7 @@
 {
   "id": "insurance-underwriting-manipulation",
   "name": "Insurance Underwriting Data Manipulation",
+  "kind": "deprecated-mock",
   "description": "Advanced attack targeting insurance underwriting systems to manipulate risk assessments, poison actuarial data, bypass premium calculations, and alter coverage limits through systematic exploitation of underwriting processes.",
   "category": "Financial Services",
   "difficulty": "Advanced",
