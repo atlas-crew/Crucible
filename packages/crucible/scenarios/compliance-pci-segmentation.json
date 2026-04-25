@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Attempts to pivot from a public API to the internal Cardholder Data Environment (CDE) subnet.",
+  "rule_ids": ["3.5.1"],
   "steps": [
     {
       "id": "public-api-recon",

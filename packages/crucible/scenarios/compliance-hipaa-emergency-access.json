@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Tests the enforcement of justification and alerting for emergency access to PHI.",
+  "rule_ids": ["164.312-a-1"],
   "steps": [
     {
       "id": "emergency-access-no-justification",

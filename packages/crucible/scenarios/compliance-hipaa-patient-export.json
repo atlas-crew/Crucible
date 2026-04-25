@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Checks if internal medical notes or psychotherapy notes are leaked during a standard patient data export.",
+  "rule_ids": ["164.312-a-1"],
   "steps": [
     {
       "id": "patient-export-request",

@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Probes for DOM injection vulnerabilities on the checkout page that could lead to form overlay attacks.",
+  "rule_ids": ["11.3.1"],
   "steps": [
     {
       "id": "checkout-page-recon",

@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Attempts to trigger a marketing event for a user who has explicitly opted out.",
+  "rule_ids": ["GDPR-ART-21"],
   "steps": [
     {
       "id": "get-consent-status",

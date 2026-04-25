@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Advanced",
   "description": "Attempts to perform a PHI export while suppressing audit logging, violating HIPAA's accounting of disclosures requirement.",
+  "rule_ids": ["164.312-b"],
   "steps": [
     {
       "id": "phi-export-standard",

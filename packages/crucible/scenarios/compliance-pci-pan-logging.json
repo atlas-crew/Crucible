@@ -4,6 +4,7 @@
   "category": "Compliance",
   "difficulty": "Intermediate",
   "description": "Performs a transaction and then probes debug logs to see if the full Primary Account Number (PAN) was accidentally logged in plain text.",
+  "rule_ids": ["3.5.1"],
   "steps": [
     {
       "id": "pci-transaction",
