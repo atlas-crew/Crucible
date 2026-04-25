@@ -44,10 +44,27 @@ export function RemoteTerminal({ executionId, className }: RemoteTerminalProps) 
     term.loadAddon(new WebLinksAddon());
 
     term.open(terminalRef.current);
-    fit.fit();
 
     termInstance.current = term;
     fitAddon.current = fit;
+
+    let disposed = false;
+    const safeFit = () => {
+      if (disposed) return;
+      const el = terminalRef.current;
+      if (!el || !el.isConnected) return;
+      const { width, height } = el.getBoundingClientRect();
+      if (!width || !height) return;
+      try {
+        fit.fit();
+      } catch {
+        // Renderer not ready yet; the ResizeObserver will retry on next layout tick.
+      }
+    };
+
+    const raf = requestAnimationFrame(safeFit);
+    const ro = new ResizeObserver(safeFit);
+    ro.observe(terminalRef.current);
 
     // Initial welcome
     term.writeln("\x1b[33mCrucible Remote Terminal\x1b[0m");
@@ -85,18 +102,19 @@ export function RemoteTerminal({ executionId, className }: RemoteTerminalProps) 
     };
     term.onResize(onResize);
 
-    const handleResize = () => {
-      fit.fit();
-    };
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", safeFit);
 
     return () => {
+      disposed = true;
+      cancelAnimationFrame(raf);
+      ro.disconnect();
       unsubscribe();
       onData.dispose();
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", safeFit);
       sendMessage({ type: "TERMINAL_STOP", payload: { executionId } });
       term.dispose();
       termInstance.current = null;
+      fitAddon.current = null;
     };
   }, [executionId, sendMessage, onMessage]);
 
