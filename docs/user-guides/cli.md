@@ -84,6 +84,7 @@ Options:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--scenario <id>` | — | Scenario ID(s), comma-separated or repeated. Also accepted as a positional argument. |
+| `--target, -t <url>` | server default | Per-run target URL. Falls back to the server's `CRUCIBLE_TARGET_URL` if omitted. Must be `http`/`https` and parseable. |
 | `--fail-below <score>` | `80` | Exit non-zero if score falls below this threshold (0–100). |
 | `--poll-interval <sec>` | `2` | How often to poll the execution status. |
 
@@ -95,6 +96,10 @@ crucible-cli assess owasp-api-1-broken-auth
 
 # Multiple scenarios, stricter threshold
 crucible-cli assess --scenario scenario-a,scenario-b --fail-below 90
+
+# Same scenario, different environments — same Crucible deployment
+crucible-cli assess production-smoke-test --target https://staging.example.com
+crucible-cli assess production-smoke-test --target https://prod.example.com
 
 # From CI with custom server
 CRUCIBLE_URL=https://crucible.staging.internal \
@@ -149,6 +154,21 @@ Start a scenario in simulation mode (no scoring). Returns immediately with the e
 
 ```bash
 crucible-cli simulate my-scenario
+```
+
+Options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--scenario <id>` | — | Scenario ID. Also accepted as a positional argument. |
+| `--target, -t <url>` | server default | Per-run target URL. Falls back to the server's `CRUCIBLE_TARGET_URL` if omitted. Must be `http`/`https` and parseable. |
+
+Examples:
+
+```bash
+crucible-cli simulate my-scenario
+crucible-cli simulate my-scenario --target https://staging.example.com
+crucible-cli simulate my-scenario -t https://prod.example.com
 ```
 
 ```json
