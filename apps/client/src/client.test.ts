@@ -185,6 +185,29 @@ describe('CrucibleClient', () => {
       );
     });
 
+    it('start() forwards targetUrl when supplied', async () => {
+      fetch = mockFetch({ executionId: 'e1', mode: 'simulation', wsUrl: 'ws://...' });
+      client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
+
+      await client.simulations.start('s1', { targetUrl: 'http://staging.example:8080' });
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/simulations',
+        expect.objectContaining({
+          body: JSON.stringify({
+            scenarioId: 's1',
+            targetUrl: 'http://staging.example:8080',
+          }),
+        }),
+      );
+    });
+
+    it('start() rejects non-string targetUrl at compile time', () => {
+      // Compile-time check — runtime path is unused.
+      // @ts-expect-error targetUrl must be string | null
+      const _bad = (): unknown => client.simulations.start('s1', { targetUrl: 123 });
+      expect(typeof _bad).toBe('function');
+    });
+
     it('start() includes triggerData', async () => {
       fetch = mockFetch({ executionId: 'e1', mode: 'simulation', wsUrl: 'ws://...' });
       client = new CrucibleClient({ baseUrl: 'http://localhost:3000', fetch });
@@ -260,6 +283,13 @@ describe('CrucibleClient', () => {
 
       const result = await client.assessments.start('s1');
       expect(result).toEqual(response);
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/assessments',
+        expect.objectContaining({
+          // No targetUrl, no triggerData — server uses engine default.
+          body: JSON.stringify({ scenarioId: 's1' }),
+        }),
+      );
     });
 
     it('start() forwards assessment triggerData when supplied', async () => {
