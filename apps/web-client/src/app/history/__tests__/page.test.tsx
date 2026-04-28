@@ -113,6 +113,19 @@ describe("HistoryPage", () => {
     expect(screen.getAllByText("92% PASS")[0]).toBeInTheDocument();
   });
 
+  it("displays the per-run target URL on rows that have one", async () => {
+    pagedExecutionResponse = () => [
+      makeExecution({ id: "exec-staging", targetUrl: "http://staging.example:8080" }),
+      makeExecution({ id: "exec-default" }),
+    ];
+
+    render(<HistoryPage />);
+    await screen.findAllByRole("link", { name: /view details/i });
+
+    expect(screen.getByText("http://staging.example:8080")).toBeInTheDocument();
+    expect(screen.queryAllByText(/^Target:/).length).toBe(1);
+  });
+
   it("applies filters through execution history query params", async () => {
     render(<HistoryPage />);
     await screen.findAllByRole("link", { name: /view details/i });

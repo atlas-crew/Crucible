@@ -259,6 +259,11 @@ export default function HistoryPage() {
                     <div>
                       <h2 className="type-heading">{scenarioName}</h2>
                       <p className="type-timestamp break-all text-muted-foreground">{execution.id}</p>
+                      {execution.targetUrl && (
+                        <p className="type-timestamp break-all text-muted-foreground">
+                          Target: <span className="text-foreground">{execution.targetUrl}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
