@@ -40,8 +40,28 @@ A **simulation** executes a scenario in real time and streams step-by-step resul
 1. Go to **/scenarios**
 2. Find the scenario you want to run
 3. Click the **Simulate** button (play icon) on the card
+4. Confirm the launch dialog (covered below)
 
 You'll be taken to the **/simulations** page where execution progress appears in real time.
+
+### The Launch Dialog
+
+Both **Simulate** and **Assess** open the same launch dialog so you can confirm which target environment the run will hit before kicking it off.
+
+| Field | What it does |
+|-------|-------------|
+| **Target URL** | The base URL the scenario runs against. Prefilled with the saved catalog target (the engine default reported by `/health`). Edit it to point this single run at staging, prod, an ephemeral CI host, etc. Leave blank to use the server default. |
+| **Expect WAF blocking** *(simulation only)* | Whether scenario-authored "blocking" assertions should pass when the attack succeeds. Turn off for runs against intentionally-vulnerable targets like Chimera. |
+
+The dialog blocks invalid targets before the request goes out. Targets must be absolute `http`/`https` URLs with no embedded credentials and no fragment. A successful launch with an override also updates the saved catalog target so subsequent launches default to the same environment.
+
+A compatibility hint appears below the input — for example, if a Chimera-shaped scenario is pointed at a non-Chimera target, the dialog warns that endpoint families don't line up before you commit.
+
+### Per-run target URL across multiple environments
+
+The same Crucible deployment can run scenarios against multiple environments without restart or redeploy. Each execution persists its effective target alongside the run record, so the **/history** page shows the target each historical run hit beneath its run ID.
+
+Restart inherits — clicking **Restart** on a completed run replays it against the originating target, not the current saved catalog target. If you want a different target, start a new run.
 
 ### Monitoring Progress
 
