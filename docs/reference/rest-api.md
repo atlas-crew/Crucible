@@ -119,9 +119,17 @@ If the source execution is currently `running`, `pending`, or `paused`, restart 
 { "executionId": "9KpNc1xC2u" }
 ```
 
+**Response 400**
+
+The originating execution's stored `targetUrl` no longer passes validation, or the scenario was edited after the original run in a way the engine can't replay (e.g., a step type that's no longer supported). The error message identifies the failing condition.
+
 **Response 404**
 
 Source execution id does not exist.
+
+**Response 500**
+
+Unexpected engine error during replay (e.g., persistence layer failure). The error message is surfaced for debugging.
 
 ## `GET /api/executions`
 

@@ -326,8 +326,10 @@ export function attachCrucibleBackend(
         return res.status(404).json({ error: 'Execution not found' });
       }
       res.json({ executionId });
-    } catch {
-      res.status(500).json({ error: 'Failed to restart execution' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to restart execution';
+      const status = isScenarioTargetUrlError(error) ? 400 : 500;
+      res.status(status).json({ error: message });
     }
   });
 
