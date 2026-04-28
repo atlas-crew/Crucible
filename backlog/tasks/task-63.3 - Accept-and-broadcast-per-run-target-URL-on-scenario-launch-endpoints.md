@@ -1,10 +1,10 @@
 ---
 id: TASK-63.3
 title: Accept and broadcast per-run target URL on scenario launch endpoints
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-12 19:24'
-updated_date: '2026-04-12 19:25'
+updated_date: '2026-04-28 10:08'
 labels:
   - feature
   - per-run-target
@@ -35,12 +35,28 @@ WebSocket `execution.started` / `execution.updated` deltas need to carry `target
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 POST /api/simulations accepts an optional targetUrl in the request body, Zod-validated for http/https scheme, well-formed parse, and reasonable length cap
-- [ ] #2 POST /api/assessments accepts an optional targetUrl with the same validation
-- [ ] #3 POST /api/executions/:id/restart reads the originating execution's stored targetUrl and replays against it, without exposing a new override parameter
-- [ ] #4 GET /health continues to report the engine default target in its informational payload
-- [ ] #5 WebSocket execution.started and execution.updated events include targetUrl in their payload
-- [ ] #6 Invalid target inputs return 400 with a descriptive error message
-- [ ] #7 Integration tests cover: launch with override, launch without override (default), restart target inheritance, invalid input rejection, WS payload shape
-- [ ] #8 REST API reference documentation in docs/reference/rest-api.md (or equivalent) updated with the new field and the restart semantics
+- [x] #1 POST /api/simulations accepts an optional targetUrl in the request body, Zod-validated for http/https scheme, well-formed parse, and reasonable length cap
+- [x] #2 POST /api/assessments accepts an optional targetUrl with the same validation
+- [x] #3 POST /api/executions/:id/restart reads the originating execution's stored targetUrl and replays against it, without exposing a new override parameter
+- [x] #4 GET /health continues to report the engine default target in its informational payload
+- [x] #5 WebSocket execution.started and execution.updated events include targetUrl in their payload
+- [x] #6 Invalid target inputs return 400 with a descriptive error message
+- [x] #7 Integration tests cover: launch with override, launch without override (default), restart target inheritance, invalid input rejection, WS payload shape
+- [x] #8 REST API reference documentation in docs/reference/rest-api.md (or equivalent) updated with the new field and the restart semantics
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Most of the request-side wiring (Zod validation, targetUrl forwarding to engine.startScenario, /health payload) was already in place from earlier per-run target work. Three gaps closed in this task:
+
+1. **Restart inheritance (AC #3).** `engine.restartExecution` was passing `parentExecutionId` to `startScenario` but not the originating execution's `targetUrl`, so restart silently fell back to the engine default. Threaded `execution.targetUrl` through; restart is now idempotent against engine-default drift.
+2. **WebSocket payload coverage (AC #5).** The broadcast layer already emits the full execution snapshot for `EXECUTION_STARTED` and the first `EXECUTION_UPDATED`, both of which include `targetUrl`. Added an explicit test pinning that contract so a future refactor of the delta path can't quietly drop the field.
+3. **REST reference doc (AC #8).** Created `docs/reference/rest-api.md` covering launch endpoints, restart inheritance semantics, the per-run target override field with validation rules, `/health` payload, and the WebSocket event shape with `targetUrl` placement.
+
+Tests added:
+- `engine.test.ts` — restart inherits originating execution's target URL.
+- `websocket.test.ts` — `EXECUTION_STARTED` snapshot preserves `targetUrl`.
+
+Existing per-run target override tests in `engine.test.ts` (validation, allowlist scoping, fragment stripping, concurrent isolation) and parser tests in `backend.test.ts` (override accept/reject, scheme rejection) cover the rest of AC #7's matrix.
+<!-- SECTION:NOTES:END -->
