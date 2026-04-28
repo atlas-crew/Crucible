@@ -226,6 +226,26 @@ describe('setupWebSocket', () => {
       expect(closedWs.send).not.toHaveBeenCalled();
     });
 
+    it('preserves targetUrl on the EXECUTION_STARTED snapshot payload', () => {
+      const openWs = createMockWs();
+      wss._simulateConnection(openWs);
+
+      engine.emit('execution:started', {
+        id: 'exec-target',
+        scenarioId: 'scenario-a',
+        mode: 'simulation',
+        status: 'running',
+        targetUrl: 'http://staging.example:8080',
+        steps: [],
+      });
+
+      expect(openWs.send).toHaveBeenCalled();
+      const sent = JSON.parse(openWs.send.mock.calls[0][0]);
+      expect(sent.type).toBe('EXECUTION_STARTED');
+      expect(sent.format).toBe('snapshot');
+      expect(sent.payload.targetUrl).toBe('http://staging.example:8080');
+    });
+
     it('sends a full snapshot for the first execution update when no prior state exists', () => {
       const openWs = createMockWs();
       wss._simulateConnection(openWs);

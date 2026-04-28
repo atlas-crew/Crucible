@@ -1401,6 +1401,32 @@ describe('ScenarioEngine', () => {
       expect(exec2.parentExecutionId).toBe(id1);
     });
 
+    it("inherits the originating execution's target URL on restart", async () => {
+      const scenario = makeScenario('restart-target', 1);
+      mockCatalog.getScenario.mockReturnValue(scenario);
+
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(mockResponse(200, 'ok')),
+      );
+
+      const done1 = waitForEvent(engine, 'execution:completed');
+      const id1 = await engine.startScenario(
+        'restart-target',
+        'simulation',
+        undefined,
+        undefined,
+        'http://staging.example:8080',
+      );
+      await done1;
+
+      const done2 = waitForEvent(engine, 'execution:completed');
+      const id2 = await engine.restartExecution(id1);
+      await done2;
+
+      expect(id2).toBeTruthy();
+      expect(engine.getExecution(id2!)?.targetUrl).toBe('http://staging.example:8080');
+    });
+
     it('cancels active execution before restart', async () => {
       const scenario = makeScenario('restart-active', 3);
       mockCatalog.getScenario.mockReturnValue(scenario);

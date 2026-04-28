@@ -1047,11 +1047,14 @@ export class ScenarioEngine extends EventEmitter {
       this.cancelExecution(id);
     }
 
+    // Restart replays against the originating execution's stored target so
+    // the run stays idempotent even if the engine default has drifted since.
     return this.startScenario(
       execution.scenarioId,
       execution.mode,
       execution.triggerData,
       id,
+      execution.targetUrl,
     );
   }
 
