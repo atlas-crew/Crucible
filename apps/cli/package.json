@@ -1,6 +1,6 @@
 {
   "name": "@atlascrew/crucible-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lightweight CLI for interacting with a running Crucible server.",
   "type": "module",
   "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",

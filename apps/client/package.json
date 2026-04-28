@@ -1,6 +1,6 @@
 {
   "name": "@atlascrew/crucible-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Typed API client for the Crucible REST and WebSocket APIs.",
   "type": "module",
   "author": "Nicholas Crew Ferguson <nick@atlascrew.dev> (https://atlascrew.dev)",
