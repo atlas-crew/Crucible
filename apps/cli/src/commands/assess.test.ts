@@ -77,6 +77,18 @@ describe('assessCommand', () => {
     });
   });
 
+  it('accepts the --target=value equals form', async () => {
+    const { client, start } = makeClient();
+    const code = await assessCommand(client, globals, [
+      'scenario-1',
+      '--target=http://staging.example:8080',
+    ]);
+    expect(code).toBe(0);
+    expect(start).toHaveBeenCalledWith('scenario-1', {
+      targetUrl: 'http://staging.example:8080',
+    });
+  });
+
   it('applies the same --target to every scenario in a multi-scenario assess', async () => {
     const { client, start } = makeClient();
     const code = await assessCommand(client, globals, [

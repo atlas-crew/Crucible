@@ -59,6 +59,24 @@ describe('simulateCommand', () => {
     expect(start).toHaveBeenCalledWith('scenario-1', { targetUrl: 'https://prod.example.com' });
   });
 
+  it('accepts the --target=value equals form', async () => {
+    const { client, start } = makeClient();
+    const code = await simulateCommand(client, globals, [
+      'scenario-1',
+      '--target=http://staging.example:8080',
+    ]);
+    expect(code).toBe(0);
+    expect(start).toHaveBeenCalledWith('scenario-1', { targetUrl: 'http://staging.example:8080' });
+  });
+
+  it('rejects -t at end of argv with no value', async () => {
+    const { client, start } = makeClient();
+    await expect(
+      simulateCommand(client, globals, ['scenario-1', '-t']),
+    ).rejects.toThrow('--target requires a value');
+    expect(start).not.toHaveBeenCalled();
+  });
+
   it('rejects an unparseable --target before any network call', async () => {
     const { client, start } = makeClient();
     const code = await simulateCommand(client, globals, ['scenario-1', '--target', 'notaurl']);
