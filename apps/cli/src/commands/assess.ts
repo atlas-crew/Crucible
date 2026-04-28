@@ -1,6 +1,6 @@
 import type { CrucibleClient, ScenarioExecution } from '@atlascrew/crucible-client';
 import { renderTable, formatDuration } from '../format.js';
-import { readFlag } from '../parse.js';
+import { readFlag, validateTargetUrlInput } from '../parse.js';
 import type { GlobalOptions } from '../parse.js';
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
@@ -11,6 +11,7 @@ interface AssessOptions {
   scenarioIds: string[];
   failBelow: number;
   pollInterval: number;
+  targetUrl?: string;
 }
 
 interface AssessScenarioResult {
@@ -58,7 +59,10 @@ export async function assessCommand(
       process.stderr.write(`Assessing ${scenarioId}...\n`);
     }
 
-    const { executionId } = await client.assessments.start(scenarioId);
+    const { executionId } = await client.assessments.start(
+      scenarioId,
+      options.targetUrl !== undefined ? { targetUrl: options.targetUrl } : undefined,
+    );
     const execution = await pollUntilDone(client, executionId, options.pollInterval);
     results.push(buildResult(execution, options.failBelow));
   }
@@ -87,6 +91,7 @@ function parseAssessArgs(argv: string[]): AssessOptions {
   const scenarioIds: string[] = [];
   let failBelow = DEFAULT_FAIL_BELOW;
   let pollInterval = DEFAULT_POLL_INTERVAL;
+  let targetUrl: string | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -95,6 +100,13 @@ function parseAssessArgs(argv: string[]): AssessOptions {
       const val = readFlag(arg, argv[i + 1], '--scenario');
       if (arg === '--scenario') i++;
       scenarioIds.push(...val.split(',').map((s) => s.trim()).filter(Boolean));
+      continue;
+    }
+
+    if (arg === '--target' || arg === '-t' || arg.startsWith('--target=')) {
+      const val = readFlag(arg, argv[i + 1], '--target');
+      if (arg === '--target' || arg === '-t') i++;
+      targetUrl = validateTargetUrlInput(val);
       continue;
     }
 
@@ -132,7 +144,7 @@ function parseAssessArgs(argv: string[]): AssessOptions {
     throw new Error('At least one scenario ID is required');
   }
 
-  return { scenarioIds, failBelow, pollInterval };
+  return { scenarioIds, failBelow, pollInterval, targetUrl };
 }
 
 async function pollUntilDone(
@@ -194,6 +206,7 @@ function renderAssessHelp(): string {
     '',
     'Options:',
     '  --scenario <id>          Scenario ID(s). Repeat or comma-separate.',
+    '  --target, -t <url>       Per-run target URL. Falls back to server default if omitted.',
     '  --fail-below <score>     Exit non-zero if score below this. Default: 80.',
     '  --poll-interval <sec>    Polling interval in seconds. Default: 2.',
     '',

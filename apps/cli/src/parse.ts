@@ -106,3 +106,21 @@ export function readFlag(arg: string, nextArg: string | undefined, flagName: str
 export function isHelpFlag(value: string): boolean {
   return value === '--help' || value === '-h';
 }
+
+/**
+ * Basic client-side URL validation for the --target flag. The REST endpoint
+ * is the authoritative validator (rejects credentials, fragments, etc.); this
+ * just catches obvious typos before the network round trip.
+ */
+export function validateTargetUrlInput(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`--target must be a valid URL (got "${value}")`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('--target must use http or https');
+  }
+  return value;
+}

@@ -28,6 +28,8 @@ Examples:
   crucible-cli health
   crucible-cli scenarios
   crucible-cli assess my-scenario --fail-below 90
+  crucible-cli assess my-scenario --target https://staging.example.com
+  crucible-cli simulate my-scenario -t https://prod.example.com
   crucible-cli executions --status running,completed --limit 20
   crucible-cli reports abc123 --download pdf -o report.pdf
 `;
