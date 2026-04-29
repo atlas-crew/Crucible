@@ -37,7 +37,7 @@ COPY apps/web-client apps/web-client
 COPY apps/demo-dashboard apps/demo-dashboard
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter @atlascrew/crucible build
+RUN pnpm build
 RUN pnpm deploy --filter @atlascrew/crucible --prod /release
 
 # ── Stage 3: Production runner ────────────────────────────────────────────────
