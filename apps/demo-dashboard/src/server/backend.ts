@@ -537,6 +537,19 @@ export function resolveArtifactPath(
   return { ok: true, path: resolvedPath };
 }
 
+/**
+ * Whether an execution is allowed to expose runner artifacts via the public
+ * download endpoint. Mirrors sendReportFile's gate so simulation-mode runs
+ * (which may produce runner output in the future) don't silently leak.
+ */
+export function isArtifactExposable(
+  execution: { mode?: string; steps: Array<{ stepId: string }> } | undefined,
+  stepId: string,
+): boolean {
+  if (!execution || execution.mode !== 'assessment') return false;
+  return execution.steps.some((s) => s.stepId === stepId);
+}
+
 function sendArtifactFile(
   executionId: string,
   stepId: string,
@@ -546,12 +559,8 @@ function sendArtifactFile(
   engine: CrucibleRuntime['engine'],
 ) {
   const execution = engine.getExecution(executionId);
-  if (!execution) {
-    return res.status(404).json({ error: 'Execution not found' });
-  }
-  const step = execution.steps.find((s) => s.stepId === stepId);
-  if (!step) {
-    return res.status(404).json({ error: 'Step not found' });
+  if (!isArtifactExposable(execution, stepId)) {
+    return res.status(404).json({ error: 'Artifact not found' });
   }
 
   const resolution = resolveArtifactPath(reportsDir, executionId, stepId, filename);

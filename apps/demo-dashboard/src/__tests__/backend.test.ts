@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   artifactContentType,
+  isArtifactExposable,
   parseAssessmentLaunchRequest,
   parseSimulationLaunchRequest,
   resolveArtifactPath,
@@ -242,6 +243,32 @@ describe('resolveArtifactPath', () => {
       ok: false,
       status: 400,
     });
+  });
+});
+
+describe('isArtifactExposable', () => {
+  const baseStep = { stepId: 'load' };
+
+  it('returns true for an assessment execution that owns the step', () => {
+    expect(
+      isArtifactExposable({ mode: 'assessment', steps: [baseStep] }, 'load'),
+    ).toBe(true);
+  });
+
+  it('refuses simulation-mode executions even when the step exists', () => {
+    expect(
+      isArtifactExposable({ mode: 'simulation', steps: [baseStep] }, 'load'),
+    ).toBe(false);
+  });
+
+  it('refuses missing executions', () => {
+    expect(isArtifactExposable(undefined, 'load')).toBe(false);
+  });
+
+  it('refuses unknown step ids', () => {
+    expect(
+      isArtifactExposable({ mode: 'assessment', steps: [baseStep] }, 'other'),
+    ).toBe(false);
   });
 });
 
