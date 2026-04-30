@@ -1,13 +1,20 @@
 import { spawn as defaultSpawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { extname, isAbsolute, join, resolve as resolvePath } from 'node:path';
 import type { ScenarioK6Step } from '@crucible/catalog';
 import type { RunnerSummary } from '../../shared/types.js';
 
-// Soft cap for stdout/stderr buffering; commit 4 tightens this with a
-// truncation flag on the summary. The cap is high enough that normal k6
-// human-readable summaries (~5–20 KiB) fit comfortably.
-const STDOUT_SOFT_CAP_BYTES = 1024 * 1024;
+const STDOUT_MAX_BYTES = 2 * 1024 * 1024;
+const SUMMARY_MAX_BYTES = 256 * 1024;
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const KILL_GRACE_MS = 5_000;
 
 export type SpawnFn = (
   command: string,
@@ -22,6 +29,8 @@ export interface K6RunnerConfig {
   spawn?: SpawnFn;
   /** Override binary name. Defaults to 'k6'. */
   binary?: string;
+  /** Wall-clock timeout per execution in milliseconds. Defaults to 10 minutes. */
+  timeoutMs?: number;
 }
 
 export interface K6ExecuteInput {
@@ -45,6 +54,7 @@ export class K6Runner {
   private readonly scriptsDir: string;
   private readonly spawn: SpawnFn;
   private readonly binary: string;
+  private readonly timeoutMs: number;
 
   constructor(config: K6RunnerConfig) {
     if (!isAbsolute(config.scriptsDir)) {
@@ -60,6 +70,7 @@ export class K6Runner {
     this.scriptsDir = realpathSync(config.scriptsDir);
     this.spawn = config.spawn ?? defaultSpawn;
     this.binary = config.binary ?? 'k6';
+    this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   async execute(input: K6ExecuteInput): Promise<RunnerSummary> {
@@ -87,7 +98,7 @@ export class K6Runner {
       scriptPath,
     ];
 
-    const { exitCode, stdout, stderr } = await this.runChild(args, env, input.signal);
+    const { exitCode, stdout, stderr, stdoutTruncated } = await this.runChild(args, env, input.signal);
     const metrics = readSummaryMetrics(summaryPath);
 
     // Persist captured streams so operators can pull them via the artifact
@@ -111,6 +122,7 @@ export class K6Runner {
       exitCode,
       targetUrl: input.targetUrl,
       summary: stdout.length > 0 ? stdout : undefined,
+      ...(stdoutTruncated ? { summaryTruncated: true } : {}),
       metrics,
       artifacts,
     };
@@ -150,7 +162,12 @@ export class K6Runner {
     args: ReadonlyArray<string>,
     env: NodeJS.ProcessEnv,
     signal: AbortSignal | undefined,
-  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  ): Promise<{
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+    stdoutTruncated: boolean;
+  }> {
     return new Promise((resolveExit, reject) => {
       let child: ChildProcess;
       try {
@@ -162,19 +179,70 @@ export class K6Runner {
 
       let stdout = '';
       let stderr = '';
-      child.stdout?.on('data', (chunk: Buffer | string) => {
-        if (stdout.length >= STDOUT_SOFT_CAP_BYTES) return;
-        stdout += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-      });
-      child.stderr?.on('data', (chunk: Buffer | string) => {
-        if (stderr.length >= STDOUT_SOFT_CAP_BYTES) return;
-        stderr += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-      });
+      let stdoutTruncated = false;
+      const captureChunk = (
+        target: 'stdout' | 'stderr',
+        chunk: Buffer | string,
+      ): void => {
+        const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        const current = target === 'stdout' ? stdout : stderr;
+        if (current.length >= STDOUT_MAX_BYTES) {
+          if (target === 'stdout') stdoutTruncated = true;
+          return;
+        }
+        const remaining = STDOUT_MAX_BYTES - current.length;
+        if (text.length <= remaining) {
+          if (target === 'stdout') stdout += text;
+          else stderr += text;
+        } else {
+          if (target === 'stdout') {
+            stdout += text.slice(0, remaining);
+            stdoutTruncated = true;
+          } else {
+            stderr += text.slice(0, remaining);
+          }
+        }
+      };
+      child.stdout?.on('data', (chunk) => captureChunk('stdout', chunk));
+      child.stderr?.on('data', (chunk) => captureChunk('stderr', chunk));
 
-      child.once('error', (err) => reject(err));
+      // Wall-clock timeout: SIGTERM, then SIGKILL after a grace period.
+      let timedOut = false;
+      let killTimer: NodeJS.Timeout | null = null;
+      const timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // child may already be dead; ignore
+        }
+        killTimer = setTimeout(() => {
+          try {
+            if (!child.killed) child.kill('SIGKILL');
+          } catch {
+            // ignore
+          }
+        }, KILL_GRACE_MS);
+      }, this.timeoutMs);
+
+      child.once('error', (err) => {
+        clearTimeout(timeoutTimer);
+        if (killTimer) clearTimeout(killTimer);
+        reject(err);
+      });
       child.once('exit', (code, signalName) => {
+        clearTimeout(timeoutTimer);
+        if (killTimer) clearTimeout(killTimer);
+        if (timedOut) {
+          reject(new Error(`k6 timeout exceeded after ${this.timeoutMs}ms`));
+          return;
+        }
+        if (signal?.aborted) {
+          reject(new Error('k6 step aborted'));
+          return;
+        }
         const exitCode = signalName ? -1 : (code ?? -1);
-        resolveExit({ exitCode, stdout, stderr });
+        resolveExit({ exitCode, stdout, stderr, stdoutTruncated });
       });
     });
   }
@@ -196,6 +264,19 @@ interface K6SummaryShape {
  * the whole step if the only issue is the metric serialization.
  */
 function readSummaryMetrics(summaryPath: string): RunnerSummary['metrics'] | undefined {
+  // Refuse to parse oversized summary files. The artifact is still on disk;
+  // operators can inspect it directly. Keeps the runner from OOM'ing on a
+  // pathological k6 export (e.g. a misconfigured handleSummary).
+  let stat;
+  try {
+    stat = statSync(summaryPath);
+  } catch {
+    return undefined;
+  }
+  if (stat.size > SUMMARY_MAX_BYTES) {
+    return undefined;
+  }
+
   let raw: K6SummaryShape;
   try {
     raw = JSON.parse(readFileSync(summaryPath, 'utf8')) as K6SummaryShape;

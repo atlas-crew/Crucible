@@ -3493,6 +3493,193 @@ describe('ScenarioEngine', () => {
       noRunnerEngine.destroy();
     });
 
+    it('cancels the step when the abort signal fires mid-run', async () => {
+      // Spawn a child that never exits on its own — the only way out is abort.
+      let abortChild: any;
+      mockSpawn.mockImplementation((_bin: string, _args: ReadonlyArray<string>, opts: any) => {
+        abortChild = new EventEmitter() as any;
+        abortChild.stdout = new EventEmitter();
+        abortChild.stderr = new EventEmitter();
+        abortChild.killed = false;
+        abortChild.kill = vi.fn().mockImplementation((sig: NodeJS.Signals) => {
+          abortChild.killed = true;
+          process.nextTick(() => abortChild.emit('exit', null, sig));
+        });
+        // Hook the engine's abort signal so the test can fire it later.
+        opts.signal?.addEventListener('abort', () => {
+          abortChild.kill('SIGTERM');
+        });
+        return abortChild;
+      });
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-abort',
+        name: 'k6 Abort',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:cancelled');
+      const executionId = await k6Engine.startScenario('k6-abort');
+      // Give the dispatch a tick to attach to the running k6 process.
+      await Promise.resolve();
+      k6Engine.cancelExecution(executionId);
+      await done;
+
+      const execution = k6Engine.getExecution(executionId);
+      expect(execution?.steps[0].status).toBe('cancelled');
+    });
+
+    it('fails the step when k6 exceeds the configured timeout', async () => {
+      let timeoutChild: any;
+      mockSpawn.mockImplementation(() => {
+        timeoutChild = new EventEmitter() as any;
+        timeoutChild.stdout = new EventEmitter();
+        timeoutChild.stderr = new EventEmitter();
+        timeoutChild.killed = false;
+        timeoutChild.kill = vi.fn().mockImplementation((sig: NodeJS.Signals) => {
+          timeoutChild.killed = true;
+          process.nextTick(() => timeoutChild.emit('exit', null, sig));
+        });
+        // Never emits exit on its own — timer must fire.
+        return timeoutChild;
+      });
+
+      // Build an engine whose runner has a tight timeout.
+      const tightEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
+        k6Runner: new K6Runner({
+          scriptsDir,
+          spawn: mockSpawn as any,
+          timeoutMs: 100,
+        }),
+        reportsDir,
+      });
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-timeout',
+        name: 'k6 Timeout',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(tightEngine, 'execution:completed');
+      await tightEngine.startScenario('k6-timeout');
+      await vi.advanceTimersByTimeAsync(200);
+      await done;
+
+      expect(timeoutChild.kill).toHaveBeenCalledWith('SIGTERM');
+      const execution = tightEngine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toMatch(/k6 timeout exceeded after 100ms/);
+      tightEngine.destroy();
+    });
+
+    it('flags truncated stdout when it exceeds the runner cap', async () => {
+      const cap = 2 * 1024 * 1024;
+      // Emit slightly more than the cap. Two halves so capture-and-cap logic
+      // exercises both the under-cap and over-cap branches.
+      const half = 'A'.repeat(cap / 2 + 100);
+      mockSpawn.mockImplementation((_bin: string, args: ReadonlyArray<string>) => {
+        const flag = args.find((a) => a.startsWith('--summary-export='));
+        const summaryPath = flag?.slice('--summary-export='.length);
+        const child = new EventEmitter() as any;
+        child.stdout = new EventEmitter();
+        child.stderr = new EventEmitter();
+        process.nextTick(() => {
+          if (summaryPath) {
+            writeFileSync(summaryPath, JSON.stringify({ metrics: {} }));
+          }
+          child.stdout.emit('data', Buffer.from(half, 'utf8'));
+          child.stdout.emit('data', Buffer.from(half, 'utf8'));
+          child.emit('exit', 0, null);
+        });
+        return child;
+      });
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-trunc',
+        name: 'k6 Trunc',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      await k6Engine.startScenario('k6-trunc');
+      await done;
+
+      const runner = k6Engine.listExecutions()[0].steps[0].details?.runner;
+      expect(runner?.summaryTruncated).toBe(true);
+      expect(runner?.summary?.length).toBe(cap);
+    });
+
+    it('skips parsing oversized k6 summary exports', async () => {
+      const cap = 256 * 1024;
+      const oversized = JSON.stringify({
+        metrics: { http_reqs: { values: { count: 1 } } },
+        padding: 'B'.repeat(cap + 1024),
+      });
+      mockSpawn.mockImplementation((_bin: string, args: ReadonlyArray<string>) => {
+        const flag = args.find((a) => a.startsWith('--summary-export='));
+        const summaryPath = flag?.slice('--summary-export='.length);
+        const child = new EventEmitter() as any;
+        child.stdout = new EventEmitter();
+        child.stderr = new EventEmitter();
+        process.nextTick(() => {
+          if (summaryPath) writeFileSync(summaryPath, oversized);
+          child.emit('exit', 0, null);
+        });
+        return child;
+      });
+
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-oversize',
+        name: 'k6 Oversize',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      const executionId = await k6Engine.startScenario('k6-oversize');
+      await done;
+
+      const runner = k6Engine.listExecutions()[0].steps[0].details?.runner;
+      // Step still completes — exitCode 0, no thresholds — but metrics are
+      // missing because we refused to parse the oversized summary file.
+      expect(runner?.metrics).toBeUndefined();
+      expect(runner?.exitCode).toBe(0);
+      // Artifact URL still surfaces so operators can inspect the file.
+      expect(runner?.artifacts).toContain(
+        `/api/reports/${executionId}/artifacts/load/summary.json`,
+      );
+    });
+
     it('fails the step when reportsDir is not configured', async () => {
       const noReportsEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
         k6Runner: new K6Runner({ scriptsDir, spawn: mockSpawn as any }),
