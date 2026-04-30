@@ -306,4 +306,113 @@ describe('ReportService', () => {
       }),
     );
   });
+
+  it('renders runner step metrics, artifact links, and exit code in HTML', async () => {
+    const runnerExecution: ScenarioExecution = {
+      ...mockExecution,
+      steps: [
+        {
+          stepId: 'load',
+          status: 'completed',
+          duration: 4200,
+          attempts: 1,
+          assertions: [],
+          details: {
+            runner: {
+              type: 'k6',
+              exitCode: 0,
+              targetUrl: 'http://victim.local',
+              summary: 'iteration 1/1 ok',
+              metrics: {
+                requests: 50,
+                iterations: 50,
+                httpReqDurationP95Ms: 187.5,
+                checksPassed: 50,
+                checksFailed: 0,
+                thresholdsPassed: 1,
+                thresholdsFailed: 0,
+              },
+              artifacts: [
+                '/api/reports/test-exec-123/artifacts/load/summary.json',
+                '/api/reports/test-exec-123/artifacts/load/stdout.log',
+              ],
+            },
+          },
+        },
+      ],
+    };
+    const runnerScenario: any = {
+      id: 'test-scenario',
+      name: 'Test Scenario',
+      steps: [
+        {
+          id: 'load',
+          name: 'Baseline load',
+          type: 'k6',
+          stage: 'main',
+          runner: { scriptRef: 'baseline-smoke.js' },
+        },
+      ],
+    };
+
+    const { htmlPath, jsonPath } = await service.generateReports(runnerExecution, runnerScenario);
+    const html = readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('K6 Metrics');
+    expect(html).toContain('Requests: 50');
+    expect(html).toContain('HTTP req duration p95: 187.5ms');
+    expect(html).toContain('Checks: 50 passed / 0 failed');
+    expect(html).toContain('Thresholds: 1 passed / 0 failed');
+    expect(html).toContain('Exit code:');
+    expect(html).toContain(
+      'href="/api/reports/test-exec-123/artifacts/load/summary.json"',
+    );
+    expect(html).toContain('Runner Output');
+
+    // Runner detail must also survive the JSON export so the report is
+    // self-contained and history views can rehydrate it.
+    const json = JSON.parse(readFileSync(jsonPath, 'utf8'));
+    expect(json.steps[0].details.runner.metrics.requests).toBe(50);
+    expect(json.steps[0].details.runner.artifacts).toHaveLength(2);
+  });
+
+  it('marks runner output as truncated when summaryTruncated is set', async () => {
+    const truncatedExecution: ScenarioExecution = {
+      ...mockExecution,
+      steps: [
+        {
+          stepId: 'load',
+          status: 'completed',
+          duration: 1000,
+          attempts: 1,
+          assertions: [],
+          details: {
+            runner: {
+              type: 'k6',
+              exitCode: 0,
+              summary: 'partial output...',
+              summaryTruncated: true,
+              artifacts: ['/api/reports/test-exec-123/artifacts/load/stdout.log'],
+            },
+          },
+        },
+      ],
+    };
+    const runnerScenario: any = {
+      id: 'test-scenario',
+      name: 'Test Scenario',
+      steps: [
+        {
+          id: 'load',
+          name: 'Truncated step',
+          type: 'k6',
+          stage: 'main',
+          runner: { scriptRef: 'baseline-smoke.js' },
+        },
+      ],
+    };
+
+    const { htmlPath } = await service.generateReports(truncatedExecution, runnerScenario);
+    expect(readFileSync(htmlPath, 'utf8')).toContain('Runner Output (truncated)');
+  });
 });

@@ -296,25 +296,10 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
 
   const stepCards = payload.steps
     .map((step, index) => {
-      const body = step.details?.response?.body;
-      const responseBody =
-        body == null
-          ? 'No response body retained.'
-          : typeof body === 'string'
-            ? body
-            : JSON.stringify(body, null, 2);
-      const assertions =
-        step.assertions.length > 0
-          ? `<ul class="assertions">${step.assertions
-              .map(
-                (assertion) => `
-                  <li class="${assertion.passed ? 'pass' : 'fail'}">
-                    <strong>${escapeHtml(assertion.field)}</strong>
-                    <span>${renderAssertionOutcome(assertion)}</span>
-                  </li>`,
-              )
-              .join('')}</ul>`
-          : '<p class="muted">No assertions recorded for this step.</p>';
+      const runnerSummary = step.details?.runner;
+      const stepBody = runnerSummary
+        ? renderRunnerStepBody(runnerSummary)
+        : renderHttpStepBody(step);
 
       return `
         <section class="step-card">
@@ -329,16 +314,7 @@ function renderHtmlReport(payload: AssessmentReportPayload): string {
               <span class="metric">${formatDuration(step.duration)}</span>
             </div>
           </div>
-          <div class="step-grid">
-            <div>
-              <p class="section-label">Assertions</p>
-              ${assertions}
-            </div>
-            <div>
-              <p class="section-label">Response Body</p>
-              <pre>${escapeHtml(responseBody)}</pre>
-            </div>
-          </div>
+          ${stepBody}
           ${
             step.error
               ? `<div class="error-box"><p class="section-label">Error</p><pre>${escapeHtml(step.error)}</pre></div>`
@@ -793,6 +769,102 @@ function sanitizeBodyValue(value: unknown, label: string): unknown {
     return `[redacted ${label}]`;
   }
   return sanitizeValue(value);
+}
+
+function renderHttpStepBody(step: AssessmentReportPayload['steps'][number]): string {
+  const body = step.details?.response?.body;
+  const responseBody =
+    body == null
+      ? 'No response body retained.'
+      : typeof body === 'string'
+        ? body
+        : JSON.stringify(body, null, 2);
+  const assertions =
+    step.assertions.length > 0
+      ? `<ul class="assertions">${step.assertions
+          .map(
+            (assertion) => `
+              <li class="${assertion.passed ? 'pass' : 'fail'}">
+                <strong>${escapeHtml(assertion.field)}</strong>
+                <span>${renderAssertionOutcome(assertion)}</span>
+              </li>`,
+          )
+          .join('')}</ul>`
+      : '<p class="muted">No assertions recorded for this step.</p>';
+
+  return `
+    <div class="step-grid">
+      <div>
+        <p class="section-label">Assertions</p>
+        ${assertions}
+      </div>
+      <div>
+        <p class="section-label">Response Body</p>
+        <pre>${escapeHtml(responseBody)}</pre>
+      </div>
+    </div>`;
+}
+
+function renderRunnerStepBody(runner: NonNullable<NonNullable<AssessmentReportPayload['steps'][number]['details']>['runner']>): string {
+  const metricsItems: string[] = [];
+  const m = runner.metrics;
+  if (m) {
+    if (m.requests !== undefined) metricsItems.push(`Requests: ${m.requests}`);
+    if (m.iterations !== undefined) metricsItems.push(`Iterations: ${m.iterations}`);
+    if (m.httpReqDurationP95Ms !== undefined) metricsItems.push(`HTTP req duration p95: ${m.httpReqDurationP95Ms}ms`);
+    if (m.checksPassed !== undefined || m.checksFailed !== undefined) {
+      metricsItems.push(`Checks: ${m.checksPassed ?? 0} passed / ${m.checksFailed ?? 0} failed`);
+    }
+    if (m.thresholdsPassed !== undefined || m.thresholdsFailed !== undefined) {
+      metricsItems.push(`Thresholds: ${m.thresholdsPassed ?? 0} passed / ${m.thresholdsFailed ?? 0} failed`);
+    }
+  }
+  if (runner.findings) {
+    metricsItems.push(`Findings: ${runner.findings.total}`);
+    if (runner.findings.bySeverity) {
+      const bySev = Object.entries(runner.findings.bySeverity)
+        .map(([sev, count]) => `${sev}=${count}`)
+        .join(', ');
+      if (bySev.length > 0) metricsItems.push(`Severity breakdown: ${bySev}`);
+    }
+  }
+
+  const metricsList = metricsItems.length > 0
+    ? `<ul>${metricsItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : '<p class="muted">No metrics captured.</p>';
+  const exitCodeLine = runner.exitCode !== undefined
+    ? `<p>Exit code: <code>${escapeHtml(String(runner.exitCode))}</code></p>`
+    : '';
+
+  const artifactList = runner.artifacts && runner.artifacts.length > 0
+    ? `<ul class="artifacts">${runner.artifacts
+        .map((url) => {
+          const name = url.split('/').pop() ?? url;
+          return `<li><a href="${escapeHtml(url)}">${escapeHtml(name)}</a></li>`;
+        })
+        .join('')}</ul>`
+    : '<p class="muted">No artifacts captured.</p>';
+
+  const summaryBlock = runner.summary
+    ? `<div class="runner-output">
+         <p class="section-label">Runner Output${runner.summaryTruncated ? ' (truncated)' : ''}</p>
+         <pre>${escapeHtml(runner.summary)}</pre>
+       </div>`
+    : '';
+
+  return `
+    <div class="step-grid">
+      <div>
+        <p class="section-label">${escapeHtml(runner.type.toUpperCase())} Metrics</p>
+        ${metricsList}
+        ${exitCodeLine}
+      </div>
+      <div>
+        <p class="section-label">Artifacts</p>
+        ${artifactList}
+      </div>
+    </div>
+    ${summaryBlock}`;
 }
 
 function formatStepDefinition(step: AssessmentReportPayload['steps'][number]): string {
