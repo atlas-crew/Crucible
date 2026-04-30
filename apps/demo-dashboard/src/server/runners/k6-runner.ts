@@ -1,6 +1,5 @@
 import { spawn as defaultSpawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { extname, isAbsolute, join, resolve as resolvePath } from 'node:path';
 import type { ScenarioK6Step } from '@crucible/catalog';
 import type { RunnerSummary } from '../../shared/types.js';
@@ -28,6 +27,10 @@ export interface K6RunnerConfig {
 export interface K6ExecuteInput {
   step: ScenarioK6Step;
   targetUrl: string;
+  /** Filesystem dir where the runner writes summary.json, stdout.log, stderr.log. Engine creates it. */
+  artifactDir: string;
+  /** URL prefix mapped to artifactDir. Runner returns artifacts as `${artifactUrlBase}/${file}`. */
+  artifactUrlBase: string;
   signal?: AbortSignal;
 }
 
@@ -72,29 +75,45 @@ export class K6Runner {
       TARGET_URL: input.targetUrl,
     };
 
-    const summaryDir = mkdtempSync(join(tmpdir(), 'crucible-k6-'));
-    const summaryPath = join(summaryDir, 'summary.json');
-    try {
-      const args = [
-        'run',
-        `--summary-export=${summaryPath}`,
-        ...(input.step.runner.args ?? []),
-        scriptPath,
-      ];
+    mkdirSync(input.artifactDir, { recursive: true });
+    const summaryPath = join(input.artifactDir, 'summary.json');
+    const stdoutPath = join(input.artifactDir, 'stdout.log');
+    const stderrPath = join(input.artifactDir, 'stderr.log');
 
-      const { exitCode, stdout } = await this.runChild(args, env, input.signal);
-      const metrics = readSummaryMetrics(summaryPath);
+    const args = [
+      'run',
+      `--summary-export=${summaryPath}`,
+      ...(input.step.runner.args ?? []),
+      scriptPath,
+    ];
 
-      return {
-        type: 'k6',
-        exitCode,
-        targetUrl: input.targetUrl,
-        summary: stdout.length > 0 ? stdout : undefined,
-        metrics,
-      };
-    } finally {
-      rmSync(summaryDir, { recursive: true, force: true });
+    const { exitCode, stdout, stderr } = await this.runChild(args, env, input.signal);
+    const metrics = readSummaryMetrics(summaryPath);
+
+    // Persist captured streams so operators can pull them via the artifact
+    // URL even when k6 itself didn't write a summary (script error, etc.).
+    writeFileSync(stdoutPath, stdout, 'utf8');
+    if (stderr.length > 0) {
+      writeFileSync(stderrPath, stderr, 'utf8');
     }
+
+    const artifacts: string[] = [];
+    if (existsSync(summaryPath)) {
+      artifacts.push(`${input.artifactUrlBase}/summary.json`);
+    }
+    artifacts.push(`${input.artifactUrlBase}/stdout.log`);
+    if (stderr.length > 0) {
+      artifacts.push(`${input.artifactUrlBase}/stderr.log`);
+    }
+
+    return {
+      type: 'k6',
+      exitCode,
+      targetUrl: input.targetUrl,
+      summary: stdout.length > 0 ? stdout : undefined,
+      metrics,
+      artifacts,
+    };
   }
 
   private resolveScriptRef(scriptRef: string): string {

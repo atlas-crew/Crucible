@@ -49,7 +49,10 @@ export function createCrucibleRuntime(
     catalog,
     repo,
     reportService,
-    options.targetUrl ? { targetUrl: options.targetUrl } : undefined,
+    {
+      reportsDir,
+      ...(options.targetUrl ? { targetUrl: options.targetUrl } : {}),
+    },
   );
 
   return {

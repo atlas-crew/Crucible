@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
+import { mkdirSync } from 'node:fs';
 import { BlockList, isIP } from 'node:net';
+import { join as joinPath } from 'node:path';
 import { nanoid } from 'nanoid';
 import { CatalogService, ExecutionRepository } from '@crucible/catalog';
 import {
@@ -78,6 +80,7 @@ export interface ScenarioEngineOptions {
   stepBodyMaxBytes?: number;
   outboundAllowlist?: string;
   k6Runner?: K6Runner | null;
+  reportsDir?: string;
 }
 
 interface AssertionContext {
@@ -134,6 +137,7 @@ export class ScenarioEngine extends EventEmitter {
   private stepBodyMaxBytes: number;
   private outboundAllowlist: OutboundAllowlist;
   private k6Runner: K6Runner | null;
+  private reportsDir: string | null;
 
   constructor(
     catalog: CatalogService,
@@ -168,6 +172,7 @@ export class ScenarioEngine extends EventEmitter {
     this.k6Runner = options.k6Runner !== undefined
       ? options.k6Runner
       : ScenarioEngine.createDefaultK6Runner();
+    this.reportsDir = options.reportsDir ?? process.env.CRUCIBLE_REPORTS_DIR ?? null;
   }
 
   private static createDefaultK6Runner(): K6Runner | null {
@@ -437,10 +442,20 @@ export class ScenarioEngine extends EventEmitter {
                     'k6 runner not configured: set CRUCIBLE_K6_SCRIPTS_DIR or pass k6Runner via ScenarioEngineOptions',
                   );
                 }
+                if (!this.reportsDir) {
+                  throw new Error(
+                    'k6 runner requires reportsDir: set CRUCIBLE_REPORTS_DIR or pass reportsDir via ScenarioEngineOptions',
+                  );
+                }
+                const artifactDir = joinPath(this.reportsDir, execution.id, step.id);
+                mkdirSync(artifactDir, { recursive: true });
+                const artifactUrlBase = `/api/reports/${execution.id}/artifacts/${step.id}`;
                 result.attempts = 1;
                 const summary = await this.k6Runner.execute({
                   step,
                   targetUrl: runtime.targetUrl,
+                  artifactDir,
+                  artifactUrlBase,
                   signal,
                 });
                 const thresholdsFailed = summary.metrics?.thresholdsFailed ?? 0;

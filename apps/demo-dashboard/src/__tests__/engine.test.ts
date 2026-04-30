@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ScenarioEngine } from '../server/engine.js';
@@ -3204,6 +3204,7 @@ describe('ScenarioEngine', () => {
 
   describe('k6 runner steps', () => {
     let scriptsDir: string;
+    let reportsDir: string;
     let mockSpawn: ReturnType<typeof vi.fn>;
     let k6Engine: ScenarioEngine;
 
@@ -3223,13 +3224,18 @@ describe('ScenarioEngine', () => {
     });
 
     beforeEach(() => {
+      reportsDir = mkdtempSync(join(tmpdir(), 'crucible-k6-reports-'));
       mockSpawn = vi.fn();
       const k6Runner = new K6Runner({ scriptsDir, spawn: mockSpawn as any });
-      k6Engine = new ScenarioEngine(mockCatalog, undefined, undefined, { k6Runner });
+      k6Engine = new ScenarioEngine(mockCatalog, undefined, undefined, {
+        k6Runner,
+        reportsDir,
+      });
     });
 
     afterEach(() => {
       k6Engine.destroy();
+      rmSync(reportsDir, { recursive: true, force: true });
     });
 
     interface FakeChildOpts {
@@ -3319,6 +3325,16 @@ describe('ScenarioEngine', () => {
         thresholdsPassed: 1,
         thresholdsFailed: 0,
       });
+      const expectedUrlBase = `/api/reports/${executionId}/artifacts/load`;
+      expect(runner?.artifacts).toEqual([
+        `${expectedUrlBase}/summary.json`,
+        `${expectedUrlBase}/stdout.log`,
+      ]);
+      // Files persisted under reportsDir/<executionId>/<stepId>/.
+      const stepDir = join(reportsDir!, executionId, 'load');
+      expect(existsSync(join(stepDir, 'summary.json'))).toBe(true);
+      expect(existsSync(join(stepDir, 'stdout.log'))).toBe(true);
+      expect(readFileSync(join(stepDir, 'stdout.log'), 'utf8')).toBe('iteration 1/1 ok\n');
       expect(mockSpawn).toHaveBeenCalledTimes(1);
       const [bin, args, options] = mockSpawn.mock.calls[0];
       expect(bin).toBe('k6');
@@ -3449,9 +3465,9 @@ describe('ScenarioEngine', () => {
     });
 
     it('fails the step when no k6 runner is configured', async () => {
-      // Build a separate engine with k6Runner explicitly null.
       const noRunnerEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
         k6Runner: null,
+        reportsDir,
       });
       mockCatalog.getScenario.mockReturnValue({
         id: 'k6-no-runner',
@@ -3475,6 +3491,36 @@ describe('ScenarioEngine', () => {
       expect(execution.steps[0].status).toBe('failed');
       expect(execution.steps[0].error).toContain('k6 runner not configured');
       noRunnerEngine.destroy();
+    });
+
+    it('fails the step when reportsDir is not configured', async () => {
+      const noReportsEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
+        k6Runner: new K6Runner({ scriptsDir, spawn: mockSpawn as any }),
+        // reportsDir intentionally omitted
+      });
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-no-reports',
+        name: 'k6 No Reports',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(noReportsEngine, 'execution:completed');
+      await noReportsEngine.startScenario('k6-no-reports');
+      await done;
+
+      const execution = noReportsEngine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('reportsDir');
+      expect(mockSpawn).not.toHaveBeenCalled();
+      noReportsEngine.destroy();
     });
   });
 
