@@ -164,6 +164,15 @@ export interface AssertionResult {
   authoredExpected?: unknown;
 }
 
+/**
+ * Wire-shape of the runner summary that flows from the engine to API consumers.
+ *
+ * NOTE: this type is intentionally duplicated from `@crucible/catalog` rather
+ * than re-exported. Catalog is a private workspace package; this client SDK
+ * publishes to npm and must not depend on private packages at consume-time.
+ * Keep the field set in sync with `RunnerSummary` in
+ * `packages/catalog/src/models/types.ts`.
+ */
 export interface RunnerSummary {
   type: 'k6' | 'nuclei';
   summary?: string;

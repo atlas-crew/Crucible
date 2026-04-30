@@ -31,6 +31,7 @@ export {
   type ScenarioRunnerType,
   type RunnerExecutionMode,
   type RunnerFindingSeverity,
+  type RunnerSummary,
   type ScenarioTargetFamily,
   type ScenarioTargetCompatibility,
   type Scenario,

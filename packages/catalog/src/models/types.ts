@@ -87,6 +87,35 @@ export const RunnerFindingSeveritySchema = z.enum([
 
 export type RunnerFindingSeverity = z.infer<typeof RunnerFindingSeveritySchema>;
 
+/**
+ * Execution-result summary produced by external runners (k6, nuclei).
+ * Lives on `ExecutionStepResult.details.runner` and is consumed by the
+ * report renderers, CLI, and web-client UI. Keep this type stable — the
+ * apps/client published SDK mirrors it as the wire contract.
+ */
+export interface RunnerSummary {
+  type: 'k6' | 'nuclei';
+  summary?: string;
+  /** True when the captured summary exceeded the runner's stdout cap. */
+  summaryTruncated?: boolean;
+  exitCode?: number;
+  targetUrl?: string;
+  artifacts?: string[];
+  metrics?: {
+    checksPassed?: number;
+    checksFailed?: number;
+    thresholdsPassed?: number;
+    thresholdsFailed?: number;
+    httpReqDurationP95Ms?: number;
+    iterations?: number;
+    requests?: number;
+  };
+  findings?: {
+    total: number;
+    bySeverity?: Partial<Record<RunnerFindingSeverity, number>>;
+  };
+}
+
 export const ScenarioTargetFamilySchema = z.enum([
   'chimera',
   'crapi',

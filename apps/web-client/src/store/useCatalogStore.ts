@@ -37,36 +37,10 @@ export interface SimulationTriggerData extends Record<string, unknown> {
   expectWafBlocking?: boolean;
 }
 
-export type RunnerFindingSeverity =
-  | 'info'
-  | 'low'
-  | 'medium'
-  | 'high'
-  | 'critical'
-  | 'unknown';
-
-export interface RunnerSummary {
-  type: 'k6' | 'nuclei';
-  summary?: string;
-  /** True when the captured summary exceeded the runner's stdout cap. */
-  summaryTruncated?: boolean;
-  exitCode?: number;
-  targetUrl?: string;
-  artifacts?: string[];
-  metrics?: {
-    checksPassed?: number;
-    checksFailed?: number;
-    thresholdsPassed?: number;
-    thresholdsFailed?: number;
-    httpReqDurationP95Ms?: number;
-    iterations?: number;
-    requests?: number;
-  };
-  findings?: {
-    total: number;
-    bySeverity?: Partial<Record<RunnerFindingSeverity, number>>;
-  };
-}
+// RunnerSummary and RunnerFindingSeverity are canonical in @crucible/catalog.
+// Re-exported here so existing local imports keep working without churn.
+import type { RunnerFindingSeverity, RunnerSummary } from '@crucible/catalog';
+export type { RunnerFindingSeverity, RunnerSummary };
 
 export interface ExecutionStepResult {
   stepId: string;

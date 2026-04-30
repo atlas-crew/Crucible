@@ -1,5 +1,19 @@
-// Scenario and ScenarioStep types come from the catalog package
-export type { Scenario, ScenarioStep } from '@crucible/catalog';
+// Shared catalog-defined types are re-exported here so legacy import sites
+// (../shared/types.js) keep working. The canonical definitions live in
+// @crucible/catalog.
+import type {
+  RunnerFindingSeverity,
+  RunnerSummary,
+  Scenario,
+  ScenarioStep,
+} from '@crucible/catalog';
+
+export type {
+  RunnerFindingSeverity,
+  RunnerSummary,
+  Scenario,
+  ScenarioStep,
+};
 
 export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'paused' | 'skipped';
 
@@ -22,37 +36,6 @@ export interface AssertionResult {
 
 export interface SimulationTriggerData extends Record<string, unknown> {
   expectWafBlocking?: boolean;
-}
-
-export type RunnerFindingSeverity =
-  | 'info'
-  | 'low'
-  | 'medium'
-  | 'high'
-  | 'critical'
-  | 'unknown';
-
-export interface RunnerSummary {
-  type: 'k6' | 'nuclei';
-  summary?: string;
-  /** True when the captured summary exceeded the runner's stdout cap. */
-  summaryTruncated?: boolean;
-  exitCode?: number;
-  targetUrl?: string;
-  artifacts?: string[];
-  metrics?: {
-    checksPassed?: number;
-    checksFailed?: number;
-    thresholdsPassed?: number;
-    thresholdsFailed?: number;
-    httpReqDurationP95Ms?: number;
-    iterations?: number;
-    requests?: number;
-  };
-  findings?: {
-    total: number;
-    bySeverity?: Partial<Record<RunnerFindingSeverity, number>>;
-  };
 }
 
 export interface ExecutionStepResult {
