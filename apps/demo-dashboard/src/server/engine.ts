@@ -178,7 +178,14 @@ export class ScenarioEngine extends EventEmitter {
   private static createDefaultK6Runner(): K6Runner | null {
     const scriptsDir = process.env.CRUCIBLE_K6_SCRIPTS_DIR;
     if (!scriptsDir) return null;
-    return new K6Runner({ scriptsDir });
+    const modeEnv = process.env.CRUCIBLE_K6_MODE;
+    const defaultMode = modeEnv === 'docker' ? 'docker' : modeEnv === 'native' ? 'native' : undefined;
+    const dockerImage = process.env.CRUCIBLE_K6_DOCKER_IMAGE;
+    return new K6Runner({
+      scriptsDir,
+      ...(defaultMode ? { defaultMode } : {}),
+      ...(dockerImage ? { dockerImage } : {}),
+    });
   }
 
   destroy(): void {

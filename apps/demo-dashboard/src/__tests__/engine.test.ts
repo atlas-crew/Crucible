@@ -3226,7 +3226,11 @@ describe('ScenarioEngine', () => {
     beforeEach(() => {
       reportsDir = mkdtempSync(join(tmpdir(), 'crucible-k6-reports-'));
       mockSpawn = vi.fn();
-      const k6Runner = new K6Runner({ scriptsDir, spawn: mockSpawn as any });
+      const k6Runner = new K6Runner({
+        scriptsDir,
+        spawn: mockSpawn as any,
+        probeBinary: () => true,
+      });
       k6Engine = new ScenarioEngine(mockCatalog, undefined, undefined, {
         k6Runner,
         reportsDir,
@@ -3267,9 +3271,18 @@ describe('ScenarioEngine', () => {
     }
 
     function spawnWith(opts: Omit<FakeChildOpts, 'summaryPath'>) {
-      return (_bin: string, args: ReadonlyArray<string>) => {
+      return (bin: string, args: ReadonlyArray<string>) => {
         const flag = args.find((a) => a.startsWith('--summary-export='));
-        const summaryPath = flag?.slice('--summary-export='.length);
+        let summaryPath = flag?.slice('--summary-export='.length);
+        // Docker mode reports the container-internal summary path. Translate
+        // it back to the host path the runner reads via the -v volume mount.
+        if (bin === 'docker' && summaryPath?.startsWith('/artifacts/')) {
+          const volumeArg = args.find((a) => typeof a === 'string' && a.endsWith(':/artifacts'));
+          if (volumeArg) {
+            const hostDir = volumeArg.split(':')[0];
+            summaryPath = summaryPath.replace('/artifacts', hostDir);
+          }
+        }
         return fakeChild({ ...opts, summaryPath });
       };
     }
@@ -3558,6 +3571,7 @@ describe('ScenarioEngine', () => {
           scriptsDir,
           spawn: mockSpawn as any,
           timeoutMs: 100,
+          probeBinary: () => true,
         }),
         reportsDir,
       });
@@ -3680,9 +3694,127 @@ describe('ScenarioEngine', () => {
       );
     });
 
+    it('fails native k6 steps when the binary probe fails', async () => {
+      const noBinaryEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
+        k6Runner: new K6Runner({
+          scriptsDir,
+          spawn: mockSpawn as any,
+          probeBinary: () => false,
+        }),
+        reportsDir,
+      });
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-no-binary',
+        name: 'k6 No Binary',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(noBinaryEngine, 'execution:completed');
+      await noBinaryEngine.startScenario('k6-no-binary');
+      await done;
+
+      const execution = noBinaryEngine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('k6 binary not found');
+      expect(mockSpawn).not.toHaveBeenCalled();
+      noBinaryEngine.destroy();
+    });
+
+    it('runs k6 in docker mode with volume mounts and env flags', async () => {
+      mockSpawn.mockImplementation(spawnWith({
+        exitCode: 0,
+        summary: { metrics: {} },
+      }));
+      // Engine default stays native (with bypassed probe), step opts into docker.
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-docker-step',
+        name: 'k6 Docker Step',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: {
+              scriptRef: 'baseline-smoke.js',
+              mode: 'docker',
+              env: { K6_VUS: '5' },
+            },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      const executionId = await k6Engine.startScenario('k6-docker-step');
+      await done;
+
+      expect(k6Engine.listExecutions()[0].steps[0].status).toBe('completed');
+      const [bin, args] = mockSpawn.mock.calls[0];
+      expect(bin).toBe('docker');
+      expect(args).toContain('--rm');
+      // Network defaults to host so curated scripts can reach the engine target.
+      expect(args[args.indexOf('--network') + 1]).toBe('host');
+      expect(args).toContain(`${scriptsDir}:/scripts:ro`);
+      expect(args).toContain(`${join(reportsDir, executionId, 'load')}:/artifacts`);
+      // TARGET_URL and step env both forwarded as -e flags.
+      expect(args).toContain('TARGET_URL=http://localhost');
+      expect(args).toContain('K6_VUS=5');
+      // Image pinned to the runner's default.
+      expect(args).toContain('grafana/k6:0.50.0');
+      // Script path inside the container is the relative form under /scripts.
+      expect(args[args.length - 1]).toBe('/scripts/baseline-smoke.js');
+    });
+
+    it('uses a custom docker image when configured on the runner', async () => {
+      mockSpawn.mockImplementation(spawnWith({ exitCode: 0, summary: { metrics: {} } }));
+      const customEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
+        k6Runner: new K6Runner({
+          scriptsDir,
+          spawn: mockSpawn as any,
+          defaultMode: 'docker',
+          dockerImage: 'my-registry.example/k6:v1',
+          probeBinary: () => true,
+        }),
+        reportsDir,
+      });
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-custom-image',
+        name: 'k6 Custom Image',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(customEngine, 'execution:completed');
+      await customEngine.startScenario('k6-custom-image');
+      await done;
+
+      const [, args] = mockSpawn.mock.calls[0];
+      expect(args).toContain('my-registry.example/k6:v1');
+      customEngine.destroy();
+    });
+
     it('fails the step when reportsDir is not configured', async () => {
       const noReportsEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
-        k6Runner: new K6Runner({ scriptsDir, spawn: mockSpawn as any }),
+        k6Runner: new K6Runner({
+          scriptsDir,
+          spawn: mockSpawn as any,
+          probeBinary: () => true,
+        }),
         // reportsDir intentionally omitted
       });
       mockCatalog.getScenario.mockReturnValue({

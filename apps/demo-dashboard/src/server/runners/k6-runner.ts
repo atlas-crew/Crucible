@@ -1,4 +1,4 @@
-import { spawn as defaultSpawn, type ChildProcess } from 'node:child_process';
+import { spawn as defaultSpawn, spawnSync, type ChildProcess } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -7,7 +7,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { extname, isAbsolute, join, resolve as resolvePath } from 'node:path';
+import { extname, isAbsolute, join, relative as relativePath, resolve as resolvePath } from 'node:path';
 import type { ScenarioK6Step } from '@crucible/catalog';
 import type { RunnerSummary } from '../../shared/types.js';
 
@@ -15,6 +15,10 @@ const STDOUT_MAX_BYTES = 2 * 1024 * 1024;
 const SUMMARY_MAX_BYTES = 256 * 1024;
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const KILL_GRACE_MS = 5_000;
+const DEFAULT_DOCKER_IMAGE = 'grafana/k6:0.50.0';
+const DEFAULT_DOCKER_NETWORK = 'host';
+
+export type RunnerExecutionMode = 'native' | 'docker';
 
 export type SpawnFn = (
   command: string,
@@ -31,6 +35,18 @@ export interface K6RunnerConfig {
   binary?: string;
   /** Wall-clock timeout per execution in milliseconds. Defaults to 10 minutes. */
   timeoutMs?: number;
+  /** Default execution mode when a step does not specify one. Defaults to 'native'. */
+  defaultMode?: RunnerExecutionMode;
+  /** Docker image to use in docker mode. Defaults to grafana/k6:0.50.0. */
+  dockerImage?: string;
+  /** Docker network argument. Defaults to 'host' so curated scripts can reach the engine target. */
+  dockerNetwork?: string;
+  /**
+   * Probe used to verify the k6 binary is installed when native mode runs.
+   * Defaults to spawnSync('k6', ['--version']) returning true on exit code 0.
+   * Overridable for tests.
+   */
+  probeBinary?: () => boolean;
 }
 
 export interface K6ExecuteInput {
@@ -50,11 +66,24 @@ export class K6ScriptResolutionError extends Error {
   }
 }
 
+function defaultProbeK6Binary(): boolean {
+  try {
+    const result = spawnSync('k6', ['--version'], { stdio: 'ignore' });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
 export class K6Runner {
   private readonly scriptsDir: string;
   private readonly spawn: SpawnFn;
   private readonly binary: string;
   private readonly timeoutMs: number;
+  private readonly defaultMode: RunnerExecutionMode;
+  private readonly dockerImage: string;
+  private readonly dockerNetwork: string;
+  private readonly nativeAvailable: boolean;
 
   constructor(config: K6RunnerConfig) {
     if (!isAbsolute(config.scriptsDir)) {
@@ -71,34 +100,72 @@ export class K6Runner {
     this.spawn = config.spawn ?? defaultSpawn;
     this.binary = config.binary ?? 'k6';
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.defaultMode = config.defaultMode ?? 'native';
+    this.dockerImage = config.dockerImage ?? DEFAULT_DOCKER_IMAGE;
+    this.dockerNetwork = config.dockerNetwork ?? DEFAULT_DOCKER_NETWORK;
+    const probe = config.probeBinary ?? defaultProbeK6Binary;
+    // Cache the probe at construction. Native mode availability rarely changes
+    // mid-process, and the alternative (probing per call) adds spawnSync cost
+    // to every k6 step.
+    this.nativeAvailable = probe();
   }
 
   async execute(input: K6ExecuteInput): Promise<RunnerSummary> {
-    const scriptPath = this.resolveScriptRef(input.step.runner.scriptRef);
+    const mode: RunnerExecutionMode = input.step.runner.mode ?? this.defaultMode;
 
-    // Inject TARGET_URL so curated scripts can read it via __ENV.TARGET_URL.
-    // This is the v0 SSRF mitigation — k6 issues HTTP itself, bypassing the
-    // engine's outbound allowlist, so curated scripts must rely on this env
-    // rather than hardcoding a host.
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      ...input.step.runner.env,
-      TARGET_URL: input.targetUrl,
-    };
+    if (mode === 'native' && !this.nativeAvailable) {
+      throw new Error(
+        'k6 binary not found on PATH. Install k6 (https://k6.io/docs/get-started/installation/) or set runner.mode to "docker".',
+      );
+    }
+
+    const { absolute: scriptAbsolute, relative: scriptRelative } =
+      this.resolveScriptRef(input.step.runner.scriptRef);
 
     mkdirSync(input.artifactDir, { recursive: true });
     const summaryPath = join(input.artifactDir, 'summary.json');
     const stdoutPath = join(input.artifactDir, 'stdout.log');
     const stderrPath = join(input.artifactDir, 'stderr.log');
 
-    const args = [
-      'run',
-      `--summary-export=${summaryPath}`,
-      ...(input.step.runner.args ?? []),
-      scriptPath,
-    ];
+    const stepEnv = { ...input.step.runner.env, TARGET_URL: input.targetUrl };
 
-    const { exitCode, stdout, stderr, stdoutTruncated } = await this.runChild(args, env, input.signal);
+    let bin: string;
+    let args: string[];
+    let env: NodeJS.ProcessEnv;
+
+    if (mode === 'docker') {
+      bin = 'docker';
+      const envFlags = Object.entries(stepEnv).flatMap(([k, v]) => ['-e', `${k}=${v}`]);
+      args = [
+        'run', '--rm',
+        '--network', this.dockerNetwork,
+        '-v', `${this.scriptsDir}:/scripts:ro`,
+        '-v', `${input.artifactDir}:/artifacts`,
+        ...envFlags,
+        this.dockerImage,
+        'run',
+        '--summary-export=/artifacts/summary.json',
+        ...(input.step.runner.args ?? []),
+        `/scripts/${scriptRelative}`,
+      ];
+      // Docker itself runs in process.env; container env is set via -e flags.
+      env = process.env;
+    } else {
+      bin = this.binary;
+      // Inject TARGET_URL so curated scripts can read it via __ENV.TARGET_URL.
+      // This is the v0 SSRF mitigation — k6 issues HTTP itself, bypassing the
+      // engine's outbound allowlist, so curated scripts must rely on this env
+      // rather than hardcoding a host.
+      env = { ...process.env, ...stepEnv };
+      args = [
+        'run',
+        `--summary-export=${summaryPath}`,
+        ...(input.step.runner.args ?? []),
+        scriptAbsolute,
+      ];
+    }
+
+    const { exitCode, stdout, stderr, stdoutTruncated } = await this.runChild(bin, args, env, input.signal);
     const metrics = readSummaryMetrics(summaryPath);
 
     // Persist captured streams so operators can pull them via the artifact
@@ -128,7 +195,7 @@ export class K6Runner {
     };
   }
 
-  private resolveScriptRef(scriptRef: string): string {
+  private resolveScriptRef(scriptRef: string): { absolute: string; relative: string } {
     if (isAbsolute(scriptRef)) {
       throw new K6ScriptResolutionError(
         `k6 scriptRef must be relative to the scripts dir, got absolute path "${scriptRef}"`,
@@ -155,10 +222,11 @@ export class K6Runner {
         `k6 scriptRef "${scriptRef}" resolves outside scripts dir (${real})`,
       );
     }
-    return real;
+    return { absolute: real, relative: relativePath(this.scriptsDir, real) };
   }
 
   private runChild(
+    bin: string,
     args: ReadonlyArray<string>,
     env: NodeJS.ProcessEnv,
     signal: AbortSignal | undefined,
@@ -171,7 +239,7 @@ export class K6Runner {
     return new Promise((resolveExit, reject) => {
       let child: ChildProcess;
       try {
-        child = this.spawn(this.binary, args, { env, signal });
+        child = this.spawn(bin, args, { env, signal });
       } catch (err) {
         reject(err);
         return;
