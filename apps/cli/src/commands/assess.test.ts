@@ -127,5 +127,69 @@ describe('assessCommand', () => {
     expect(writeErr.mock.calls.flat().join('')).toContain('http or https');
   });
 
+  it('includes runner step detail in JSON output', async () => {
+    const { client } = makeClient({
+      steps: [
+        {
+          stepId: 'load',
+          status: 'completed',
+          duration: 4200,
+          attempts: 1,
+          assertions: [],
+          details: {
+            runner: {
+              type: 'k6',
+              exitCode: 0,
+              targetUrl: 'http://staging.example',
+              metrics: { requests: 50, httpReqDurationP95Ms: 187.5, thresholdsPassed: 1, thresholdsFailed: 0 },
+              artifacts: ['/api/reports/exec-1/artifacts/load/summary.json'],
+            },
+          },
+        },
+      ],
+    });
+    const code = await assessCommand(client, globals, ['scenario-1']);
+    expect(code).toBe(0);
+    const json = JSON.parse(writeOut.mock.calls.flat().join(''));
+    expect(json.results[0].steps).toHaveLength(1);
+    expect(json.results[0].steps[0].runner.metrics.requests).toBe(50);
+    expect(json.results[0].steps[0].runner.artifacts).toEqual([
+      '/api/reports/exec-1/artifacts/load/summary.json',
+    ]);
+  });
+
+  it('exits non-zero and prints failed-step block when a runner step fails', async () => {
+    const tableGlobals: GlobalOptions = { ...globals, format: 'table' };
+    const { client } = makeClient({
+      report: { summary: 'failed', passed: false, score: 0, artifacts: [] },
+      steps: [
+        {
+          stepId: 'load',
+          status: 'failed',
+          duration: 4200,
+          attempts: 1,
+          error: 'k6 thresholds failed: 2 threshold(s) breached',
+          assertions: [],
+          details: {
+            runner: {
+              type: 'k6',
+              exitCode: 0,
+              metrics: { requests: 100, thresholdsPassed: 0, thresholdsFailed: 2 },
+              artifacts: ['/api/reports/exec-1/artifacts/load/summary.json'],
+            },
+          },
+        },
+      ],
+    });
+    const code = await assessCommand(client, tableGlobals, ['scenario-1']);
+    expect(code).toBe(1);
+    const out = writeOut.mock.calls.flat().join('');
+    expect(out).toContain('Failed steps:');
+    expect(out).toContain('scenario-1 / load (k6) — failed');
+    expect(out).toContain('error: k6 thresholds failed');
+    expect(out).toContain('thresholds=0/2');
+    expect(out).toContain('/api/reports/exec-1/artifacts/load/summary.json');
+  });
+
   void writeOut;
 });

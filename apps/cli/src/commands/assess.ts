@@ -1,4 +1,9 @@
-import type { CrucibleClient, ScenarioExecution } from '@atlascrew/crucible-client';
+import type {
+  CrucibleClient,
+  ExecutionStepResult,
+  RunnerSummary,
+  ScenarioExecution,
+} from '@atlascrew/crucible-client';
 import { renderTable, formatDuration } from '../format.js';
 import { readFlag, validateTargetUrlInput } from '../parse.js';
 import type { GlobalOptions } from '../parse.js';
@@ -14,6 +19,15 @@ interface AssessOptions {
   targetUrl?: string;
 }
 
+interface AssessStepDetail {
+  stepId: string;
+  status: string;
+  durationMs?: number;
+  attempts: number;
+  error?: string;
+  runner?: RunnerSummary;
+}
+
 interface AssessScenarioResult {
   scenarioId: string;
   executionId: string;
@@ -26,6 +40,7 @@ interface AssessScenarioResult {
   error?: string;
   stepCount: number;
   failedStepCount: number;
+  steps: AssessStepDetail[];
 }
 
 interface AssessResult {
@@ -180,7 +195,20 @@ function buildResult(execution: ScenarioExecution, failBelow: number): AssessSce
     error: execution.error,
     stepCount: execution.steps.length,
     failedStepCount,
+    steps: execution.steps.map(buildStepDetail),
   };
+}
+
+function buildStepDetail(step: ExecutionStepResult): AssessStepDetail {
+  const detail: AssessStepDetail = {
+    stepId: step.stepId,
+    status: step.status,
+    durationMs: step.duration,
+    attempts: step.attempts,
+  };
+  if (step.error) detail.error = step.error;
+  if (step.details?.runner) detail.runner = step.details.runner;
+  return detail;
 }
 
 function writeAssessTable(result: AssessResult): void {
@@ -197,6 +225,60 @@ function writeAssessTable(result: AssessResult): void {
   process.stdout.write(
     `\nOverall: ${result.passed ? 'PASS' : 'FAIL'} (${result.results.filter((r) => r.meetsThreshold).length}/${result.results.length} met threshold)\n`,
   );
+
+  const stepBlocks = result.results
+    .map((r) => formatScenarioStepBlock(r))
+    .filter((block) => block.length > 0);
+  if (stepBlocks.length > 0) {
+    process.stdout.write('\nFailed steps:\n');
+    process.stdout.write(stepBlocks.join('\n'));
+    process.stdout.write('\n');
+  }
+}
+
+function formatScenarioStepBlock(scenario: AssessScenarioResult): string {
+  // Surface failed steps and any runner step (even when passing) so CI can
+  // see metrics without parsing the JSON output. HTTP-only passing scenarios
+  // still print as a clean one-line summary above.
+  const interesting = scenario.steps.filter((s) => s.status === 'failed' || s.runner);
+  if (interesting.length === 0) return '';
+
+  return interesting
+    .map((step) => {
+      const lines = [
+        `  ${scenario.scenarioId} / ${step.stepId} (${step.runner?.type ?? 'http'}) — ${step.status}`,
+      ];
+      if (step.error) lines.push(`    error: ${step.error}`);
+      if (step.runner) {
+        if (step.runner.exitCode !== undefined) {
+          lines.push(`    exit code: ${step.runner.exitCode}`);
+        }
+        const m = step.runner.metrics;
+        if (m) {
+          const parts: string[] = [];
+          if (m.requests !== undefined) parts.push(`requests=${m.requests}`);
+          if (m.httpReqDurationP95Ms !== undefined) parts.push(`p95=${m.httpReqDurationP95Ms}ms`);
+          if (m.thresholdsPassed !== undefined || m.thresholdsFailed !== undefined) {
+            parts.push(`thresholds=${m.thresholdsPassed ?? 0}/${m.thresholdsFailed ?? 0}`);
+          }
+          if (m.checksPassed !== undefined || m.checksFailed !== undefined) {
+            parts.push(`checks=${m.checksPassed ?? 0}/${m.checksFailed ?? 0}`);
+          }
+          if (parts.length > 0) lines.push(`    metrics: ${parts.join(', ')}`);
+        }
+        if (step.runner.findings) {
+          lines.push(`    findings: ${step.runner.findings.total}`);
+        }
+        if (step.runner.artifacts && step.runner.artifacts.length > 0) {
+          lines.push('    artifacts:');
+          for (const url of step.runner.artifacts) {
+            lines.push(`      ${url}`);
+          }
+        }
+      }
+      return lines.join('\n');
+    })
+    .join('\n');
 }
 
 function renderAssessHelp(): string {

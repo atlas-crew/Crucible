@@ -167,6 +167,8 @@ export interface AssertionResult {
 export interface RunnerSummary {
   type: 'k6' | 'nuclei';
   summary?: string;
+  /** True when the captured summary exceeded the runner's stdout cap. */
+  summaryTruncated?: boolean;
   exitCode?: number;
   targetUrl?: string;
   artifacts?: string[];
