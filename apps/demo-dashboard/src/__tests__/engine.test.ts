@@ -1,4 +1,9 @@
+import { EventEmitter } from 'node:events';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ScenarioEngine } from '../server/engine.js';
+import { K6Runner } from '../server/runners/k6-runner.js';
 
 // ── Mocks ─────────────────────────────────────────────────────────────
 
@@ -3135,26 +3140,25 @@ describe('ScenarioEngine', () => {
       ).rejects.toThrow('Scenario non-existent not found');
     });
 
-    it('rejects runner steps before creating execution state', async () => {
+    it('rejects unsupported runner steps before creating execution state', async () => {
       mockCatalog.getScenario.mockReturnValue({
         id: 'runner-step',
         name: 'Runner Step',
         steps: [
           {
-            id: 'load-check',
-            name: 'Load Check',
-            type: 'k6',
+            id: 'scan-check',
+            name: 'Nuclei Scan',
+            type: 'nuclei',
             stage: 'main',
             runner: {
-              type: 'k6',
-              scriptRef: 'baseline-smoke.js',
+              templateRef: 'cves/2021/cve-2021-44228.yaml',
             },
           },
         ],
       });
 
       await expect(engine.startScenario('runner-step')).rejects.toThrow(
-        'Scenario runner-step contains runner steps that are not executable yet: load-check (k6)',
+        'Scenario runner-step contains runner steps that are not executable yet: scan-check (nuclei)',
       );
 
       expect(engine.listExecutions()).toHaveLength(0);
@@ -3193,6 +3197,189 @@ describe('ScenarioEngine', () => {
 
       // Should only call fetch once (no retries after abort)
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── TASK-65.2: k6 runner step execution ──────────────────────────────
+
+  describe('k6 runner steps', () => {
+    let scriptsDir: string;
+    let mockSpawn: ReturnType<typeof vi.fn>;
+    let k6Engine: ScenarioEngine;
+
+    beforeAll(() => {
+      scriptsDir = mkdtempSync(join(tmpdir(), 'crucible-k6-tests-'));
+      writeFileSync(join(scriptsDir, 'baseline-smoke.js'), '// fake k6 script\n');
+      mkdirSync(join(scriptsDir, 'sub'));
+      writeFileSync(join(scriptsDir, 'sub', 'nested.js'), '// fake nested\n');
+      // Symlink that points outside the scripts dir to test traversal defense.
+      const escapeDir = mkdtempSync(join(tmpdir(), 'crucible-k6-escape-'));
+      writeFileSync(join(escapeDir, 'evil.js'), '// outside\n');
+      symlinkSync(join(escapeDir, 'evil.js'), join(scriptsDir, 'symlink-escape.js'));
+    });
+
+    afterAll(() => {
+      rmSync(scriptsDir, { recursive: true, force: true });
+    });
+
+    beforeEach(() => {
+      mockSpawn = vi.fn();
+      const k6Runner = new K6Runner({ scriptsDir, spawn: mockSpawn as any });
+      k6Engine = new ScenarioEngine(mockCatalog, undefined, undefined, { k6Runner });
+    });
+
+    afterEach(() => {
+      k6Engine.destroy();
+    });
+
+    function fakeChild(exitCode: number | null, signalName: NodeJS.Signals | null = null) {
+      const child = new EventEmitter() as any;
+      process.nextTick(() => child.emit('exit', exitCode, signalName));
+      return child;
+    }
+
+    it('executes a k6 step successfully when k6 exits 0', async () => {
+      mockSpawn.mockImplementation(() => fakeChild(0));
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-success',
+        name: 'k6 Success',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      const executionId = await k6Engine.startScenario('k6-success');
+      await done;
+
+      const execution = k6Engine.getExecution(executionId);
+      expect(execution?.status).toBe('completed');
+      expect(execution?.steps[0].status).toBe('completed');
+      expect(execution?.steps[0].details?.runner).toEqual({
+        type: 'k6',
+        exitCode: 0,
+        targetUrl: 'http://localhost',
+      });
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+      const [bin, args, options] = mockSpawn.mock.calls[0];
+      expect(bin).toBe('k6');
+      expect(args[0]).toBe('run');
+      expect(args[args.length - 1]).toMatch(/baseline-smoke\.js$/);
+      expect((options as any).env.TARGET_URL).toBe('http://localhost');
+    });
+
+    it('marks the step failed when k6 exits non-zero and surfaces the exit code', async () => {
+      mockSpawn.mockImplementation(() => fakeChild(99));
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-thresholds',
+        name: 'k6 Thresholds',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      const executionId = await k6Engine.startScenario('k6-thresholds');
+      await done;
+
+      const execution = k6Engine.getExecution(executionId);
+      // Engine treats execution-level status as 'completed' once all steps
+      // settle; per-step status is the failure signal. Mirrors how HTTP
+      // assertion failures are reported today.
+      expect(execution?.steps[0].status).toBe('failed');
+      expect(execution?.steps[0].error).toBe('k6 exited with code 99');
+      expect(execution?.steps[0].details?.runner?.exitCode).toBe(99);
+    });
+
+    it('rejects path-traversal scriptRef before invoking spawn', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-traversal',
+        name: 'k6 Traversal',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: '../etc/passwd.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      await k6Engine.startScenario('k6-traversal');
+      await done;
+
+      expect(mockSpawn).not.toHaveBeenCalled();
+      const execution = k6Engine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toMatch(/k6 script ".*" not found|resolves outside scripts dir/);
+    });
+
+    it('rejects symlink-based escape from the scripts dir', async () => {
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-symlink',
+        name: 'k6 Symlink',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'symlink-escape.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      await k6Engine.startScenario('k6-symlink');
+      await done;
+
+      expect(mockSpawn).not.toHaveBeenCalled();
+      const execution = k6Engine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('resolves outside scripts dir');
+    });
+
+    it('fails the step when no k6 runner is configured', async () => {
+      // Build a separate engine with k6Runner explicitly null.
+      const noRunnerEngine = new ScenarioEngine(mockCatalog, undefined, undefined, {
+        k6Runner: null,
+      });
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-no-runner',
+        name: 'k6 No Runner',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(noRunnerEngine, 'execution:completed');
+      await noRunnerEngine.startScenario('k6-no-runner');
+      await done;
+
+      const execution = noRunnerEngine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toContain('k6 runner not configured');
+      noRunnerEngine.destroy();
     });
   });
 

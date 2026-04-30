@@ -4,6 +4,8 @@ import { nanoid } from 'nanoid';
 import { CatalogService, ExecutionRepository } from '@crucible/catalog';
 import {
   isScenarioHttpStep,
+  isScenarioK6Step,
+  isScenarioRunnerStep,
   type Expect,
   type Extract,
   type Scenario,
@@ -11,6 +13,7 @@ import {
   type ScenarioStep,
 } from '@crucible/catalog';
 import { ReportService } from './reports.js';
+import { K6Runner } from './runners/k6-runner.js';
 import type {
   ScenarioExecution,
   ExecutionStepResult,
@@ -74,6 +77,7 @@ export interface ScenarioEngineOptions {
   stepBodyRetention?: StepBodyRetentionPolicy;
   stepBodyMaxBytes?: number;
   outboundAllowlist?: string;
+  k6Runner?: K6Runner | null;
 }
 
 interface AssertionContext {
@@ -129,6 +133,7 @@ export class ScenarioEngine extends EventEmitter {
   private stepBodyRetention: StepBodyRetentionPolicy;
   private stepBodyMaxBytes: number;
   private outboundAllowlist: OutboundAllowlist;
+  private k6Runner: K6Runner | null;
 
   constructor(
     catalog: CatalogService,
@@ -160,6 +165,15 @@ export class ScenarioEngine extends EventEmitter {
       options.outboundAllowlist ?? process.env.CRUCIBLE_OUTBOUND_ALLOWLIST,
       this.targetUrl,
     );
+    this.k6Runner = options.k6Runner !== undefined
+      ? options.k6Runner
+      : ScenarioEngine.createDefaultK6Runner();
+  }
+
+  private static createDefaultK6Runner(): K6Runner | null {
+    const scriptsDir = process.env.CRUCIBLE_K6_SCRIPTS_DIR;
+    if (!scriptsDir) return null;
+    return new K6Runner({ scriptsDir });
   }
 
   destroy(): void {
@@ -212,7 +226,7 @@ export class ScenarioEngine extends EventEmitter {
       throw new Error(`Scenario ${scenarioId} not found`);
     }
     const unsupportedStepTypes = scenario.steps
-      .filter((step) => !isScenarioHttpStep(step))
+      .filter((step) => isScenarioRunnerStep(step) && !isScenarioK6Step(step))
       .map((step) => `${step.id} (${step.type})`);
     if (unsupportedStepTypes.length > 0) {
       throw new Error(
@@ -414,9 +428,52 @@ export class ScenarioEngine extends EventEmitter {
 
         void (async () => {
           try {
+            const signal = ctrl?.abortController.signal;
+
+            if (isScenarioK6Step(step)) {
+              try {
+                if (!this.k6Runner) {
+                  throw new Error(
+                    'k6 runner not configured: set CRUCIBLE_K6_SCRIPTS_DIR or pass k6Runner via ScenarioEngineOptions',
+                  );
+                }
+                result.attempts = 1;
+                const summary = await this.k6Runner.execute({
+                  step,
+                  targetUrl: runtime.targetUrl,
+                  signal,
+                });
+                const ok = summary.exitCode === 0;
+                result.status = ok ? 'completed' : 'failed';
+                if (!ok) {
+                  result.error = `k6 exited with code ${summary.exitCode}`;
+                }
+                result.details = { runner: summary };
+                result.result = result.details as any;
+                result.completedAt = Date.now();
+                result.duration = result.completedAt - result.startedAt!;
+                if (ok) passedSteps++;
+                this.repo?.upsertStep(execution.id, result);
+                this.emit('execution:updated', execution);
+                completeStep(step.id);
+              } catch (err) {
+                if (signal?.aborted) {
+                  result.status = 'cancelled';
+                } else {
+                  result.status = 'failed';
+                  result.error = err instanceof Error ? err.message : String(err);
+                }
+                result.completedAt = Date.now();
+                result.duration = result.completedAt - result.startedAt!;
+                this.repo?.upsertStep(execution.id, result);
+                this.emit('execution:updated', execution);
+                completeStep(step.id);
+              }
+              return;
+            }
+
             const assertionContext = this.getAssertionContext(execution);
             const maxAttempts = (step.execution?.retries ?? 0) + 1;
-            const signal = ctrl?.abortController.signal;
             let latestResponse: StepHttpResponse | undefined;
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
