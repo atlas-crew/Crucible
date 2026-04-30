@@ -443,10 +443,13 @@ export class ScenarioEngine extends EventEmitter {
                   targetUrl: runtime.targetUrl,
                   signal,
                 });
-                const ok = summary.exitCode === 0;
+                const thresholdsFailed = summary.metrics?.thresholdsFailed ?? 0;
+                const ok = summary.exitCode === 0 && thresholdsFailed === 0;
                 result.status = ok ? 'completed' : 'failed';
                 if (!ok) {
-                  result.error = `k6 exited with code ${summary.exitCode}`;
+                  result.error = summary.exitCode !== 0
+                    ? `k6 exited with code ${summary.exitCode}`
+                    : `k6 thresholds failed: ${thresholdsFailed} threshold(s) breached`;
                 }
                 result.details = { runner: summary };
                 result.result = result.details as any;

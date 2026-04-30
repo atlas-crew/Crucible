@@ -3232,14 +3232,59 @@ describe('ScenarioEngine', () => {
       k6Engine.destroy();
     });
 
-    function fakeChild(exitCode: number | null, signalName: NodeJS.Signals | null = null) {
+    interface FakeChildOpts {
+      exitCode: number | null;
+      signalName?: NodeJS.Signals | null;
+      stdout?: string;
+      stderr?: string;
+      summaryPath?: string;
+      summary?: object;
+    }
+
+    function fakeChild(opts: FakeChildOpts) {
       const child = new EventEmitter() as any;
-      process.nextTick(() => child.emit('exit', exitCode, signalName));
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      process.nextTick(() => {
+        if (opts.summaryPath && opts.summary !== undefined) {
+          writeFileSync(opts.summaryPath, JSON.stringify(opts.summary));
+        }
+        if (opts.stdout) {
+          child.stdout.emit('data', Buffer.from(opts.stdout, 'utf8'));
+        }
+        if (opts.stderr) {
+          child.stderr.emit('data', Buffer.from(opts.stderr, 'utf8'));
+        }
+        child.emit('exit', opts.exitCode, opts.signalName ?? null);
+      });
       return child;
     }
 
+    function spawnWith(opts: Omit<FakeChildOpts, 'summaryPath'>) {
+      return (_bin: string, args: ReadonlyArray<string>) => {
+        const flag = args.find((a) => a.startsWith('--summary-export='));
+        const summaryPath = flag?.slice('--summary-export='.length);
+        return fakeChild({ ...opts, summaryPath });
+      };
+    }
+
     it('executes a k6 step successfully when k6 exits 0', async () => {
-      mockSpawn.mockImplementation(() => fakeChild(0));
+      mockSpawn.mockImplementation(spawnWith({
+        exitCode: 0,
+        stdout: 'iteration 1/1 ok\n',
+        summary: {
+          metrics: {
+            http_reqs: { values: { count: 50 } },
+            iterations: { values: { count: 50 } },
+            http_req_duration: { values: { 'p(95)': 187.5 } },
+            checks: { values: { passes: 50, fails: 0 } },
+            http_req_failed: {
+              values: { rate: 0 },
+              thresholds: { 'rate<0.01': { ok: true } },
+            },
+          },
+        },
+      }));
       mockCatalog.getScenario.mockReturnValue({
         id: 'k6-success',
         name: 'k6 Success',
@@ -3259,23 +3304,73 @@ describe('ScenarioEngine', () => {
       await done;
 
       const execution = k6Engine.getExecution(executionId);
-      expect(execution?.status).toBe('completed');
       expect(execution?.steps[0].status).toBe('completed');
-      expect(execution?.steps[0].details?.runner).toEqual({
-        type: 'k6',
-        exitCode: 0,
-        targetUrl: 'http://localhost',
+      const runner = execution?.steps[0].details?.runner;
+      expect(runner?.type).toBe('k6');
+      expect(runner?.exitCode).toBe(0);
+      expect(runner?.targetUrl).toBe('http://localhost');
+      expect(runner?.summary).toBe('iteration 1/1 ok\n');
+      expect(runner?.metrics).toEqual({
+        requests: 50,
+        iterations: 50,
+        httpReqDurationP95Ms: 187.5,
+        checksPassed: 50,
+        checksFailed: 0,
+        thresholdsPassed: 1,
+        thresholdsFailed: 0,
       });
       expect(mockSpawn).toHaveBeenCalledTimes(1);
       const [bin, args, options] = mockSpawn.mock.calls[0];
       expect(bin).toBe('k6');
       expect(args[0]).toBe('run');
+      expect(args.some((a: string) => a.startsWith('--summary-export='))).toBe(true);
       expect(args[args.length - 1]).toMatch(/baseline-smoke\.js$/);
       expect((options as any).env.TARGET_URL).toBe('http://localhost');
     });
 
+    it('flips the step to failed when k6 exits 0 but thresholds breached', async () => {
+      mockSpawn.mockImplementation(spawnWith({
+        exitCode: 0,
+        summary: {
+          metrics: {
+            http_reqs: { values: { count: 100 } },
+            http_req_failed: {
+              values: { rate: 0.12 },
+              thresholds: { 'rate<0.01': { ok: false } },
+            },
+            http_req_duration: {
+              values: { 'p(95)': 920 },
+              thresholds: { 'p(95)<500': { ok: false } },
+            },
+          },
+        },
+      }));
+      mockCatalog.getScenario.mockReturnValue({
+        id: 'k6-thresholds-soft',
+        name: 'k6 Thresholds Soft Fail',
+        steps: [
+          {
+            id: 'load',
+            name: 'Load',
+            type: 'k6',
+            stage: 'main',
+            runner: { scriptRef: 'baseline-smoke.js' },
+          },
+        ],
+      });
+
+      const done = waitForEvent(k6Engine, 'execution:completed');
+      await k6Engine.startScenario('k6-thresholds-soft');
+      await done;
+
+      const execution = k6Engine.listExecutions()[0];
+      expect(execution.steps[0].status).toBe('failed');
+      expect(execution.steps[0].error).toBe('k6 thresholds failed: 2 threshold(s) breached');
+      expect(execution.steps[0].details?.runner?.metrics?.thresholdsFailed).toBe(2);
+    });
+
     it('marks the step failed when k6 exits non-zero and surfaces the exit code', async () => {
-      mockSpawn.mockImplementation(() => fakeChild(99));
+      mockSpawn.mockImplementation(spawnWith({ exitCode: 99 }));
       mockCatalog.getScenario.mockReturnValue({
         id: 'k6-thresholds',
         name: 'k6 Thresholds',
