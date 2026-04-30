@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { parseAssessmentLaunchRequest, parseSimulationLaunchRequest } from '../server/backend.js';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  artifactContentType,
+  parseAssessmentLaunchRequest,
+  parseSimulationLaunchRequest,
+  resolveArtifactPath,
+} from '../server/backend.js';
 
 describe('backend launch request parsing', () => {
   it('accepts simulation triggerData overrides under the triggerData envelope', () => {
@@ -167,5 +175,85 @@ describe('backend launch request parsing', () => {
     }
 
     expect(result.error.issues[0]?.message).toContain('http or https');
+  });
+});
+
+describe('resolveArtifactPath', () => {
+  let reportsDir: string;
+  let escapeDir: string;
+  const executionId = 'exec-abc';
+  const stepId = 'load';
+
+  beforeAll(() => {
+    reportsDir = mkdtempSync(join(tmpdir(), 'crucible-artifact-tests-'));
+    mkdirSync(join(reportsDir, executionId, stepId), { recursive: true });
+    writeFileSync(
+      join(reportsDir, executionId, stepId, 'summary.json'),
+      JSON.stringify({ ok: true }),
+    );
+    writeFileSync(join(reportsDir, executionId, stepId, 'stdout.log'), 'ok\n');
+
+    // Symlink that points at a file outside reportsDir to verify the realpath
+    // guard rejects symlink-based escapes.
+    escapeDir = mkdtempSync(join(tmpdir(), 'crucible-artifact-escape-'));
+    writeFileSync(join(escapeDir, 'secret.log'), 'pretend secret\n');
+    symlinkSync(
+      join(escapeDir, 'secret.log'),
+      join(reportsDir, executionId, stepId, 'evil.log'),
+    );
+  });
+
+  afterAll(() => {
+    rmSync(reportsDir, { recursive: true, force: true });
+    rmSync(escapeDir, { recursive: true, force: true });
+  });
+
+  it('resolves a normal artifact under reportsDir', () => {
+    const result = resolveArtifactPath(reportsDir, executionId, stepId, 'summary.json');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.path).toBe(join(reportsDir, executionId, stepId, 'summary.json'));
+    }
+  });
+
+  it('returns 404 when the artifact does not exist', () => {
+    const result = resolveArtifactPath(reportsDir, executionId, stepId, 'missing.log');
+    expect(result).toEqual({ ok: false, status: 404 });
+  });
+
+  it('strips path-traversal segments via basename', () => {
+    // basename of '../../etc/passwd' is 'passwd' — which doesn't exist under
+    // <reports>/<exec>/<step>/, so we end up with a 404 rather than a leak.
+    const result = resolveArtifactPath(reportsDir, executionId, stepId, '../../etc/passwd');
+    expect(result).toEqual({ ok: false, status: 404 });
+  });
+
+  it('rejects symlink-based escapes with 403', () => {
+    const result = resolveArtifactPath(reportsDir, executionId, stepId, 'evil.log');
+    expect(result).toEqual({ ok: false, status: 403 });
+  });
+
+  it('returns 400 when any path segment is empty after basename', () => {
+    expect(resolveArtifactPath(reportsDir, '/', stepId, 'summary.json')).toEqual({
+      ok: false,
+      status: 400,
+    });
+    expect(resolveArtifactPath(reportsDir, executionId, '', 'summary.json')).toEqual({
+      ok: false,
+      status: 400,
+    });
+  });
+});
+
+describe('artifactContentType', () => {
+  it('maps known artifact extensions', () => {
+    expect(artifactContentType('summary.json')).toBe('application/json; charset=utf-8');
+    expect(artifactContentType('stdout.log')).toBe('text/plain; charset=utf-8');
+    expect(artifactContentType('notes.txt')).toBe('text/plain; charset=utf-8');
+  });
+
+  it('falls back to application/octet-stream for unknown or extensionless files', () => {
+    expect(artifactContentType('README')).toBe('application/octet-stream');
+    expect(artifactContentType('weird.xyz')).toBe('application/octet-stream');
   });
 });

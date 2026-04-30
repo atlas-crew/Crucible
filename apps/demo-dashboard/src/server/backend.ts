@@ -1,4 +1,4 @@
-import { existsSync } from 'fs';
+import { existsSync, realpathSync } from 'fs';
 import { IncomingMessage, Server as HttpServer } from 'http';
 import { basename, join } from 'path';
 import cors from 'cors';
@@ -437,6 +437,24 @@ export function attachCrucibleBackend(
     return sendReportFile(req.params.id, 'pdf', res, reportsDir, engine);
   });
 
+  // Artifacts produced by external runners (k6, nuclei) live under
+  // <reportsDir>/<executionId>/<stepId>/<file>. The runner returns URL paths
+  // shaped like this route so consumers can download them without leaking the
+  // filesystem layout.
+  app.get(
+    `${apiBasePath}/reports/:executionId/artifacts/:stepId/:filename`,
+    (req, res) => {
+      return sendArtifactFile(
+        req.params.executionId,
+        req.params.stepId,
+        req.params.filename,
+        res,
+        reportsDir,
+        engine,
+      );
+    },
+  );
+
   return {
     ...runtime,
     apiBasePath,
@@ -462,6 +480,96 @@ function buildWebSocketUrl(req: Request, wsPath: string): string {
   const host = req.get('host') ?? 'localhost';
   const protocol = req.protocol === 'https' ? 'wss' : 'ws';
   return `${protocol}://${host}${wsPath}`;
+}
+
+const ARTIFACT_CONTENT_TYPES: Record<string, string> = {
+  '.json': 'application/json; charset=utf-8',
+  '.log': 'text/plain; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+};
+
+export function artifactContentType(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  if (dot < 0) return 'application/octet-stream';
+  return ARTIFACT_CONTENT_TYPES[filename.slice(dot)] ?? 'application/octet-stream';
+}
+
+export type ResolveArtifactResult =
+  | { ok: true; path: string }
+  | { ok: false; status: 400 | 403 | 404 };
+
+/**
+ * Resolve an artifact filesystem path under reportsDir, rejecting any input
+ * that escapes the root via path separators, traversal, or symlinks. Pure
+ * function so security cases can be exercised without an express harness.
+ */
+export function resolveArtifactPath(
+  reportsDir: string,
+  executionId: string,
+  stepId: string,
+  filename: string,
+): ResolveArtifactResult {
+  // basename strips any path separators an attacker put in the URL params.
+  const safeExecution = basename(executionId);
+  const safeStep = basename(stepId);
+  const safeFile = basename(filename);
+  if (!safeExecution || !safeStep || !safeFile) {
+    return { ok: false, status: 400 };
+  }
+  const candidatePath = join(reportsDir, safeExecution, safeStep, safeFile);
+  if (!existsSync(candidatePath)) {
+    return { ok: false, status: 404 };
+  }
+  // realpath defeats symlink-based escapes that `basename` and a literal
+  // string-prefix check would miss.
+  let resolvedPath: string;
+  let resolvedRoot: string;
+  try {
+    resolvedPath = realpathSync(candidatePath);
+    resolvedRoot = realpathSync(reportsDir);
+  } catch {
+    return { ok: false, status: 404 };
+  }
+  const rootWithSep = resolvedRoot.endsWith('/') ? resolvedRoot : `${resolvedRoot}/`;
+  if (!resolvedPath.startsWith(rootWithSep)) {
+    return { ok: false, status: 403 };
+  }
+  return { ok: true, path: resolvedPath };
+}
+
+function sendArtifactFile(
+  executionId: string,
+  stepId: string,
+  filename: string,
+  res: Response,
+  reportsDir: string,
+  engine: CrucibleRuntime['engine'],
+) {
+  const execution = engine.getExecution(executionId);
+  if (!execution) {
+    return res.status(404).json({ error: 'Execution not found' });
+  }
+  const step = execution.steps.find((s) => s.stepId === stepId);
+  if (!step) {
+    return res.status(404).json({ error: 'Step not found' });
+  }
+
+  const resolution = resolveArtifactPath(reportsDir, executionId, stepId, filename);
+  if (!resolution.ok) {
+    const messageByStatus: Record<400 | 403 | 404, string> = {
+      400: 'Invalid artifact path',
+      403: 'Access denied',
+      404: 'Artifact not found',
+    };
+    return res.status(resolution.status).json({ error: messageByStatus[resolution.status] });
+  }
+
+  res.setHeader('Content-Type', artifactContentType(basename(filename)));
+  return res.sendFile(resolution.path, (err) => {
+    if (err && !res.headersSent) {
+      res.status(500).json({ error: 'Failed to serve artifact' });
+    }
+  });
 }
 
 function sendReportFile(
