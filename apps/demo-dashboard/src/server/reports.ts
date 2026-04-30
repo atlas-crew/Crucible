@@ -852,10 +852,14 @@ function renderRunnerStepBody(runner: NonNullable<NonNullable<AssessmentReportPa
        </div>`
     : '';
 
+  // Header copy follows the runner type's primary signal: k6 reports metrics,
+  // nuclei reports findings. "K6 Metrics" is right; "NUCLEI Metrics" is not.
+  const sectionLabel = runner.type === 'nuclei' ? 'Nuclei Findings' : 'K6 Metrics';
+
   return `
     <div class="step-grid">
       <div>
-        <p class="section-label">${escapeHtml(runner.type.toUpperCase())} Metrics</p>
+        <p class="section-label">${escapeHtml(sectionLabel)}</p>
         ${metricsList}
         ${exitCodeLine}
       </div>

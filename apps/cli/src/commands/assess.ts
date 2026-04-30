@@ -226,21 +226,35 @@ function writeAssessTable(result: AssessResult): void {
     `\nOverall: ${result.passed ? 'PASS' : 'FAIL'} (${result.results.filter((r) => r.meetsThreshold).length}/${result.results.length} met threshold)\n`,
   );
 
-  const stepBlocks = result.results
-    .map((r) => formatScenarioStepBlock(r))
+  const failedBlocks = result.results
+    .map((r) => formatScenarioStepBlock(r, (s) => s.status === 'failed'))
     .filter((block) => block.length > 0);
-  if (stepBlocks.length > 0) {
+  if (failedBlocks.length > 0) {
     process.stdout.write('\nFailed steps:\n');
-    process.stdout.write(stepBlocks.join('\n'));
+    process.stdout.write(failedBlocks.join('\n'));
+    process.stdout.write('\n');
+  }
+
+  // Passing runner steps go in their own block so CI can see metrics without
+  // misreading the "Failed" header. Skipped when there are no runner steps
+  // or when every runner step already showed up under "Failed".
+  const passingRunnerBlocks = result.results
+    .map((r) =>
+      formatScenarioStepBlock(r, (s) => s.runner !== undefined && s.status !== 'failed'),
+    )
+    .filter((block) => block.length > 0);
+  if (passingRunnerBlocks.length > 0) {
+    process.stdout.write('\nRunner steps:\n');
+    process.stdout.write(passingRunnerBlocks.join('\n'));
     process.stdout.write('\n');
   }
 }
 
-function formatScenarioStepBlock(scenario: AssessScenarioResult): string {
-  // Surface failed steps and any runner step (even when passing) so CI can
-  // see metrics without parsing the JSON output. HTTP-only passing scenarios
-  // still print as a clean one-line summary above.
-  const interesting = scenario.steps.filter((s) => s.status === 'failed' || s.runner);
+function formatScenarioStepBlock(
+  scenario: AssessScenarioResult,
+  predicate: (step: AssessStepDetail) => boolean,
+): string {
+  const interesting = scenario.steps.filter(predicate);
   if (interesting.length === 0) return '';
 
   return interesting

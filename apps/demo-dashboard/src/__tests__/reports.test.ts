@@ -359,6 +359,8 @@ describe('ReportService', () => {
     const html = readFileSync(htmlPath, 'utf8');
 
     expect(html).toContain('K6 Metrics');
+    // Section label is k6-specific; nuclei would render 'Nuclei Findings'.
+    expect(html).not.toContain('Nuclei Findings');
     expect(html).toContain('Requests: 50');
     expect(html).toContain('HTTP req duration p95: 187.5ms');
     expect(html).toContain('Checks: 50 passed / 0 failed');

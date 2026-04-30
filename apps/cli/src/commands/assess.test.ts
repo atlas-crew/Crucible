@@ -191,5 +191,34 @@ describe('assessCommand', () => {
     expect(out).toContain('/api/reports/exec-1/artifacts/load/summary.json');
   });
 
+  it('renders passing runner steps under their own block, not under Failed steps', async () => {
+    const tableGlobals: GlobalOptions = { ...globals, format: 'table' };
+    const { client } = makeClient({
+      steps: [
+        {
+          stepId: 'load',
+          status: 'completed',
+          duration: 4200,
+          attempts: 1,
+          assertions: [],
+          details: {
+            runner: {
+              type: 'k6',
+              exitCode: 0,
+              metrics: { requests: 50, thresholdsPassed: 1, thresholdsFailed: 0 },
+              artifacts: ['/api/reports/exec-1/artifacts/load/stdout.log'],
+            },
+          },
+        },
+      ],
+    });
+    const code = await assessCommand(client, tableGlobals, ['scenario-1']);
+    expect(code).toBe(0);
+    const out = writeOut.mock.calls.flat().join('');
+    expect(out).toContain('Runner steps:');
+    expect(out).not.toContain('Failed steps:');
+    expect(out).toContain('scenario-1 / load (k6) — completed');
+  });
+
   void writeOut;
 });

@@ -573,7 +573,11 @@ function sendArtifactFile(
     return res.status(resolution.status).json({ error: messageByStatus[resolution.status] });
   }
 
-  res.setHeader('Content-Type', artifactContentType(basename(filename)));
+  const safeFile = basename(filename);
+  res.setHeader('Content-Type', artifactContentType(safeFile));
+  // Mirror sendReportFile so curl/script consumers get a sensible filename
+  // and browsers download instead of inlining text/plain.
+  res.setHeader('Content-Disposition', `attachment; filename="${safeFile}"`);
   return res.sendFile(resolution.path, (err) => {
     if (err && !res.headersSent) {
       res.status(500).json({ error: 'Failed to serve artifact' });
