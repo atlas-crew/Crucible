@@ -3,10 +3,10 @@ id: TASK-65.2
 title: >-
   Implement k6 runner execution and artifact capture in the shared Crucible
   runtime
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-13 18:02'
-updated_date: '2026-04-30 07:50'
+updated_date: '2026-04-30 08:34'
 labels:
   - feature
   - scenario-engine
@@ -32,10 +32,10 @@ Add the first external runner implementation by teaching the shared runtime and 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 k6 steps execute through the shared runtime using approved script references rather than arbitrary command strings
-- [ ] #2 Runner execution supports target and environment injection, timeout handling, and deterministic exit-state mapping into Crucible step status
-- [ ] #3 k6 output is parsed into a concise summary with threshold or failure information plus captured artifacts suitable for later report download
-- [ ] #4 Security guardrails cover allowed script locations, output limits, and artifact retention behavior
+- [x] #1 k6 steps execute through the shared runtime using approved script references rather than arbitrary command strings
+- [x] #2 Runner execution supports target and environment injection, timeout handling, and deterministic exit-state mapping into Crucible step status
+- [x] #3 k6 output is parsed into a concise summary with threshold or failure information plus captured artifacts suitable for later report download
+- [x] #4 Security guardrails cover allowed script locations, output limits, and artifact retention behavior
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,3 +67,28 @@ Add the first external runner implementation by teaching the shared runtime and 
 - `child_process.spawn` mock pattern doesn't exist in the test suite yet; established in commit 1.
 - k6 `executionMode: 'parallel'` may oversubscribe host CPU; document as v0 limitation.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented k6 runner execution end-to-end across the engine and shared runtime. Curated k6 steps now run in either native or Docker mode through `apps/demo-dashboard/src/server/runners/k6-runner.ts`, with the engine routing dispatch to the runner and persisting artifacts under `reportsDir`.
+
+Landed in five atomic commits:
+1. `feat(engine): execute k6 scenario steps via shared runner module` — runner skeleton with native execution, dependency-injected spawn, path-traversal guards (realpath defeats `..` and symlink escape). Replaced the rejection block in engine.ts with a per-step k6 branch; nuclei still pre-rejects.
+2. `feat(k6-runner): parse summary export into runner metrics` — `--summary-export` parsed into `RunnerSummary.metrics` (requests, iterations, p95, checks, thresholds). Threshold breaches flip step status to failed even when k6 exits 0.
+3. `feat(k6-runner): persist artifacts under reportsDir per execution step` — per-step dir at `<reportsDir>/<executionId>/<stepId>/{summary.json, stdout.log, stderr.log}` with URL-shaped artifact paths (TASK-65.3 owns the download endpoint).
+4. `feat(k6-runner): enforce timeout, abort, and output buffer caps` — 10-min default wall-clock timeout (SIGTERM → 5s grace → SIGKILL), abort signal propagation maps to `cancelled` status, 2 MiB stdout buffer cap with `summaryTruncated` flag, 256 KiB summary file size cap.
+5. `feat(k6-runner): add docker mode and binary probe with per-step override` — startup probe via `spawnSync('k6', ['--version'])` (cached), Docker mode pinned to `grafana/k6:0.50.0` (configurable via `CRUCIBLE_K6_DOCKER_IMAGE`), `--network host` default, volume mounts for scripts (read-only) and artifacts. Per-step `runner.mode` overrides engine default.
+
+**SSRF mitigation (v0):** Curated scripts must read targets via `__ENV.TARGET_URL`, which the runner injects from the engine's per-execution effective target. k6 issues HTTP itself bypassing the engine's outbound allowlist; real network-namespace isolation is a follow-up.
+
+**Test coverage:** 14 new k6 tests in `engine.test.ts` covering happy path, exit-99 failure, threshold-failed soft fail, path traversal (`..`), symlink escape, missing runner, missing reportsDir, missing binary, abort cancellation, timeout, stdout truncation, oversized summary file, docker mode args, custom docker image. All 113 engine tests pass; full demo-dashboard suite (156) and catalog suite (136) green.
+
+**Verification:** `pnpm --filter @crucible/demo-dashboard type-check`, `pnpm --filter @crucible/demo-dashboard test`, `pnpm --filter @crucible/catalog test`, `pnpm -r type-check`.
+
+**Known limitations / follow-ups:**
+- `--network host` in docker mode is permissive; tighter scoping is a future task.
+- Stderr buffer is also capped at 2 MiB silently (no flag); commit 4 only surfaces truncation for stdout. Add a stderr-truncated flag if operators need it.
+- `executionMode: 'parallel'` may oversubscribe host CPU when multiple k6 steps run concurrently; document as v0 limitation.
+- Schema for `RunnerSummary.summaryTruncated` lives in `apps/demo-dashboard/src/shared/types.ts`; client mirrors should pick it up via TASK-65.5 (web-client) and TASK-65.3 (CLI/reports) when those land.
+<!-- SECTION:FINAL_SUMMARY:END -->
