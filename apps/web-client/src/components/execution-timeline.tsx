@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useCatalogStore } from "@/store/useCatalogStore";
-import type { ExecutionStepResult, ExecutionStatus, ScenarioExecution } from "@/store/useCatalogStore";
+import type { ExecutionStepResult, ExecutionStatus, RunnerSummary, ScenarioExecution } from "@/store/useCatalogStore";
 import { getScenarioStepType, isScenarioHttpStep, isScenarioRunnerStep } from "@crucible/catalog/models/types";
 import type { Scenario, ScenarioStep } from "@crucible/catalog/models/types";
 
@@ -211,7 +211,147 @@ function buildDerivedLogs(
 
 // ── Step card ───────────────────────────────────────────────────────
 
-function StepCard({ 
+function RunnerSummaryView({ runner }: { runner: RunnerSummary }) {
+  const exitOk = runner.exitCode === 0;
+  const thresholdsFailed = runner.metrics?.thresholdsFailed ?? 0;
+  const m = runner.metrics;
+  const tiles: Array<{ label: string; value: string; tone?: "danger" | "warn" }> = [];
+  if (m?.requests !== undefined) tiles.push({ label: "Requests", value: String(m.requests) });
+  if (m?.iterations !== undefined) tiles.push({ label: "Iterations", value: String(m.iterations) });
+  if (m?.httpReqDurationP95Ms !== undefined) {
+    tiles.push({ label: "HTTP p95", value: `${m.httpReqDurationP95Ms}ms` });
+  }
+  if (m?.checksPassed !== undefined || m?.checksFailed !== undefined) {
+    const failed = m.checksFailed ?? 0;
+    tiles.push({
+      label: "Checks",
+      value: `${m.checksPassed ?? 0} / ${failed} failed`,
+      tone: failed > 0 ? "danger" : undefined,
+    });
+  }
+  if (m?.thresholdsPassed !== undefined || m?.thresholdsFailed !== undefined) {
+    tiles.push({
+      label: "Thresholds",
+      value: `${m.thresholdsPassed ?? 0} pass / ${thresholdsFailed} fail`,
+      tone: thresholdsFailed > 0 ? "danger" : undefined,
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant="secondary" className="text-[10px] h-4 py-0 uppercase">
+          {runner.type}
+        </Badge>
+        {runner.exitCode !== undefined && (
+          <Badge
+            variant={exitOk ? "secondary" : "destructive"}
+            className="text-[10px] h-4 py-0"
+          >
+            exit {runner.exitCode}
+          </Badge>
+        )}
+        {thresholdsFailed > 0 && (
+          <Badge variant="destructive" className="text-[10px] h-4 py-0">
+            {thresholdsFailed} threshold{thresholdsFailed === 1 ? "" : "s"} breached
+          </Badge>
+        )}
+      </div>
+
+      {tiles.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {tiles.map((tile) => (
+            <div
+              key={tile.label}
+              className={cn(
+                "rounded border bg-muted/30 p-2",
+                tile.tone === "danger" && "border-destructive/30 bg-destructive/5",
+              )}
+            >
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {tile.label}
+              </p>
+              <p className="type-body font-semibold mt-0.5">{tile.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {runner.findings && (
+        <div className="rounded border border-border/50 bg-muted/30 p-2">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+            Findings
+          </p>
+          <p className="type-body font-semibold">
+            {runner.findings.total} total
+          </p>
+          {runner.findings.bySeverity && (
+            <div className="mt-1 flex flex-wrap gap-2">
+              {Object.entries(runner.findings.bySeverity).map(([sev, count]) => (
+                <Badge
+                  key={sev}
+                  variant={
+                    sev === "critical" || sev === "high" ? "destructive" : "outline"
+                  }
+                  className="text-[10px] h-4 py-0"
+                >
+                  {sev}: {count}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {runner.artifacts && runner.artifacts.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+            Artifacts
+          </p>
+          <div className="space-y-1">
+            {runner.artifacts.map((url) => {
+              const filename = url.split("/").pop() ?? url;
+              const presentation = getArtifactPresentation(url);
+              const Icon = presentation.icon;
+              return (
+                <a
+                  key={url}
+                  href={url}
+                  download={filename}
+                  className="flex items-center gap-2 bg-muted/20 px-2 py-1.5 rounded border border-border/30 text-[11px] hover:bg-muted/40 transition-colors"
+                >
+                  <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <span className="font-medium">{filename}</span>
+                  <span className="text-muted-foreground ml-auto">{presentation.label}</span>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {runner.summary && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+              Runner Output
+            </p>
+            {runner.summaryTruncated && (
+              <span className="flex items-center gap-1 text-[10px] text-warning">
+                <AlertCircle className="h-3 w-3" /> Truncated
+              </span>
+            )}
+          </div>
+          <pre className="type-code bg-black/90 text-success/90 p-3 rounded border border-border/50 overflow-x-auto max-h-[300px] text-[11px] leading-relaxed scrollbar-thin">
+            {runner.summary}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StepCard({
   step, 
   index, 
   definition,
@@ -345,9 +485,19 @@ function StepCard({
         {/* Expanded detail */}
         {expanded && (
           <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-            <Tabs defaultValue={hasError ? "error" : "response"} className="w-full">
+            <Tabs
+              defaultValue={
+                hasError
+                  ? "error"
+                  : hasRunnerSummary
+                    ? "runner"
+                    : "response"
+              }
+              className="w-full"
+            >
               <TabsList className="w-full justify-start h-8 bg-muted/50 p-1 mb-2">
                 <TabsTrigger value="request" className="text-[11px] px-3 h-6">Request</TabsTrigger>
+                <TabsTrigger value="runner" className="text-[11px] px-3 h-6" disabled={!hasRunnerSummary}>Runner</TabsTrigger>
                 <TabsTrigger value="response" className="text-[11px] px-3 h-6" disabled={!hasResult}>Response</TabsTrigger>
                 <TabsTrigger value="logs" className="text-[11px] px-3 h-6" disabled={!hasLogs}>
                   {hasCapturedLogs ? "Logs" : "Summary"}
@@ -418,15 +568,13 @@ function StepCard({
                 )}
               </TabsContent>
 
-                <TabsContent value="response" className="mt-0 space-y-4">
+              <TabsContent value="runner" className="mt-0 space-y-4">
                 {step.details?.runner && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Runner Summary</p>
-                    <pre className="type-code bg-muted/30 p-2 rounded border border-border/50 overflow-x-auto text-[11px]">
-                      {JSON.stringify(step.details.runner, null, 2)}
-                    </pre>
-                  </div>
+                  <RunnerSummaryView runner={step.details.runner} />
                 )}
+              </TabsContent>
+
+                <TabsContent value="response" className="mt-0 space-y-4">
                 {step.details?.response && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
