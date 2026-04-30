@@ -487,10 +487,10 @@ function StepCard({
           <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
             <Tabs
               defaultValue={
-                hasError
-                  ? "error"
-                  : hasRunnerSummary
-                    ? "runner"
+                hasRunnerSummary
+                  ? "runner"
+                  : hasError
+                    ? "error"
                     : "response"
               }
               className="w-full"

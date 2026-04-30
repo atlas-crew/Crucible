@@ -26,6 +26,20 @@ vi.mock("@/store/useCatalogStore", () => ({
           },
         ],
       },
+      {
+        id: "scenario-load",
+        name: "Load Scenario",
+        description: "Curated k6 load run",
+        steps: [
+          {
+            id: "load",
+            name: "Baseline load",
+            type: "k6",
+            stage: "main",
+            runner: { scriptRef: "baseline-smoke.js" },
+          },
+        ],
+      },
     ],
     fetchScenarios,
   }),
@@ -137,5 +151,168 @@ describe("ExecutionTimeline", () => {
     await user.click(expandButton);
 
     expect(screen.getByRole("tab", { name: /summary/i })).toBeEnabled();
+  });
+
+  it("renders runner metric tiles, threshold badge, and artifact links for k6 steps", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ExecutionTimeline
+        execution={{
+          id: "exec-runner-1",
+          scenarioId: "scenario-load",
+          mode: "assessment",
+          status: "completed",
+          targetUrl: "http://target.local",
+          duration: 4200,
+          steps: [
+            {
+              stepId: "load",
+              status: "failed",
+              attempts: 1,
+              duration: 4200,
+              error: "k6 thresholds failed: 2 threshold(s) breached",
+              assertions: [],
+              details: {
+                runner: {
+                  type: "k6",
+                  exitCode: 0,
+                  targetUrl: "http://target.local",
+                  metrics: {
+                    requests: 100,
+                    httpReqDurationP95Ms: 920,
+                    checksPassed: 60,
+                    checksFailed: 40,
+                    thresholdsPassed: 0,
+                    thresholdsFailed: 2,
+                  },
+                  artifacts: [
+                    "/api/reports/exec-runner-1/artifacts/load/summary.json",
+                    "/api/reports/exec-runner-1/artifacts/load/stdout.log",
+                  ],
+                  summary: "iteration 1/1 ok\nstats: requests=100",
+                },
+              },
+            },
+          ],
+          report: {
+            summary: "1 step ran. 0 passed.",
+            passed: false,
+            score: 0,
+            artifacts: [],
+          },
+        }}
+      />,
+    );
+
+    const expandButton = screen.getAllByRole("button")[1];
+    await user.click(expandButton);
+
+    // Runner tab is enabled and selected by default for runner steps.
+    const runnerTab = screen.getByRole("tab", { name: /^runner$/i });
+    expect(runnerTab).toBeEnabled();
+    expect(runnerTab).toHaveAttribute("data-state", "active");
+
+    // Metric tiles populate from RunnerSummary.metrics.
+    expect(screen.getByText("Requests")).toBeInTheDocument();
+    expect(screen.getByText("100")).toBeInTheDocument();
+    expect(screen.getByText("HTTP p95")).toBeInTheDocument();
+    expect(screen.getByText("920ms")).toBeInTheDocument();
+    expect(screen.getByText("60 / 40 failed")).toBeInTheDocument();
+    expect(screen.getByText("0 pass / 2 fail")).toBeInTheDocument();
+
+    // Threshold-failed banner appears in the badge row.
+    expect(screen.getByText(/2 thresholds breached/i)).toBeInTheDocument();
+    expect(screen.getByText(/^exit 0$/i)).toBeInTheDocument();
+
+    // Artifact links carry the runner's URL paths and are downloadable.
+    const summaryLink = screen.getByRole("link", { name: /summary\.json/ });
+    expect(summaryLink).toHaveAttribute(
+      "href",
+      "/api/reports/exec-runner-1/artifacts/load/summary.json",
+    );
+    expect(summaryLink).toHaveAttribute("download", "summary.json");
+    const stdoutLink = screen.getByRole("link", { name: /stdout\.log/ });
+    expect(stdoutLink).toHaveAttribute(
+      "href",
+      "/api/reports/exec-runner-1/artifacts/load/stdout.log",
+    );
+
+    // Runner output is rendered in a pre block.
+    expect(screen.getByText(/iteration 1\/1 ok/)).toBeInTheDocument();
+  });
+
+  it("flags truncated runner output", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ExecutionTimeline
+        execution={{
+          id: "exec-runner-trunc",
+          scenarioId: "scenario-load",
+          mode: "assessment",
+          status: "completed",
+          targetUrl: "http://target.local",
+          steps: [
+            {
+              stepId: "load",
+              status: "completed",
+              attempts: 1,
+              duration: 1000,
+              assertions: [],
+              details: {
+                runner: {
+                  type: "k6",
+                  exitCode: 0,
+                  summary: "partial output...",
+                  summaryTruncated: true,
+                  artifacts: [
+                    "/api/reports/exec-runner-trunc/artifacts/load/stdout.log",
+                  ],
+                },
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    const expandButton = screen.getAllByRole("button")[1];
+    await user.click(expandButton);
+
+    expect(screen.getByText(/^Truncated$/)).toBeInTheDocument();
+  });
+
+  it("disables the runner tab on HTTP-only steps", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ExecutionTimeline
+        execution={{
+          id: "exec-http-only",
+          scenarioId: "scenario-auth",
+          mode: "assessment",
+          status: "completed",
+          targetUrl: "http://target.local",
+          steps: [
+            {
+              stepId: "step-1",
+              status: "completed",
+              attempts: 1,
+              duration: 250,
+              assertions: [],
+              details: {
+                response: { status: 200, headers: {}, body: "ok" },
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    const expandButton = screen.getAllByRole("button")[1];
+    await user.click(expandButton);
+
+    expect(screen.getByRole("tab", { name: /^runner$/i })).toBeDisabled();
   });
 });
